@@ -50,9 +50,10 @@ ffmpeg_refactoring_plan.md
 .dolt/
 .beads-credential-key
 
-# IDE / editor
+# IDE / editor / AI tooling
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 *~

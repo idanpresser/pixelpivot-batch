@@ -46,8 +46,8 @@ tests/                Pytest suites (hardening + integration)
 tools/                CLI helpers (heuristic table generator, stress harness)
 ```
 
-See [`CLAUDE.md`](CLAUDE.md) for the canonical architecture notes — every
-design constraint there is load-bearing.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the canonical
+architecture notes — every design constraint there is load-bearing.
 
 ---
 

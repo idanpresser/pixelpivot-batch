@@ -59,8 +59,8 @@ don't ship blurry thumbnails or oversized hero images.
 └─────────────────────────┘
 ```
 
-Full design notes live in [`CLAUDE.md`](CLAUDE.md). Every constraint there
-is load-bearing — read it before refactoring.
+Full design notes live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Every constraint there is load-bearing — read it before refactoring.
 
 ---
 
