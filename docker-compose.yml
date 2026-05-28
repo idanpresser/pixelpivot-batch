@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # Headless FastAPI Engine
+  pixelpivot-batch-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pixelpivot_batch_api
+    command: ["uvicorn", "app.batch_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - /app/node_modules        # preserve image contents over the host mount
+      - sqlitedata:/data         # SQLite file lives on a Docker volume, NOT /mnt
+                                 # (WSL2 mounts under /mnt are slow for fsync-heavy workloads)
+      - ./test_examples:/app/test_examples
+      - ./out:/app/out
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    environment:
+      - IS_DOCKER=true
+      - PIXELPIVOT_DB_PATH=/data/pixelpivot.db
+
+  # Standalone Batch GUI
+  pixelpivot-batch-gui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pixelpivot_batch_gui
+    command: ["python", "-m", "streamlit", "run", "app/web/batch_gui/main.py", "--server.port=8503"]
+    ports:
+      - "8503:8503"
+    environment:
+      - BATCH_API_URL=http://pixelpivot-batch-api:8000/api/v1
+    depends_on:
+      pixelpivot-batch-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8503/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # CLI Access / Test Runner — shares the SQLite volume so it can inspect the DB
+  pixelpivot-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pixelpivot_cli
+    command: ["tail", "-f", "/dev/null"]   # keep alive
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - sqlitedata:/data
+    environment:
+      - IS_DOCKER=true
+      - PIXELPIVOT_DB_PATH=/data/pixelpivot.db
+    depends_on:
+      - pixelpivot-batch-api
+
+volumes:
+  sqlitedata:

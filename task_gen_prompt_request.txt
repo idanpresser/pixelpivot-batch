@@ -1,0 +1,50 @@
+as a master prompt engineer, write a prompt that takes this plan and converts it to test driven development tasks.
+To protect the codebase, we will copy all existing code to a new folder 'pixelpivot_batch' combined with **Atomic Commits**.
+1. **The Epic Branch:** For each feature, The LLM will be instructed to create a master feature branch branched off `main`.
+2. **Phase/Task Sub-branches:** For each task, a sub-branch is created (e.g., `task/INIT1-001-CopyFilesFromMainApp`).
+3. **Atomic Commits:** The LLM must be instructed to commit the code *only* when the task's specific acceptance criteria are met, using conventional commit messages.
+
+### RULES OF ENGAGEMENT
+
+1. **Granularity:** Each task must be achievable in 1 to 4 hours by a single Python developer. Break down larger phases into multiple tasks.
+2. **Encapsulation & Safety:** The core modules must NEVER import GUI components. Ensure changes maintain hygiene of the project.
+3. **Testability & Stubbing:** Because core DTO changes will break the GUI, tasks MUST include instructions to temporarily stub or adapt downstream interfaces (e.g., returning a dummy 3D array for the GUI while the core uses the 2D array) so the `pytest` suite does not fatally crash during the transition.
+4. **Strict Git Workflow:** Every task must specify exact Git commands for branching from an epic branch, committing atomically, and merging.
+
+dependencies so the test suite can still run without throwing fatal errors.each task must contain:
+# TASK: [Task Title]
+**ID:** [Task File Name]
+**Phase:** [Phase Number & Name]
+**Estimated Effort:** [1-4 Hours]
+**Dependencies:** [List of Task IDs that must be completed first, or "None"]
+**Target files:** [List of files to be created or modified, with line numbers/classes when relevant]
+
+## 1. Objective
+[1-2 sentences explaining exactly what this task accomplishes and why it fits into the Scientific Upgrade architecture.]
+
+## 2. Git Workflow & Branching
+- **Epic Branch:** `feature/scientific-upgrade` (Ensure you are on this branch before branching further).
+- **Task Branch:** `git checkout -b task/[Task-ID]`
+- **Commit Message:**
+
+
+## 3. Acceptance Criteria
+- [ ] [Binary condition that must be true to close the task]
+- [ ] [Binary condition...]
+- [ ] [Binary condition...]
+
+## 4. Implementation Steps
+1. **[Step Name]:** [Detailed instruction, referencing specific interfaces, design patterns, libraries like `scipy.interpolate.RBFInterpolator` or `numba`].
+2. **[Step Name]:** [Include code snippets provided in the upgrade plan where applicable].
+
+## 5. Testing & Validation
+- **Static Analysis:**
+- **Type Checking:**
+- **Unit Testing:**
+- **Git Merge:**
+
+## RULES OF ENGAGEMENT
+
+- **Write tests first**, only then run code (RED -> GREEN).
+- **Each test will doubt the validity of pre existing code**, and write tests for it as well.
+- **Each test batch should grow in complexity**, test every part of the pipeline and be geared towards pinpointing problems.

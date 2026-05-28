@@ -1,0 +1,67 @@
+"""FastAPI application entry point for PixelPivot Batch Engine.
+
+Initializes the FastAPI app with startup/shutdown lifespan handlers,
+mounts REST API routes, and manages the BatchOrchestrator and HotFolderManager.
+"""
+import asyncio
+import sys
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from .routes import router
+from .hot_folder import init_hot_folder_manager, get_hot_folder_manager
+from .orchestrator import BatchOrchestrator
+from ..core.db.schema import init_db
+from ..core.config import MIN_PYTHON_VERSION
+from ..core.logger import get_logger
+
+log = get_logger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage FastAPI app lifecycle: startup initialization and shutdown cleanup."""
+    if sys.version_info < MIN_PYTHON_VERSION:
+        msg = (
+            f"PixelPivot requires Python >= {MIN_PYTHON_VERSION[0]}."
+            f"{MIN_PYTHON_VERSION[1]}; got {sys.version_info.major}."
+            f"{sys.version_info.minor}.{sys.version_info.micro}"
+        )
+        log.error(msg)
+        raise RuntimeError(msg)
+
+    # Schema bootstrap — idempotent. SQLite file is created on first connect.
+    try:
+        init_db()
+    except Exception as e:
+        log.error("init_db failed on startup: %s", e)
+        raise
+
+    # Reap orphaned 'running' batches left by a prior crash/restart so they do
+    # not linger forever in /batch/status. Best-effort: never block startup.
+    try:
+        from ..core.db.connection import get_connection
+        from ..core.db.repositories.batch import BatchRepository
+        with get_connection() as conn:
+            reaped = BatchRepository().reap_stale_running(conn)
+        if reaped:
+            log.warning("Reaped %d orphaned 'running' batch(es) on startup.", reaped)
+    except Exception as e:
+        log.error("Startup reaper failed: %s", e)
+
+    loop = asyncio.get_running_loop()
+    app.state.orchestrator = BatchOrchestrator()
+    manager = init_hot_folder_manager(app.state.orchestrator, loop)
+    manager.start()
+    app.state.hot_folder_manager = manager
+    try:
+        yield
+    finally:
+        manager.stop()
+
+app = FastAPI(title="PixelPivot Batch Engine", lifespan=lifespan)
+
+app.include_router(router, prefix="/api/v1")
+
+@app.get("/")
+async def root():
+    """Return health check response."""
+    return {"message": "PixelPivot Batch Engine API is running"}

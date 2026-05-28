@@ -1,0 +1,14 @@
+{
+  "name": "pixelpivot-sharp-daemon",
+  "version": "1.0.0",
+  "description": "Sharp daemon for PixelPivot Batch Engine",
+  "main": "app/scripts/sharp_daemon.js",
+  "scripts": {
+    "start": "node app/scripts/sharp_daemon.js",
+    "dev": "concurrently --kill-others \"npm start\" \"python -m uvicorn app.batch_api.main:app --host 0.0.0.0 --port 8000\" \"python -m streamlit run app/web/batch_gui/main.py --server.port 8503\""
+  },
+  "dependencies": {
+    "sharp": "^0.33.5",
+    "concurrently": "^8.2.2"
+  }
+}

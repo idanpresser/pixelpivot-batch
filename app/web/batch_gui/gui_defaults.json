@@ -1,0 +1,7 @@
+{
+    "source_dir": "test_examples",
+    "target_dir": "test_examples/converted",
+    "target_format": ["avif"],
+    "tool": ["magick", "ffmpeg", "vips", "sharp", "ffmpeg_nvenc"],
+    "category": ["general", "highRes", "web", "uiSharp", "lowContrst", "edgeCase"]
+}

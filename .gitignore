@@ -1,14 +1,59 @@
+# Python
 .venv/
 __pycache__/
-node_modules/
-out/
-*.db
-*.log
+*.py[cod]
+*.egg-info/
 .pytest_cache/
+build/
+dist/
+
+# Node
+node_modules/
+
+# Databases & logs
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.log
+*.log.*
+
+# Application output
+out/
+converted_images/
+
+# Vendored binaries & runtime (air-gap bundle — distributed separately)
+bin/
+vendor/
+python-3.14.5-embed-amd64/
+python-3.14.5-embed-amd64.zip
+
+# Test/sample image fixtures (large, local-only)
+image_samples/
+test_examples/
+
+# Scratch / throwaway scripts
+scratch/
+
+# Claude Code session memory (already self-ignored, listed for clarity)
+.remember/
+
+# Legacy planning/brainstorm artifacts
 ffmpeg_multi_image_brainstorm.html
 ffmpeg_refactoring_plan.md
-python-3.14.5-embed-amd64/
 
-# Beads / Dolt files (added by bd init)
+# Beads / Dolt local state (also handled by .beads/.gitignore)
 .dolt/
 .beads-credential-key
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store

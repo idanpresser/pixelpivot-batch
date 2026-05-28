@@ -1,0 +1,141 @@
+/* ── Design Tokens ───────────────────────────────────────────── */
+html, :root {
+    --void-black:    #030304 !important;
+    --dark-matter:   #0F1115 !important;
+    --pure-light:    #FFFFFF !important;
+    --stardust:      #94A3B8 !important;
+    --dim-border:    #1E293B !important;
+    --obsidian-clipper-text-muted: #94A3B8 !important;
+
+    --btc-orange:    #F7931A;
+    --burnt-orange:  #EA580C;
+    --digital-gold:  #FFD600;
+
+    --gradient-primary:  linear-gradient(to right, #EA580C, #F7931A);
+    --gradient-gold:     linear-gradient(to right, #F7931A, #FFD600);
+    --gradient-card:     linear-gradient(180deg, rgba(15, 17, 21, 0.95) 0%, rgba(3, 3, 4, 0.98) 100%);
+
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-pill: 9999px;
+
+    --shadow-orange:   0 0 20px -5px rgba(234, 88, 12, 0.5);
+    --shadow-gold:     0 0 20px rgba(255, 214, 0, 0.3);
+    --shadow-card:     0 0 50px -10px rgba(247, 147, 26, 0.1);
+
+    /* Semantic Aliases */
+    --theme-bg: var(--void-black);
+    --theme-surface: var(--dark-matter);
+    --theme-text: var(--pure-light);
+    --theme-muted: var(--stardust);
+    --theme-accent: var(--btc-orange);
+    --theme-accent-2: var(--burnt-orange);
+    --theme-border: var(--dim-border);
+
+    /* Streamlit Internal Overrides */
+    --st-background-color:            var(--void-black);
+    --st-secondary-background-color:  var(--dark-matter);
+    --st-text-color:                  var(--pure-light);
+    --st-primary-color:               var(--btc-orange);
+    --st-border-color:                var(--dim-border);
+}
+
+/* ── Global Background & Typography ─────────────────────────── */
+[data-testid="stAppViewContainer"], [data-testid="stHeader"], .stApp {
+    background-color: var(--void-black) !important;
+}
+
+.stApp, .main .block-container {
+    background-color: var(--void-black) !important;
+    background-image:
+        radial-gradient(ellipse at 20% 30%, rgba(247, 147, 26, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(234, 88, 12, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(255, 214, 0, 0.03) 0%, transparent 70%) !important;
+    font-family: 'Inter', sans-serif;
+    color: var(--pure-light) !important;
+}
+
+/* ── Headers ─────────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 700 !important;
+    color: var(--pure-light);
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+section[data-testid="stSidebar"] {
+    background-color: var(--dark-matter) !important;
+    border-right: 1px solid rgba(247, 147, 26, 0.15) !important;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────── */
+.stTabs [data-testid="stTab"] {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: var(--space-sm) var(--space-lg);
+    border-radius: var(--radius-md);
+    color: var(--stardust);
+    transition: all 0.2s ease;
+}
+.stTabs [data-testid="stTab"][aria-selected="true"] {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+    border: none;
+    box-shadow: var(--shadow-orange);
+}
+.stTabs [data-testid="stTabList"] {
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    background: var(--dark-matter);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.stButton button {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-pill) !important;
+    border: 1px solid rgba(247, 147, 26, 0.3) !important;
+    background: rgba(247, 147, 26, 0.1) !important;
+    color: var(--btc-orange) !important;
+    transition: all 0.3s ease !important;
+}
+.stButton button:hover {
+    box-shadow: var(--shadow-orange) !important;
+    transform: translateY(-2px) !important;
+    border-color: var(--btc-orange) !important;
+}
+
+/* ── Status Pulse ───────────────────────────────────────────── */
+@keyframes pulse-orange {
+    0%, 100% { box-shadow: 0 0 20px -5px rgba(247, 147, 26, 0.5); }
+    50% { box-shadow: 0 0 35px -5px rgba(247, 147, 26, 0.8); }
+}
+.status-processing {
+    color: var(--btc-orange);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+    animation: pulse-orange 2s infinite;
+}
+
+/* ── Cards ─────────────────────────────────────────────────── */
+.result-card {
+    background: var(--gradient-card);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin: 1rem 0;
+    transition: all 0.3s ease;
+}
+.result-card:hover {
+    border-color: rgba(247, 147, 26, 0.4);
+    box-shadow: var(--shadow-orange);
+}

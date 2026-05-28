@@ -1,0 +1,13 @@
+<Configuration>
+  <Networking>Disable</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>.</HostFolder>
+      <SandboxFolder>C:\PixelPivot</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -ExecutionPolicy Bypass -File C:\PixelPivot\scripts\sandbox_init.ps1</Command>
+  </LogonCommand>
+</Configuration>

@@ -1,0 +1,29 @@
+# Canonical air-gap dependency list for PixelPivot Batch.
+#
+# Consumed by:
+#   - scripts/download_wheels.ps1 (host-side: pre-fetch wheels into vendor/wheels)
+#   - scripts/sandbox_init.ps1    (sandbox-side: install from vendor/wheels)
+#
+# Format: one package spec per line. Lines starting with # are comments.
+# Edit here, not in either PowerShell script.
+
+# --- Build-time tooling (must install first / be available during builds) ---
+setuptools
+wheel
+pip
+cffi
+pkgconfig
+
+# --- Application dependencies (mirror pyproject.toml) ---
+fastapi
+uvicorn[standard]
+httpx
+pydantic
+watchdog
+streamlit
+Pillow
+pillow-heif
+pyvips
+pandas
+psutil
+nvidia-ml-py
