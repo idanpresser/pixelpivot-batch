@@ -60,7 +60,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/idanpresser/pixelpivot_batch"
-Repository = "https://github.com/idanpresser/pixelpivot_batch"
-Issues = "https://github.com/idanpresser/pixelpivot_batch/issues"
-Changelog = "https://github.com/idanpresser/pixelpivot_batch/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/idanpresser/pixelpivot-batch"
+Repository = "https://github.com/idanpresser/pixelpivot-batch.git"
+Issues = "https://github.com/idanpresser/pixelpivot-batch/issues"
+Changelog = "https://github.com/idanpresser/pixelpivot-batch/blob/main/CHANGELOG.md"

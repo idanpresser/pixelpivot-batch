@@ -79,8 +79,8 @@ is load-bearing — read it before refactoring.
 ### From source
 
 ```bash
-git clone https://github.com/<your-org>/pixelpivot_batch.git
-cd pixelpivot_batch
+git clone https://github.com/idanpresser/pixelpivot-batch.git
+cd pixelpivot-batch
 python -m venv .venv
 .venv\Scripts\Activate.ps1     # PowerShell
 # source .venv/bin/activate    # bash / zsh
