@@ -22,6 +22,10 @@ node_modules/
 out/
 converted_images/
 
+# Test setup artifact (test_integration_real_assets.py writes this at runtime;
+# canonical heuristic table lives at app/core/heuristic_table.json)
+app/heuristic_table.json
+
 # Vendored binaries & runtime (air-gap bundle — distributed separately)
 bin/
 vendor/
