@@ -11,8 +11,8 @@ By participating, you agree to abide by the project's [Code of Conduct](CODE_OF_
 ## Quick start
 
 ```bash
-# 1. Fork on GitHub, then clone your fork
-git clone https://github.com/<your-user>/pixelpivot-batch.git
+# 1. Clone the repo (external contributors: fork first, then clone your fork)
+git clone https://github.com/idanpresser/pixelpivot-batch.git
 cd pixelpivot-batch
 
 # 2. Create a Python 3.14+ virtualenv and install dev extras
