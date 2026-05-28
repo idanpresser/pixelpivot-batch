@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "pixelpivot_batch",
+  "project_id": "ec9f2f0f-b1d9-4755-ab53-0db1fb4277eb"
+}

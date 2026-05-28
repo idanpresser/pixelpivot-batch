@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+node_modules/
+out/
+*.db
+*.log
+.pytest_cache/
+ffmpeg_multi_image_brainstorm.html
+ffmpeg_refactoring_plan.md
+python-3.14.5-embed-amd64/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key
