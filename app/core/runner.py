@@ -114,7 +114,6 @@ class Runner:
         output_path: str,
         target_format: str,
         quality: Union[int, float],
-        use_gpu: bool = False,
         is_intermediate: bool = True
     ) -> Dict[str, Any]:
         """Delegate a conversion to the specified tool adapter.
@@ -125,7 +124,6 @@ class Runner:
             output_path: Path for output image.
             target_format: Target format (e.g. "webp", "avif", "jxl").
             quality: Tool-native quality scalar.
-            use_gpu: Whether to use GPU if available.
             is_intermediate: Whether this is a temporary intermediate file.
 
         Returns:
@@ -138,13 +136,12 @@ class Runner:
             return {"success": False, "error": error_msg}
 
         log.debug(
-            f"Delegating conversion to {tool_name}: {input_path} -> {output_path} (format={target_format}, quality={quality}, gpu={use_gpu})"
+            f"Delegating conversion to {tool_name}: {input_path} -> {output_path} (format={target_format}, quality={quality})"
         )
         return converter.convert(
-            input_path, 
-            output_path, 
-            target_format, 
-            quality, 
-            use_gpu=use_gpu, 
-            is_intermediate=is_intermediate
+            input_path,
+            output_path,
+            target_format,
+            quality,
+            is_intermediate=is_intermediate,
         )

@@ -102,7 +102,6 @@ class MagickConverter(BaseConverter):
         output_path: str,
         target_format: str,
         quality: Union[int, float],
-        use_gpu: bool = False,
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -116,7 +115,6 @@ class MagickConverter(BaseConverter):
             output_path: Path where output should be written.
             target_format: Output format ('webp', 'avif', or 'jxl').
             quality: Quality value 0-100 (higher is better).
-            use_gpu: Unused (ImageMagick GPU acceleration not configured).
             is_intermediate: Unused.
             run_id: Optional batch run ID for telemetry.
 

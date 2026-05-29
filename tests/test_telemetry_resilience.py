@@ -5,48 +5,6 @@ import threading
 from unittest.mock import MagicMock, patch
 
 from app.core.telemetry import TelemetryMonitor
-import app.core.telemetry as telemetry_module
-
-def test_gpu_transient_isolation():
-    """Verify that transient GPU failures are isolated per-instance and don't mutate global HAS_GPU."""
-    # Reset global state to True for testing
-    with patch.object(telemetry_module, "HAS_GPU", True), \
-         patch("app.core.telemetry.nvmlInit") as mock_init, \
-         patch("app.core.telemetry.nvmlDeviceGetHandleByIndex") as mock_get_handle, \
-         patch("app.core.telemetry.nvmlDeviceGetUtilizationRates") as mock_get_util, \
-         patch("app.core.telemetry.nvmlDeviceGetMemoryInfo") as mock_get_mem:
-        
-        # Setup mock behavior so it doesn't fail with TypeError on None calls
-        mock_get_handle.return_value = "mock_handle"
-        mock_get_util.return_value = MagicMock(gpu=10.0)
-        mock_get_mem.return_value = MagicMock(used=1024 * 1024 * 100)
-
-        monitor1 = TelemetryMonitor(run_id=123)
-        assert monitor1.gpu_available is True
-        assert monitor1._gpu_consecutive_fails == 0
-
-        # Mock nvml to fail
-        mock_get_handle.side_effect = RuntimeError("Transient GPU Error")
-        
-        # Trigger 4 failures — should not disable gpu_available
-        for _ in range(4):
-            monitor1._sample()
-        assert monitor1.gpu_available is True
-        assert monitor1._gpu_consecutive_fails == 4
-
-        # Trigger 5th failure — should disable gpu_available for this monitor
-        monitor1._sample()
-        assert monitor1.gpu_available is False
-        assert monitor1._gpu_consecutive_fails == 5
-
-        # Restore success side effect
-        mock_get_handle.side_effect = None
-
-        # Verify that a brand new monitor instance still has GPU enabled initially
-        # because the global HAS_GPU was never mutated!
-        monitor2 = TelemetryMonitor(run_id=124)
-        assert monitor2.gpu_available is True
-        assert telemetry_module.HAS_GPU is True
 
 
 def test_telemetry_connection_recovery():
@@ -126,7 +84,7 @@ def test_telemetry_buffer_limit_safeguard():
             # The flusher thread will process items from the queue.
             # Let's enqueue 1100 items (exceeds the 1000 limit)
             for i in range(1100):
-                monitor._queue.put((999, "2026-05-20 12:00:00", 5.0, 50.0, 0.0, 0.0))
+                monitor._queue.put((999, "2026-05-20 12:00:00", 5.0, 50.0))
                 
             # Send stop sentinel to join flusher
             monitor._queue.put(None)

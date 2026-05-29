@@ -75,7 +75,6 @@ class FFmpegConverter(BaseConverter):
         output_path: str,
         target_format: str,
         quality: Union[int, float],
-        use_gpu: bool = False,
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -86,7 +85,6 @@ class FFmpegConverter(BaseConverter):
             output_path: Path where output should be written.
             target_format: Output format ('webp', 'avif', or 'jxl').
             quality: Format-native quality (0-100 for webp/avif/jxl).
-            use_gpu: Enable CUDA hardware acceleration if available.
             is_intermediate: Hint to use faster encoder settings (AVIF only; sets cpu-used=6).
             run_id: Optional batch run ID for telemetry.
 
@@ -109,7 +107,7 @@ class FFmpegConverter(BaseConverter):
             except (ValueError, IndexError):
                 params.extend(["-cpu-used", "6"])
 
-        args = self._build_args(input_path, output_path, params, use_gpu)
+        args = self._build_args(input_path, output_path, params)
         return self._run_ffmpeg(args, params, quality, target_format, output_path, run_id=run_id)
 
     def _build_args(
@@ -117,7 +115,6 @@ class FFmpegConverter(BaseConverter):
         input_path: str,
         output_path: str,
         encoder_params: List[str],
-        use_gpu: bool,
     ) -> List[str]:
         """Build the ffmpeg command-line arguments for a single image conversion.
 
@@ -125,15 +122,13 @@ class FFmpegConverter(BaseConverter):
             input_path: Input file path.
             output_path: Output file path.
             encoder_params: Encoder-specific parameters (e.g., codec, quality flags).
-            use_gpu: Enable CUDA hwaccel if True.
 
         Returns:
             Complete argv list (without ffmpeg binary name).
         """
         global_opts = ["-y", "-hide_banner", "-nostats", "-progress", "pipe:1"]
-        hwaccel = ["-hwaccel", "cuda"] if use_gpu else []
         padding = ["-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2"]
-        return global_opts + hwaccel + ["-i", input_path] + padding + encoder_params + [output_path]
+        return global_opts + ["-i", input_path] + padding + encoder_params + [output_path]
 
     def _run_ffmpeg(
         self,

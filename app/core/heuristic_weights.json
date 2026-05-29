@@ -51,13 +51,6 @@
       "mp_min": 0.0003,
       "mp_max": 2.0736
     },
-    "edgeCase|avif|ffmpeg_nvenc": {
-      "a": 53.889,
-      "b": 14.725,
-      "n": 6,
-      "mp_min": 0.0655,
-      "mp_max": 2.0736
-    },
     "edgeCase|avif|sharp": {
       "a": 10.1652,
       "b": -0.2063,
@@ -142,13 +135,6 @@
       "mp_min": 8.2944,
       "mp_max": 8.2944
     },
-    "highRes|avif|ffmpeg_nvenc": {
-      "a": 41.74,
-      "b": 0.0,
-      "n": 100,
-      "mp_min": 8.2944,
-      "mp_max": 8.2944
-    },
     "highRes|avif|sharp": {
       "a": 38.01,
       "b": 0.0,
@@ -228,13 +214,6 @@
     },
     "lowContrst|avif|ffmpeg": {
       "a": 61.74,
-      "b": 0.0,
-      "n": 100,
-      "mp_min": 2.0736,
-      "mp_max": 2.0736
-    },
-    "lowContrst|avif|ffmpeg_nvenc": {
-      "a": 63.0,
       "b": 0.0,
       "n": 100,
       "mp_min": 2.0736,
@@ -331,13 +310,6 @@
       "mp_min": 2.0736,
       "mp_max": 2.0736
     },
-    "uiSharp|avif|ffmpeg_nvenc": {
-      "a": 62.97,
-      "b": 0.0,
-      "n": 100,
-      "mp_min": 2.0736,
-      "mp_max": 2.0736
-    },
     "uiSharp|avif|pyvips": {
       "a": 3.67,
       "b": 0.0,
@@ -389,13 +361,6 @@
     },
     "web|avif|ffmpeg": {
       "a": 30.9,
-      "b": 0.0,
-      "n": 190,
-      "mp_min": 2.0736,
-      "mp_max": 2.0736
-    },
-    "web|avif|ffmpeg_nvenc": {
-      "a": 40.7421,
       "b": 0.0,
       "n": 190,
       "mp_min": 2.0736,

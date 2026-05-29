@@ -82,7 +82,6 @@ class BaseConverter(ABC):
         output_path: str,
         target_format: str,
         quality: Union[int, float],
-        use_gpu: bool = False,
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -93,7 +92,6 @@ class BaseConverter(ABC):
             output_path: Path where output should be written.
             target_format: Output format (e.g., 'webp', 'avif', 'jxl').
             quality: Format-native quality value. Higher values indicate better quality.
-            use_gpu: Enable GPU acceleration if supported by the converter.
             is_intermediate: Hint that this is a calibration encode (may optimize speed over quality).
             run_id: Optional batch run ID for telemetry tracking.
 

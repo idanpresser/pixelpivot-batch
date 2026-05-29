@@ -130,7 +130,6 @@ SHARP_PIPELINE_CHUNK = 64
 # ---------------------------------------------------------------------------
 TELEMETRY_BATCH_SIZE = 20           # Flush every N samples
 TELEMETRY_QUEUE_TIMEOUT = 2.0       # Max seconds to wait before periodic flush
-TELEMETRY_GPU_FAIL_LIMIT = 5        # Number of consecutive failures before disabling GPU sampling
 
 # How often to re-discover the process tree (children/grandchildren). Sampling
 # (CPU/RAM per PID) still happens every TELEMETRY_INTERVAL — only the recursive
