@@ -10,7 +10,6 @@ import shutil
 from typing import Dict, Any, List, Optional, Union
 from .converters.base import BaseConverter
 from .converters.ffmpeg_converter import FFmpegConverter
-from .converters.ffmpeg_nvenc_converter import FFmpegNvencConverter
 from .converters.magick_converter import MagickConverter
 from .converters.vips_converter import VipsConverter
 from .converters.sharp_converter import SharpConverter
@@ -82,7 +81,6 @@ class Runner:
         # Register converters
         self._converters: Dict[str, BaseConverter] = {
             "ffmpeg": FFmpegConverter(self.paths["ffmpeg"]),
-            "ffmpeg_nvenc": FFmpegNvencConverter(self.paths["ffmpeg"]),
             "imagemagick": MagickConverter(self.paths["magick"]),
             "pyvips": VipsConverter(),
             "sharp": SharpConverter(port=sharp_port) if sharp_port else SharpConverter(),

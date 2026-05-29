@@ -6,7 +6,6 @@ each encoder's NATIVE scalar:
   - ffmpeg avif  -> libaom-av1 -crf (valid 0..63, lower = better)
   - magick/vips/sharp avif/webp -> -quality 0..100 (higher = better)
   - jxl (all tools) -> 0..100 quality; converters map to Butteraugli distance
-  - ffmpeg_nvenc avif -> 0..100 quality; converter maps to -cq (100-q)/2
 
 A single tool-agnostic fallback (1.0 for jxl else 80.0) is therefore unsafe:
   - ffmpeg avif gets -crf 80 (outside libaom's 0..63 range -> worst quality)
@@ -51,14 +50,6 @@ def test_default_quality_for_jxl_matches_quality_scale():
     # would mean distance ~9.9 (garbage). Must be a high quality on any tool.
     assert default_quality_for("ffmpeg", "jxl") >= 70
     assert default_quality_for("vips", "jxl") >= 70
-
-
-def test_default_quality_for_nvenc_avif_is_quality_scale():
-    from app.core.config import default_quality_for
-
-    # ffmpeg_nvenc avif takes 0..100 (maps internally to -cq); 80 is correct here,
-    # NOT the ffmpeg(libaom) CRF default.
-    assert default_quality_for("ffmpeg_nvenc", "avif") >= 70
 
 
 def test_interpolator_empty_table_ffmpeg_avif_is_crf_valid(tmp_path):

@@ -203,14 +203,6 @@ def main() -> int:
         else:
             fail(f"task_024: pyvips Q={q_rec!r} (expected ~87.43); res.success={r.get('success')}", failures)
 
-        from app.core.converters.ffmpeg_nvenc_converter import FFmpegNvencConverter
-        args = FFmpegNvencConverter.FORMAT_PARAMS["avif"](86.6)
-        cq = args[args.index("-cq") + 1]
-        if cq == "7":
-            passed(f"task_024: NVENC formula uses round() (q=86.6 -> -cq 7)")
-        else:
-            fail(f"task_024: NVENC -cq={cq} for q=86.6 (expected '7')", failures)
-
         # ---------- task_022 observable: app booted on this Python ----------
         banner("task_022: lifespan ran on this Python without raising")
         passed(f"task_022: Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro} - lifespan passed the MIN_PYTHON_VERSION guard")

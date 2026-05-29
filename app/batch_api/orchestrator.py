@@ -19,7 +19,6 @@ from ..core.converters.magick_converter import MagickConverter
 from ..core.converters.ffmpeg_converter import FFmpegConverter
 from ..core.converters.vips_converter import VipsConverter
 from ..core.converters.sharp_converter import SharpConverter
-from ..core.converters.ffmpeg_nvenc_converter import FFmpegNvencConverter
 from ..core.logger import get_logger
 from ..core.config import (
     FFMPEG_TIMEOUT,
@@ -150,11 +149,10 @@ class BatchOrchestrator:
             magick_bin = "magick"
 
         self.converters = {
-            "magick":       MagickConverter(magick_path=magick_bin),
-            "ffmpeg":       FFmpegConverter(ffmpeg_path=ffmpeg_bin),
-            "vips":         VipsConverter(),
-            "sharp":        SharpConverter(port=8765),
-            "ffmpeg_nvenc": FFmpegNvencConverter(ffmpeg_path=ffmpeg_bin),
+            "magick": MagickConverter(magick_path=magick_bin),
+            "ffmpeg": FFmpegConverter(ffmpeg_path=ffmpeg_bin),
+            "vips":   VipsConverter(),
+            "sharp":  SharpConverter(port=8765),
         }
     def _preflight_resources(self, target_dir: str) -> None:
         """Validate available memory and disk space before batch execution.

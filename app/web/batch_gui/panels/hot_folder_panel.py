@@ -21,7 +21,7 @@ def render_hot_folder_panel(client: APIClient):
             with col1:
                 target_format = st.selectbox("Target Format", ["webp", "avif", "jxl"])
             with col2:
-                tool = st.selectbox("Tool", ["magick", "ffmpeg", "vips", "sharp", "ffmpeg_nvenc"])
+                tool = st.selectbox("Tool", ["magick", "ffmpeg", "vips", "sharp"])
                 
             category = st.selectbox("Category", ["general", "highRes", "web", "uiSharp", "lowContrst", "edgeCase"])
             
