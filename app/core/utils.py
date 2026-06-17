@@ -165,13 +165,15 @@ def probe_image_dimensions(path: str) -> tuple[int, int]:
     Returns:
         (width, height) tuple in pixels.
     """
+    from .converters.base import _win32_safe_path
+    safe = _win32_safe_path(path)
     cmd = [
         "ffprobe",
         "-v", "error",
         "-select_streams", "v:0",
         "-show_entries", "stream=width,height",
         "-of", "json",
-        path
+        safe,
     ]
     try:
         creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -181,7 +183,7 @@ def probe_image_dimensions(path: str) -> tuple[int, int]:
             text=True,
             check=True,
             timeout=5.0,
-            creationflags=creationflags
+            creationflags=creationflags,
         )
         data = json.loads(result.stdout)
         stream = data["streams"][0]
@@ -189,7 +191,7 @@ def probe_image_dimensions(path: str) -> tuple[int, int]:
     except (subprocess.SubprocessError, FileNotFoundError, KeyError, IndexError, json.JSONDecodeError) as e:
         log.debug(f"ffprobe failed for {path} ({e}), falling back to PIL.")
         from PIL import Image
-        with Image.open(path) as img:
+        with Image.open(safe) as img:
             return img.size
 
 

@@ -27,7 +27,7 @@ from ..ffmpeg import FFmpegProcess
 from ..logger import get_logger
 from ..telemetry import TelemetryMonitor, aggregate_telemetry
 from ..utils import quality_to_jxl_distance
-from .base import BaseConverter
+from .base import BaseConverter, _win32_safe_path
 from .ffmpeg_batch_helpers import (
     all_same_resolution,
     build_image2_args,
@@ -92,7 +92,7 @@ class FFmpegConverter(BaseConverter):
             Dict with conversion result including success status, duration, telemetry,
             and error details.
         """
-        if self.is_broken:
+        if self.is_broken and not getattr(self, "_bypass_breaker", False):
             return {"success": False, "error": f"{self.get_name()} is broken"}
 
         params = encoder_params_for(target_format, quality)
@@ -128,7 +128,7 @@ class FFmpegConverter(BaseConverter):
         """
         global_opts = ["-y", "-hide_banner", "-nostats", "-progress", "pipe:1"]
         padding = ["-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2"]
-        return global_opts + ["-i", input_path] + padding + encoder_params + [output_path]
+        return global_opts + ["-i", _win32_safe_path(input_path)] + padding + ["-map_metadata", "0"] + encoder_params + [_win32_safe_path(output_path)]
 
     def _run_ffmpeg(
         self,
@@ -246,48 +246,35 @@ class FFmpegConverter(BaseConverter):
             Dict with 'success_count', 'failure_count', 'duration_ms', 'telemetry',
             and 'errors' keys. Note: does NOT return per-image results.
         """
-        start = time.time()
-        os.makedirs(output_dir, exist_ok=True)
+        self._bypass_breaker = True
+        try:
+            start = time.time()
+            os.makedirs(output_dir, exist_ok=True)
 
-        if not input_paths:
-            return {
-                "success_count": 0,
-                "failure_count": 0,
-                "duration_ms": 0.0,
-                "telemetry": {},
-                "errors": [],
-            }
+            if not input_paths:
+                return {
+                    "success_count": 0,
+                    "failure_count": 0,
+                    "duration_ms": 0.0,
+                    "telemetry": {},
+                    "errors": [],
+                }
 
-        success_count = 0
-        failure_count = 0
-        errors: List[Dict[str, Any]] = []
-        telemetry_samples: List[Dict[str, Any]] = []
+            success_count = 0
+            failure_count = 0
+            errors: List[Dict[str, Any]] = []
+            telemetry_samples: List[Dict[str, Any]] = []
 
-        # Outer group by quality (encoder params depend on quality).
-        quality_groups: Dict[float, List[str]] = defaultdict(list)
-        for path, q in zip(input_paths, qualities):
-            quality_groups[q].append(path)
+            # Outer group by quality (encoder params depend on quality).
+            quality_groups: Dict[float, List[str]] = defaultdict(list)
+            for path, q in zip(input_paths, qualities):
+                quality_groups[q].append(path)
 
-        for q, group_paths in quality_groups.items():
-            params = encoder_params_for(target_format, q)
-            if params is None:
-                # Unsupported format — surface the error per item.
-                res = self._fallback_per_file(group_paths, output_dir, target_format, [q] * len(group_paths), run_id, suffix=suffix)
-                success_count += res["success_count"]
-                failure_count += res["failure_count"]
-                errors.extend(res["errors"])
-                if res["telemetry"]:
-                    telemetry_samples.append(res["telemetry"])
-                continue
-
-            # Hardware-safety: limit threads when doing many-output batching
-            batch_params = params + ["-threads", "1"]
-
-            size_groups = group_by_dimensions(group_paths)
-
-            for wh, sub_paths in size_groups.items():
-                if wh is None:
-                    res = self._fallback_per_file(sub_paths, output_dir, target_format, [q] * len(sub_paths), run_id, suffix=suffix)
+            for q, group_paths in quality_groups.items():
+                params = encoder_params_for(target_format, q)
+                if params is None:
+                    # Unsupported format — surface the error per item.
+                    res = self._fallback_per_file(group_paths, output_dir, target_format, [q] * len(group_paths), run_id, suffix=suffix)
                     success_count += res["success_count"]
                     failure_count += res["failure_count"]
                     errors.extend(res["errors"])
@@ -295,48 +282,65 @@ class FFmpegConverter(BaseConverter):
                         telemetry_samples.append(res["telemetry"])
                     continue
 
-                # image2 path is unreliable for AVIF/JXL on some libaom/heif builds; gated
-                # by IMAGE2_ALLOW_LOSSY_FORMATS (env: PIXELPIVOT_IMAGE2_ALLOW_LOSSY). When
-                # the flag is on, multimap remains the per-chunk safety net on failure.
-                can_use_image2 = (
-                    target_format not in ("avif", "jxl") or IMAGE2_ALLOW_LOSSY_FORMATS
-                )
+                # Outer group by quality (encoder params depend on quality).
+                batch_params = params + ["-threads", "1"]
 
-                if can_use_image2 and len(sub_paths) >= IMAGE2_THRESHOLD and all_same_resolution(sub_paths):
-                    ok, fail, errs, tele, leftovers = self._run_image2_path(
-                        sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix
+                size_groups = group_by_dimensions(group_paths)
+
+                for wh, sub_paths in size_groups.items():
+                    if wh is None:
+                        res = self._fallback_per_file(sub_paths, output_dir, target_format, [q] * len(sub_paths), run_id, suffix=suffix)
+                        success_count += res["success_count"]
+                        failure_count += res["failure_count"]
+                        errors.extend(res["errors"])
+                        if res["telemetry"]:
+                            telemetry_samples.append(res["telemetry"])
+                        continue
+
+                    # image2 path is unreliable for AVIF/JXL on some libaom/heif builds; gated
+                    # by IMAGE2_ALLOW_LOSSY_FORMATS (env: PIXELPIVOT_IMAGE2_ALLOW_LOSSY). When
+                    # the flag is on, multimap remains the per-chunk safety net on failure.
+                    can_use_image2 = (
+                        target_format not in ("avif", "jxl") or IMAGE2_ALLOW_LOSSY_FORMATS
                     )
-                    success_count += ok
-                    failure_count += fail
-                    errors.extend(errs)
-                    if tele:
-                        telemetry_samples.append(tele)
-                    if leftovers:
-                        ok2, fail2, errs2, tele2 = self._run_multimap_path(
-                            leftovers, output_dir, target_format, q, batch_params, run_id, suffix=suffix
+
+                    if can_use_image2 and len(sub_paths) >= IMAGE2_THRESHOLD and all_same_resolution(sub_paths):
+                        ok, fail, errs, tele, leftovers = self._run_image2_path(
+                            sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix
                         )
-                        success_count += ok2
-                        failure_count += fail2
-                        errors.extend(errs2)
-                        if tele2:
-                            telemetry_samples.append(tele2)
-                else:
-                    ok, fail, errs, tele = self._run_multimap_path(
-                        sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix
-                    )
-                    success_count += ok
-                    failure_count += fail
-                    errors.extend(errs)
-                    if tele:
-                        telemetry_samples.append(tele)
+                        success_count += ok
+                        failure_count += fail
+                        errors.extend(errs)
+                        if tele:
+                            telemetry_samples.append(tele)
+                        if leftovers:
+                            ok2, fail2, errs2, tele2 = self._run_multimap_path(
+                                leftovers, output_dir, target_format, q, batch_params, run_id, suffix=suffix
+                            )
+                            success_count += ok2
+                            failure_count += fail2
+                            errors.extend(errs2)
+                            if tele2:
+                                telemetry_samples.append(tele2)
+                    else:
+                        ok, fail, errs, tele = self._run_multimap_path(
+                            sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix
+                        )
+                        success_count += ok
+                        failure_count += fail
+                        errors.extend(errs)
+                        if tele:
+                            telemetry_samples.append(tele)
 
-        return {
-            "success_count": success_count,
-            "failure_count": failure_count,
-            "duration_ms": (time.time() - start) * 1000,
-            "telemetry": aggregate_telemetry(telemetry_samples),
-            "errors": errors,
-        }
+            return {
+                "success_count": success_count,
+                "failure_count": failure_count,
+                "duration_ms": (time.time() - start) * 1000,
+                "telemetry": aggregate_telemetry(telemetry_samples),
+                "errors": errors,
+            }
+        finally:
+            self._bypass_breaker = False
 
     def _run_image2_path(
         self,
