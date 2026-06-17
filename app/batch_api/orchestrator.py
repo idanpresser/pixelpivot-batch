@@ -30,6 +30,7 @@ from ..core.config import (
     MIN_FREE_DISK_BYTES,
     DISK_RECHECK_EVERY_CELLS,
     default_quality_for,
+    MASSIVE_IMAGE_THRESHOLD,
 )
 from ..core.paths import APP_ROOT, PROJ_ROOT
 
@@ -207,17 +208,22 @@ class BatchOrchestrator:
     def _probe_all_dimensions(self, paths: list[str]) -> Dict[str, tuple[int, int]]:
         """Probe dimensions of all input images in parallel.
 
-        Args:
-            paths: List of image file paths.
-
-        Returns:
-            Dict mapping path to (width, height) tuple.
+        Returns (0, 0) for any file that cannot be probed instead of propagating
+        the exception — callers treat (0, 0) as unreadable and reject the file.
         """
         from ..core.utils import probe_image_dimensions
-        workers = min(32, (os.cpu_count() or 4) * 4)
         from concurrent.futures import ThreadPoolExecutor
+
+        def _safe_probe(path: str) -> tuple[int, int]:
+            try:
+                return probe_image_dimensions(path)
+            except Exception as e:
+                log.warning("Could not probe dimensions for %s: %s", Path(path).name, e)
+                return (0, 0)
+
+        workers = min(32, (os.cpu_count() or 4) * 4)
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            dims = list(ex.map(probe_image_dimensions, paths))
+            dims = list(ex.map(_safe_probe, paths))
         return dict(zip(paths, dims))
 
     def execute_batch(self, run_id: int, request: BatchRequest) -> None:
@@ -270,7 +276,30 @@ class BatchOrchestrator:
             all_telemetry_summaries = []
             
             dim_cache = self._probe_all_dimensions(input_paths)
-            
+
+            # Filter unreadable and massive images upfront
+            filtered_input_paths = []
+            for path in input_paths:
+                w, h = dim_cache.get(path, (0, 0))
+                if w == 0 and h == 0:
+                    err_msg = f"Image {Path(path).name} could not be probed (unreadable or corrupt) — skipped."
+                    log.error(err_msg)
+                    all_failure_count += len(plan)
+                    for cell in plan:
+                        all_errors.append({"path": path, "error": err_msg})
+                elif w * h > MASSIVE_IMAGE_THRESHOLD:
+                    err_msg = (
+                        f"Image {Path(path).name} exceeds MASSIVE_IMAGE_THRESHOLD "
+                        f"({w}x{h} = {w*h} px > {MASSIVE_IMAGE_THRESHOLD} px) and was rejected."
+                    )
+                    log.error(err_msg)
+                    all_failure_count += len(plan)
+                    for cell in plan:
+                        all_errors.append({"path": path, "error": err_msg})
+                else:
+                    filtered_input_paths.append(path)
+            input_paths = filtered_input_paths
+
             from concurrent.futures import ThreadPoolExecutor
             probe_workers = min(32, (os.cpu_count() or 4) * 4)
 
@@ -309,10 +338,11 @@ class BatchOrchestrator:
                     continue
                 
                 if converter.is_broken:
-                    err_msg = f"Aborting sub-batch: {t_name} is marked as BROKEN."
-                    log.error(err_msg)
+                    err_msg = f"Quarantined: {t_name} circuit breaker tripped — not attempted."
+                    log.error(f"Aborting sub-batch: {t_name} is marked as BROKEN. Quarantining {len(input_paths)} files.")
                     all_failure_count += len(input_paths)
-                    all_errors.append({"path": "N/A", "error": err_msg})
+                    for _p in input_paths:
+                        all_errors.append({"path": _p, "error": err_msg, "quarantined": True})
                     continue
 
                 if DISK_RECHECK_EVERY_CELLS > 0 and cells_processed > 0 and cells_processed % DISK_RECHECK_EVERY_CELLS == 0:
@@ -398,12 +428,10 @@ class BatchOrchestrator:
                         cpu_avg_pct=telemetry.get("cpu_avg", 0.0),
                         cpu_peak_pct=telemetry.get("cpu_peak", 0.0),
                         ram_peak_mb=telemetry.get("ram_peak", 0.0),
-                        gpu_peak_pct=telemetry.get("gpu_peak", 0.0),
-                        vram_peak_mb=telemetry.get("vram_peak_mb", 0.0),
                         yield_mb_sec=yield_mb_sec,
                         savings_pct=savings_pct,
                         success_count=all_success_count,
-                        failure_count=all_failure_count
+                        failure_count=all_failure_count,
                     )
                     self.repo.update_status(conn, run_id, "completed", total_images=total_conversions)
             
