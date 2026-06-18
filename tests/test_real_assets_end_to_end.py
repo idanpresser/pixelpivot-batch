@@ -52,7 +52,7 @@ async def test_end_to_end_real_tools(tool, executable, real_images_dir, setup_di
         source_dir=str(source_dir),
         target_dir=str(target_dir),
         target_format=["webp"],
-        tool=tool,
+        tool=[tool],
         category=["general"]
     )
     

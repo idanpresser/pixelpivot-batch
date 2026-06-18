@@ -72,7 +72,10 @@ async def test_summary_persists_when_all_files_fail(tmp_path, isolated_db):
             ",".join(request.target_format), ",".join([t.value for t in request.tool]), "manual",
         )
 
-    orch.execute_batch(run_id, request)
+    # Dummy files probe as (0,0) via the real seam; patch it so they survive the
+    # upfront unreadable filter and reach the (mocked) converter.
+    with patch("app.core.utils.probe_image_dimensions", return_value=(100, 100)):
+        orch.execute_batch(run_id, request)
 
     with get_connection() as conn:
         summary = orch.repo.get_summary(conn, run_id)
@@ -127,7 +130,7 @@ async def test_summary_survives_when_save_errors_raises(tmp_path, isolated_db):
     # update_status writes (in a separate transaction) must remain.
     with patch.object(
         orch.repo, "save_errors", side_effect=RuntimeError("simulated DB failure")
-    ):
+    ), patch("app.core.utils.probe_image_dimensions", return_value=(100, 100)):
         orch.execute_batch(run_id, request)
 
     with get_connection() as conn:

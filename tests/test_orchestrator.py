@@ -44,11 +44,10 @@ async def test_execute_batch_success(orchestrator, tmp_path):
     with patch("app.batch_api.orchestrator.get_connection") as mock_get_conn:
         mock_get_conn.return_value.__enter__.return_value = MagicMock()
         
-        # Mock PIL Image to avoid reading real files
-        with patch("PIL.Image.open") as mock_image_open:
-            mock_img = mock_image_open.return_value.__enter__.return_value
-            mock_img.size = (1000, 1000)
-            
+        # Probe via the real seam the orchestrator uses (probe_image_dimensions),
+        # not PIL.Image.open — otherwise the dummy files probe as (0,0) and get
+        # dropped before reaching the converter.
+        with patch("app.core.utils.probe_image_dimensions", return_value=(1000, 1000)):
             orchestrator.execute_batch(run_id=123, request=request)
             
             # Verify orchestrator steps
