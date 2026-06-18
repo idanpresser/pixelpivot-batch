@@ -130,10 +130,22 @@ function Invoke-Batch([string]$tool, [string]$srcDir, [string]$tgtDir, [string]$
         category      = @('general')
         trigger_type  = 'e2e'
     } | ConvertTo-Json
-    try {
-        $resp = Invoke-RestMethod "$ApiUrl/api/v1/batch/start" -Method Post -Body $body `
-            -ContentType 'application/json' -TimeoutSec 30
-    } catch { return $null }
+    # POST /batch/start can transiently return 500 "database is locked" when the
+    # previous batch's summary write / WAL checkpoint is still settling. The API
+    # itself retries DB writes (busy_timeout + with_db_retry); give that window a
+    # few attempts here rather than treating the first transient 500 as fatal.
+    $resp = $null
+    for ($attempt = 1; $attempt -le 6; $attempt++) {
+        try {
+            $resp = Invoke-RestMethod "$ApiUrl/api/v1/batch/start" -Method Post -Body $body `
+                -ContentType 'application/json' -TimeoutSec 30
+            break
+        } catch {
+            $msg = "$($_.ErrorDetails.Message)$($_.Exception.Message)"
+            if ($msg -match 'locked|busy') { Start-Sleep -Seconds 3; continue }
+            return $null
+        }
+    }
     $runId = $resp.run_id
     if (-not $runId) { return $null }
 
