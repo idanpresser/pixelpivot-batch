@@ -1,3 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Pin discovery to the app package. Without this, setuptools flat-layout
+# auto-discovery sees the many top-level runtime dirs (out, data, deploy,
+# vendor, node_modules, ...) and refuses to build (ambiguous packages).
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [project]
 name = "pixelpivot-batch"
 version = "0.1.0"
