@@ -26,7 +26,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
@@ -50,6 +49,9 @@ dependencies = [
     "psutil>=5.9",
     "nvidia-ml-py>=12.535",
 ]
+
+[project.scripts]
+pixelpivot-cli = "app.cli:main"
 
 [project.optional-dependencies]
 dev = [
