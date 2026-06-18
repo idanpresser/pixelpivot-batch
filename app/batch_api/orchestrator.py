@@ -259,6 +259,17 @@ class BatchOrchestrator:
                     self.repo.update_status(conn, run_id, "completed", total_images=0)
                 return
 
+            # Per-batch circuit-breaker isolation (issue 49x): converters are
+            # long-lived singletons shared across batches. Reset every breaker at
+            # the start of each run so poison-pill files from a prior batch cannot
+            # bleed into this one and quarantine healthy files during the cooldown.
+            # Guarded: a converter without the BaseConverter breaker (e.g. a test
+            # stub) simply has no state to reset.
+            for converter in self.converters.values():
+                reset = getattr(converter, "_reset_failures", None)
+                if callable(reset):
+                    reset()
+
             # Matrix Configuration
             categories = request.category if isinstance(request.category, list) else [request.category]
             tools = request.tool if isinstance(request.tool, list) else [request.tool]
