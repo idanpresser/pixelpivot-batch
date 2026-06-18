@@ -14,7 +14,7 @@ param(
     [string]$DeployDir    = (Join-Path $PSScriptRoot '..\deploy'),
     [string]$PicsRoot     = 'Z:\pics',
     [string]$UncRoot      = '\\ipsds5\Share\pics',
-    [string]$ApiUrl       = 'http://localhost:8000',
+    [string]$ApiUrl       = 'http://127.0.0.1:8000',
     [int]   $StartupSec   = 30,
     [int]   $BatchTimeout = 600,
     [int]   $ExpectedReal = 500
