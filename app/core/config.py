@@ -222,6 +222,17 @@ HOT_FOLDER_POLLING_INTERVAL_S = 10.0
 # ---------------------------------------------------------------------------
 # Calibration
 # ---------------------------------------------------------------------------
+# Calibration (iterative SSIM-targeted quality search) is disabled: quality is
+# resolved exclusively via HeuristicInterpolator (config.default_quality_for
+# fallback). The calibration_results table and BatchRepository calibration
+# methods are kept intact but inert — gated by this flag, not deleted — so the
+# feature can be re-enabled without a migration. Override with
+# PIXELPIVOT_CALIBRATION_ENABLED=true.
+CALIBRATION_ENABLED = os.getenv("PIXELPIVOT_CALIBRATION_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 CALIBRATION_SSIM_TOLERANCE = 0.005
 MAX_CALIBRATION_ITERS = 10
 TARGET_SSIM = 0.98
