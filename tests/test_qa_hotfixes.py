@@ -19,10 +19,10 @@ def test_loop_prevention(tmp_path):
     config = {
         "source_dir": same_dir,
         "target_dir": same_dir,
-        "target_format": "webp",
-        "tool": "magick"
+        "target_format": ["webp"],
+        "tool": ["magick"]
     }
-    
+
     with pytest.raises(ValueError, match="cannot be the same"):
         manager.add_hot_folder(config)
 
@@ -39,8 +39,8 @@ def test_timer_cancellation_on_remove(tmp_path):
     config = {
         "source_dir": src_dir,
         "target_dir": dst_dir,
-        "target_format": "webp",
-        "tool": "magick"
+        "target_format": ["webp"],
+        "tool": ["magick"]
     }
     
     watcher_id = manager.add_hot_folder(config)

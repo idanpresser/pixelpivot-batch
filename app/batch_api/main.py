@@ -19,14 +19,41 @@ log = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage FastAPI app lifecycle: startup initialization and shutdown cleanup."""
-    if sys.version_info < MIN_PYTHON_VERSION:
+    # Fail loudly on a wrong Python (air-gap deploy onto a host below the
+    # declared floor) here at lifespan, not cryptically at native-wheel import.
+    if sys.version_info[:2] < MIN_PYTHON_VERSION:
         msg = (
-            f"PixelPivot requires Python >= {MIN_PYTHON_VERSION[0]}."
-            f"{MIN_PYTHON_VERSION[1]}; got {sys.version_info.major}."
-            f"{sys.version_info.minor}.{sys.version_info.micro}"
+            f"Python {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+ required; "
+            f"running {sys.version_info.major}.{sys.version_info.minor}. "
+            "Vendored native wheels are ABI-pinned to the declared floor."
         )
         log.error(msg)
         raise RuntimeError(msg)
+
+    if sys.platform == "win32":
+        try:
+            import winreg
+            try:
+                key = winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SYSTEM\CurrentControlSet\Control\FileSystem",
+                    0,
+                    winreg.KEY_READ
+                )
+                value, _ = winreg.QueryValueEx(key, "LongPathsEnabled")
+                winreg.CloseKey(key)
+                if value != 1:
+                    msg = "Windows LongPathsEnabled registry key is disabled. Long path support is required. Please enable it in registry HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled."
+                    log.error(msg)
+                    raise RuntimeError(msg)
+            except FileNotFoundError:
+                msg = "Windows LongPathsEnabled registry key not found. Long path support is required. Please enable it in registry HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled."
+                log.error(msg)
+                raise RuntimeError(msg)
+        except Exception as e:
+            if isinstance(e, RuntimeError):
+                raise
+            log.warning("Could not query Windows LongPathsEnabled registry key: %s. Proceeding with caution.", e)
 
     # Schema bootstrap — idempotent. SQLite file is created on first connect.
     try:

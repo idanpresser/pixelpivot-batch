@@ -18,9 +18,25 @@ def test_sqlite_busy_retry_with_real_lock(tmp_path, monkeypatch):
     monkeypatch.setattr(connection, "SQLITE_DB_PATH", db_path)
     monkeypatch.setenv("PIXELPIVOT_DB_PATH", str(db_path))
 
-    # Initialize schema
+    # get_connection() caches a thread-local connection; drop any left open by a
+    # prior test on this worker thread so the whole test binds to db_path.
+    if getattr(connection._local, "conn", None) is not None:
+        try:
+            connection._local.conn.close()
+        except Exception:
+            pass
+    connection._local.conn = None
+    connection._local.depth = 0
+
+    # Initialize schema on an explicit connection bound to db_path. The no-arg
+    # init_db() proved order-sensitive in the full suite (schema landed where a
+    # raw reader couldn't see it -> "no such table"); passing the connection
+    # makes the target deterministic. Checkpoint so the WAL is folded into the
+    # main file before the orchestrator's raw connection reads it.
     from app.core.db.schema import init_db
-    init_db()
+    with connection.get_connection() as _c:
+        init_db(_c)
+        _c.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     # Create a batch request
     request = BatchRequest(
@@ -55,12 +71,15 @@ def test_sqlite_busy_retry_with_real_lock(tmp_path, monkeypatch):
 
     def locker():
         try:
-            # Open connection and hold exclusive lock for 0.5s
+            # Hold an exclusive lock for 0.5s so the orchestrator's save_summary
+            # hits SQLITE_BUSY and must exercise the busy-retry path. The lock
+            # alone forces contention; we deliberately do NOT write status here
+            # (a trailing UPDATE would race and clobber the orchestrator's final
+            # 'completed', which is exactly what this test asserts survives).
             with sqlite3.connect(str(db_path), timeout=0.1) as conn:
                 conn.execute("BEGIN EXCLUSIVE TRANSACTION")
                 time.sleep(0.5)
-                # Commit releases the lock
-                conn.execute("UPDATE batch_runs SET status='running' WHERE id=?", (run_id,))
+                # Block exit commits and releases the lock.
         except Exception as e:
             print(f"Locker thread error: {e}")
 

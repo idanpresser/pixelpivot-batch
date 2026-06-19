@@ -37,7 +37,7 @@ to be discoverable on `PATH` or in a local `bin/` directory. See the
 app/
 ├── batch_api/        FastAPI service: orchestrator + hot-folder watcher
 ├── core/
-│   ├── converters/   BaseConverter + 5 backends (magick/ffmpeg/vips/sharp/nvenc)
+│   ├── converters/   BaseConverter + 4 backends (magick/ffmpeg/vips/sharp)
 │   ├── db/           SQLite schema + repository layer
 │   ├── ffmpeg/       Subprocess plumbing + error classification
 │   └── heuristic*    Log-linear quality interpolator + curve fitter

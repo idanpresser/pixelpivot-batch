@@ -342,6 +342,9 @@ class BatchOrchestrator:
 
                 converter = self.converters.get(t_name)
                 if not converter:
+                    # Skip an unregistered tool's cell so sibling cells still run
+                    # (partial success). If NO cell executes, the post-loop guard
+                    # fails the whole batch.
                     err_msg = f"Unsupported tool: {t_name}"
                     log.error(err_msg)
                     all_failure_count += len(input_paths)
@@ -400,6 +403,15 @@ class BatchOrchestrator:
                         "quality": q, "success": p not in error_paths,
                     })
 
+            # Nothing ran at all (every tool unregistered, all images unreadable)
+            # while failures accrued → the batch failed; raise so the except
+            # handler marks it 'failed'. Exception: a fully-quarantined batch
+            # (broken converter) is a handled outcome — fall through so its
+            # per-file quarantine errors are still persisted via save_errors.
+            if not executed_cells and all_failure_count > 0:
+                if not any(e.get("quarantined") for e in all_errors):
+                    raise ValueError("Batch produced no executed cells (all tools unsupported or all images unreadable).")
+
             # 4. Save Summary & Finalize Status
             duration_ms = (time.time() - start_time) * 1000
             from ..core.telemetry import aggregate_telemetry
@@ -430,6 +442,11 @@ class BatchOrchestrator:
             yield_mb_sec = (output_bytes / (1024 * 1024)) / duration_s
             savings_pct = (1.0 - output_bytes / input_bytes) * 100.0 if input_bytes else 0.0
 
+            # A batch that produced zero successful conversions while accruing
+            # failures (e.g. every tool unregistered, all images unreadable) is a
+            # failure, not a silent "completed". Partial success stays "completed".
+            final_status = "failed" if all_success_count == 0 and all_failure_count > 0 else "completed"
+
             def _save_summary():
                 with get_connection() as conn:
                     self.repo.save_summary(
@@ -444,7 +461,7 @@ class BatchOrchestrator:
                         success_count=all_success_count,
                         failure_count=all_failure_count,
                     )
-                    self.repo.update_status(conn, run_id, "completed", total_images=total_conversions)
+                    self.repo.update_status(conn, run_id, final_status, total_images=total_conversions)
             
             with_busy_retry(_save_summary, attempts=SQLITE_BUSY_ATTEMPTS, base_delay_s=SQLITE_BUSY_BASE_DELAY_S)
 

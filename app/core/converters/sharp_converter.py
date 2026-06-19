@@ -3,6 +3,7 @@
 import socket
 import json
 import subprocess
+import threading
 import sys
 import time
 import os
@@ -35,7 +36,19 @@ class SharpConverter(BaseConverter):
         self.port = port
         self.host = "127.0.0.1"
         self.daemon_process = None
-        self._socket = None
+        # Persistent socket is thread-local: convert_batch fans out across a
+        # ThreadPoolExecutor, and a socket is a single bidirectional stream —
+        # sharing one across threads interleaves requests/responses and corrupts
+        # the framing. Each worker thread gets its own connection.
+        self._local = threading.local()
+
+    @property
+    def _socket(self):
+        return getattr(self._local, "socket", None)
+
+    @_socket.setter
+    def _socket(self, value):
+        self._local.socket = value
 
     def get_name(self) -> str:
         """Return the converter name."""
@@ -271,8 +284,9 @@ class SharpConverter(BaseConverter):
         for attempt in range(max_retries + 1):
             try:
                 sock = self._get_connection()
-                # Fix: Preserve float distance values for JXL, otherwise cast to int
-                val_quality = float(quality) if target_format == "jxl" else int(quality)
+                # Fix: Preserve float distance values for JXL; otherwise round to the
+                # nearest int (unbiased) at this final encoder boundary, not truncate.
+                val_quality = float(quality) if target_format == "jxl" else round(quality)
                 request = {
                     "inputPath": input_path,
                     "outputPath": output_path,
@@ -344,12 +358,10 @@ class SharpConverter(BaseConverter):
                     log.error(f"Sharp daemon error: {error_msg}")
                     return {"success": False, "error": error_msg}
 
-            except (
-                socket.timeout,
-                ConnectionResetError,
-                BrokenPipeError,
-                ConnectionRefusedError,
-            ) as e:
+            except OSError as e:
+                # OSError covers socket.timeout, all ConnectionError subclasses
+                # (reset/refused/aborted), BrokenPipeError, and bare OSError —
+                # every transient socket fault is retryable here.
                 last_error = e
                 log.warning(
                     f"Sharp socket error (attempt {attempt + 1}/{max_retries + 1}): {e}"
@@ -378,11 +390,15 @@ class SharpConverter(BaseConverter):
                 log.error(f"Sharp socket error: {e}")
                 break
 
-        # All retries exhausted
+        # All retries exhausted. The daemon was already stopped/restarted between
+        # attempts; trip the circuit breaker and surface the attempt count.
         if monitor:
             monitor.stop()
-        self._stop_daemon()
-        return {"success": False, "error": str(last_error)}
+        self._mark_failure()
+        return {
+            "success": False,
+            "error": f"Sharp conversion failed after {max_retries + 1} attempts: {last_error}",
+        }
 
     def convert_batch(
         self,

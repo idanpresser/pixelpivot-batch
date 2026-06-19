@@ -27,3 +27,11 @@ pyvips
 pandas
 psutil
 nvidia-ml-py
+
+# --- Dev / smoke-test deps (mirror pyproject.toml [project.optional-dependencies].dev) ---
+# Included so the air-gapped target can run `pytest` and scripts/smoke_test.ps1.
+# Drop this section if you are shipping a production-only bundle.
+pytest
+pytest-asyncio
+respx
+wand

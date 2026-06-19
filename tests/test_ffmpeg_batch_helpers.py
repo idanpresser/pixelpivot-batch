@@ -238,11 +238,15 @@ def test_build_multimap_args_pairs_inputs_and_maps_correctly():
 
     assert args.count("-i") == 3
     assert args.count("-map") == 3
+    assert args.count("-map_metadata") == 3
     assert args.count("-c:v") == 3
     assert args.count("libwebp") == 3
     assert "a.webp" in args
     assert "b.webp" in args
     assert "c.webp" in args
+    # Verify metadata is mapped per index
+    assert args[args.index("a.webp") - 6] == "-map_metadata"
+    assert args[args.index("a.webp") - 5] == "0"
 
 
 def test_encoder_params_webp():

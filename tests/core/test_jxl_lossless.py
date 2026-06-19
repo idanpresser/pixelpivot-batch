@@ -21,7 +21,8 @@ def test_jxl_lossless_vips():
     Verify Vips lossless JXL call.
     """
     conv = VipsConverter()
-    with patch("app.core.converters.vips_converter.pyvips") as mock_vips:
+    with patch("app.core.converters.vips_converter.get_pyvips") as mock_get_vips:
+        mock_vips = mock_get_vips.return_value
         mock_img = mock_vips.Image.new_from_file.return_value
         
         conv.convert("in.jpg", "out.jxl", "jxl", 100)

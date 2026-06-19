@@ -26,6 +26,7 @@ DecodeSpeedMeter.measure_one(filepath)
 import io
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
 from pathlib import Path
 
 from PIL import Image
@@ -118,7 +119,8 @@ class DecodeSpeedMeter:
         # Preserve input order by indexing futures
         results: list[tuple[int, float | None]] = [None] * len(tasks)
 
-        with ProcessPoolExecutor(max_workers=workers) as pool:
+        ctx = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as pool:
             future_to_idx = {pool.submit(_one, task): i for i, task in enumerate(tasks)}
             for future in as_completed(future_to_idx):
                 idx = future_to_idx[future]

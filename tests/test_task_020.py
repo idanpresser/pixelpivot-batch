@@ -56,9 +56,10 @@ def test_per_tick_sample_lands_for_batch_run(fresh_db: sqlite3.Connection) -> No
     """A sample tagged with a batch_runs.id must be persisted, not dropped."""
     from app.core.db.repositories.telemetry import insert_telemetry_batch
     batch_id = _create_batch_run(fresh_db)
+    # (run_id, timestamp, cpu_pct, ram_mb) — GPU columns dropped (CPU-only target).
     samples = [
-        (batch_id, "2026-05-28 03:48:08", 1.0, 2.0, 3.0, 4.0),
-        (batch_id, "2026-05-28 03:48:09", 5.0, 6.0, 7.0, 8.0),
+        (batch_id, "2026-05-28 03:48:08", 1.0, 2.0),
+        (batch_id, "2026-05-28 03:48:09", 5.0, 6.0),
     ]
     insert_telemetry_batch(fresh_db, samples, auto_commit=True)
     # The fixed code writes to a batch-keyed table -- assert rows landed.
@@ -94,7 +95,7 @@ def test_no_foreign_key_constraint_warning_on_batch_insert(fresh_db: sqlite3.Con
         batch_id = _create_batch_run(fresh_db)
         insert_telemetry_batch(
             fresh_db,
-            [(batch_id, "2026-05-28 03:48:08", 1.0, 2.0, 3.0, 4.0)],
+            [(batch_id, "2026-05-28 03:48:08", 1.0, 2.0)],
             auto_commit=True,
         )
     finally:
@@ -118,6 +119,6 @@ def test_orphan_run_id_does_not_crash(fresh_db: sqlite3.Connection) -> None:
     # the caller.
     insert_telemetry_batch(
         fresh_db,
-        [(99999, "2026-05-28 03:48:08", 1.0, 2.0, 3.0, 4.0)],
+        [(99999, "2026-05-28 03:48:08", 1.0, 2.0)],
         auto_commit=True,
     )
