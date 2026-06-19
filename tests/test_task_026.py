@@ -40,7 +40,8 @@ def test_shared_dep_list_has_canonical_packages() -> None:
         "uvicorn[standard]",
         "pydantic",
         "watchdog",
-        "streamlit",
+        # streamlit intentionally excluded — GUI is an optional [gui] extra,
+        # not part of the headless air-gap bundle (bead y0z).
         "pillow",
         "pillow-heif",
         "pyvips",

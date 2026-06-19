@@ -2,13 +2,18 @@ import pytest
 import sqlite3
 import json
 import os
+from app.core import config
 from app.core.db.schema import init_db
 from app.core.db.repositories.batch import BatchRepository
 
-def test_calibration_data_persistence_and_export(tmp_path):
+def test_calibration_data_persistence_and_export(tmp_path, monkeypatch):
     """
     Verify that calibration results are stored and can be exported to JSON.
+
+    Calibration persistence is gated off by default (bead z0a); this test
+    exercises the kept-but-inert feature with the flag explicitly enabled.
     """
+    monkeypatch.setattr(config, "CALIBRATION_ENABLED", True)
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_db(conn)

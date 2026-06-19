@@ -20,7 +20,6 @@ uvicorn[standard]
 httpx
 pydantic
 watchdog
-streamlit
 Pillow
 pillow-heif
 pyvips

@@ -13,6 +13,11 @@ import json
 from datetime import datetime
 from typing import Optional
 
+from ... import config
+from ...logger import get_logger
+
+log = get_logger(__name__)
+
 
 class BatchRepository:
     """Manages batch_runs and batch_summary table persistence.
@@ -337,7 +342,15 @@ class BatchRepository:
             quality_found: Quality setting that achieved target_ssim.
             iterations: Number of binary-search iterations performed.
             data: list[dict] with per-iteration attempt details (serialized as JSON).
+
+        No-op when ``config.CALIBRATION_ENABLED`` is False (the default): the
+        table and this method are kept intact but inert — quality is resolved
+        heuristically, so there is nothing to persist.
         """
+        if not config.CALIBRATION_ENABLED:
+            log.debug("Calibration disabled; skipping calibration_results write for %s", input_path)
+            return
+
         cur = conn.cursor()
         try:
             cur.execute(
