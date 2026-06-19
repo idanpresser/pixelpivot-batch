@@ -5,13 +5,33 @@ support for Docker environments and environment variable overrides.
 """
 
 import os
+import sys
 from pathlib import Path
 
 # 1. Resolve Project Root
 _DEFAULT_APP_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_PROJ_ROOT = _DEFAULT_APP_ROOT.parent
 
-PROJ_ROOT = Path(os.getenv("PIXELPIVOT_PROJ_ROOT", _DEFAULT_PROJ_ROOT))
+
+def resolve_proj_root() -> Path:
+    """Resolve the project root, frozen-aware for PyInstaller.
+
+    Priority:
+      1. ``PIXELPIVOT_PROJ_ROOT`` env override (any deployment).
+      2. Frozen build (``sys.frozen``): the directory of the executable.
+         PyInstaller ``--onedir`` ships native binaries (bin/, vendor/) next
+         to the exe, so the source-tree ``__file__`` layout is meaningless.
+      3. Source/dev run: two levels up from this file (``app/core`` -> root).
+    """
+    env_override = os.getenv("PIXELPIVOT_PROJ_ROOT")
+    if env_override:
+        return Path(env_override)
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return _DEFAULT_PROJ_ROOT
+
+
+PROJ_ROOT = resolve_proj_root()
 APP_ROOT = PROJ_ROOT / "app"
 
 # 2. Main Directories
