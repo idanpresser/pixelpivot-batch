@@ -83,28 +83,36 @@ def check_paths(source: str, target: str) -> bool:
         
     return ok
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="PixelPivot Batch Engine CLI tool for environment and path validation."
-    )
-    parser.add_argument(
-        "--source", "-s",
-        required=True,
-        help="Path to the source directory containing images to convert."
-    )
-    parser.add_argument(
-        "--target", "-t",
-        required=True,
-        help="Path to the target directory where output will be written."
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Perform validation of environment, paths, and binaries without running conversion."
-    )
-    
-    args = parser.parse_args()
-    
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="PixelPivot Batch Engine.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_serve = sub.add_parser("serve", help="Run the FastAPI API server.")
+    p_serve.add_argument("--host", default="0.0.0.0")
+    p_serve.add_argument("--port", type=int, default=8000)
+
+    p_conv = sub.add_parser("convert", help="Validate environment / run conversion.")
+    p_conv.add_argument("--source", "-s", required=True)
+    p_conv.add_argument("--target", "-t", required=True)
+    p_conv.add_argument("--dry-run", action="store_true")
+
+    sub.add_parser("tui", help="Launch the terminal UI (supervises the API).")
+
+    args = parser.parse_args(argv)
+    if args.command == "serve":
+        _run_serve(args.host, args.port)
+    elif args.command == "convert":
+        _run_convert(args.source, args.target, args.dry_run)
+    elif args.command == "tui":
+        _run_tui()
+
+
+def _run_serve(host: str, port: int) -> None:
+    import uvicorn
+    uvicorn.run("app.batch_api.main:app", host=host, port=port)
+
+
+def _run_convert(source: str, target: str, dry_run: bool) -> None:
     print("==================================================")
     print("      PixelPivot Environment Validation CLI       ")
     print("==================================================")
@@ -112,7 +120,7 @@ def main():
     validation_passed = True
     
     # 1. Check Paths
-    if not check_paths(args.source, args.target):
+    if not check_paths(source, target):
         validation_passed = False
         
     # 2. Check Native Binaries
@@ -146,5 +154,12 @@ def main():
         print(" Validation Result: FAILED")
         sys.exit(1)
 
+
+def _run_tui() -> None:
+    from app.tui.launcher import run_tui
+    run_tui()
+
+
 if __name__ == "__main__":
     main()
+

@@ -21,10 +21,6 @@ def test_cli_validation_flow(tmp_path, monkeypatch):
     dst_dir = tmp_path / "dst"
     dst_dir.mkdir()
     
-    # Mock arg parsing
-    test_args = ["pixelpivot-cli", "-s", str(src_dir), "-t", str(dst_dir), "--dry-run"]
-    monkeypatch.setattr(sys, "argv", test_args)
-    
     # Mock binary checking, pyvips loading, and sharp daemon
     with patch("app.cli.check_binary", return_value=True) as mock_check_binary, \
          patch("app.cli.check_pyvips", return_value=True) as mock_check_pyvips, \
@@ -38,7 +34,7 @@ def test_cli_validation_flow(tmp_path, monkeypatch):
             
         monkeypatch.setattr(sys, "exit", mock_exit)
         
-        main()
+        main(["convert", "-s", str(src_dir), "-t", str(dst_dir), "--dry-run"])
         
         assert exit_code == 0
         assert mock_check_binary.call_count == 2
@@ -51,15 +47,11 @@ def test_cli_exits_1_when_source_missing(tmp_path, monkeypatch):
     missing_src = tmp_path / "does_not_exist"
     dst_dir = tmp_path / "dst"
     dst_dir.mkdir()
-    monkeypatch.setattr(
-        sys, "argv",
-        ["pixelpivot-cli", "-s", str(missing_src), "-t", str(dst_dir), "--dry-run"],
-    )
     holder = _capture_exit(monkeypatch)
     with patch("app.cli.check_binary", return_value=True), \
          patch("app.cli.check_pyvips", return_value=True), \
          patch("app.cli.check_sharp_daemon", return_value=True):
-        main()
+        main(["convert", "-s", str(missing_src), "-t", str(dst_dir), "--dry-run"])
     assert holder["code"] == 1
 
 
@@ -69,15 +61,11 @@ def test_cli_exits_1_when_binary_missing(tmp_path, monkeypatch):
     src_dir.mkdir()
     dst_dir = tmp_path / "dst"
     dst_dir.mkdir()
-    monkeypatch.setattr(
-        sys, "argv",
-        ["pixelpivot-cli", "-s", str(src_dir), "-t", str(dst_dir), "--dry-run"],
-    )
     holder = _capture_exit(monkeypatch)
     with patch("app.cli.check_binary", return_value=False), \
          patch("app.cli.check_pyvips", return_value=True), \
          patch("app.cli.check_sharp_daemon", return_value=True):
-        main()
+        main(["convert", "-s", str(src_dir), "-t", str(dst_dir), "--dry-run"])
     assert holder["code"] == 1
 
 
