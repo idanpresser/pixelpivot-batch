@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Callable, TypeVar, Tuple
 
 from .models import BatchRequest, Tool
+from .run_control import RunControl, RunControlRegistry
 from ..core.db.repositories.batch import BatchRepository
 from ..core.db.connection import get_connection
 from ..core.heuristic_interpolator import HeuristicInterpolator
@@ -128,6 +129,7 @@ class BatchOrchestrator:
     def __init__(self):
         """Initialize orchestrator with converter instances and heuristic interpolator."""
         self.repo = BatchRepository()
+        self.run_controls: RunControlRegistry = {}
         self.interpolator = HeuristicInterpolator(HEURISTIC_TABLE_PATH)
 
         # Register HEIF/AVIF support for Pillow metadata probing
@@ -238,6 +240,8 @@ class BatchOrchestrator:
             request: BatchRequest with source_dir, target_dir, formats, tools, categories.
         """
         start_time = time.time()
+        ctrl = self.run_controls.setdefault(run_id, RunControl())
+        cancelled = False
         try:
             # 1. Scan source_dir
             source_path = Path(request.source_dir)
@@ -334,7 +338,12 @@ class BatchOrchestrator:
                         pass
 
             for cell in plan:
-                if abort_matrix: break
+                if abort_matrix:
+                    break
+                ctrl.wait_if_paused()
+                if ctrl.cancelled:
+                    cancelled = True
+                    break
                 
                 t_name = cell.tool
                 cat = cell.category
@@ -412,6 +421,21 @@ class BatchOrchestrator:
                 if not any(e.get("quarantined") for e in all_errors):
                     raise ValueError("Batch produced no executed cells (all tools unsupported or all images unreadable).")
 
+            if cancelled:
+                def _mark_cancelled():
+                    with get_connection() as conn:
+                        self.repo.update_status(conn, run_id, "cancelled",
+                                                total_images=total_conversions)
+                with_busy_retry(_mark_cancelled, attempts=SQLITE_BUSY_ATTEMPTS,
+                                base_delay_s=SQLITE_BUSY_BASE_DELAY_S)
+                if all_failure_count > 0:
+                    try:
+                        with get_connection() as conn:
+                            self.repo.save_errors(conn, run_id, all_errors)
+                    except Exception as e:
+                        log.warning(f"save_errors dropped {len(all_errors)} rows: {e}")
+                return
+
             # 4. Save Summary & Finalize Status
             duration_ms = (time.time() - start_time) * 1000
             from ..core.telemetry import aggregate_telemetry
@@ -488,3 +512,5 @@ class BatchOrchestrator:
                 with get_connection() as conn:
                     self.repo.update_status(conn, run_id, "failed")
             with_busy_retry(_fail, attempts=SQLITE_BUSY_ATTEMPTS, base_delay_s=SQLITE_BUSY_BASE_DELAY_S)
+        finally:
+            self.run_controls.pop(run_id, None)
