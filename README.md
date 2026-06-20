@@ -106,6 +106,10 @@ docker-compose up --build
 
 ## Usage
 
+> **New here?** The [User Guide](docs/USER_GUIDE.md) is a verified, step-by-step
+> walkthrough: validate with the CLI, start the Sharp daemon and API server, run
+> a batch, and read the results.
+
 ### Start the services locally
 
 ```powershell
@@ -123,15 +127,24 @@ streamlit run -m app.web.batch_gui.main --server.port 8503
 Open http://localhost:8503 for the GUI, or hit the API directly:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/batch \
+curl -X POST http://localhost:8000/api/v1/batch/start \
   -H "Content-Type: application/json" \
   -d '{
-        "input_dir": "C:/images/in",
-        "output_dir": "C:/images/out",
-        "format": "avif",
-        "tool": "ffmpeg",
-        "quality": 50
+        "source_dir": "C:/images/in",
+        "target_dir": "C:/images/out",
+        "target_format": ["avif"],
+        "tool": ["ffmpeg"],
+        "category": ["general"]
       }'
+# {"run_id": 1, "status": "queued"}
+```
+
+`target_format` and `tool` are **lists** — pass several to run the full matrix
+(every image converted by every tool into every format). The call returns a
+`run_id`; poll it for progress:
+
+```bash
+curl http://localhost:8000/api/v1/batch/status/1
 ```
 
 ### Hot-folder mode
@@ -140,9 +153,16 @@ Drop files into a watched directory; a batch fires automatically 5 seconds
 after the last write:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/hot-folder/start \
+curl -X POST http://localhost:8000/api/v1/hotfolder/register \
   -H "Content-Type: application/json" \
-  -d '{"watch_dir": "C:/inbox", "output_dir": "C:/out", "format": "webp"}'
+  -d '{
+        "source_dir": "C:/inbox",
+        "target_dir": "C:/out",
+        "target_format": ["webp"],
+        "tool": ["vips"],
+        "category": ["general"]
+      }'
+# {"watcher_id": "...", "status": "active"}
 ```
 
 ---
