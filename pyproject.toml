@@ -57,6 +57,8 @@ dependencies = [
     "pandas>=2.2",
     "psutil>=5.9",
     "nvidia-ml-py>=12.535",
+    "prompt-toolkit>=3.0",
+    "rich>=13.0",
 ]
 
 [project.scripts]

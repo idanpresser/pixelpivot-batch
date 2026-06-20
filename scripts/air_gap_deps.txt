@@ -26,6 +26,9 @@ pyvips
 pandas
 psutil
 nvidia-ml-py
+prompt-toolkit
+rich
+
 
 # --- Dev / smoke-test deps (mirror pyproject.toml [project.optional-dependencies].dev) ---
 # Included so the air-gapped target can run `pytest` and scripts/smoke_test.ps1.

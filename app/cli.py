@@ -8,46 +8,42 @@ from pathlib import Path
 # Frozen-aware project root (PyInstaller bundles binaries next to the exe).
 # Centralised in app.core.paths so the seam lives in exactly one place.
 from app.core.paths import PROJ_ROOT
+from app.core import toolcheck
 
 def check_binary(name: str, path_str: str) -> bool:
     """Check if a binary exists at the path or is on PATH."""
     print(f"Checking {name}...", end="", flush=True)
-    if os.path.exists(path_str):
-        print(f" OK (found at {path_str})")
-        return True
-    
-    # Try finding on PATH
-    which_path = shutil.which(name)
-    if which_path:
-        print(f" OK (found on PATH at {which_path})")
-        return True
-        
-    print(" FAILED (not found)")
-    return False
+    st = toolcheck.check_binary(name, path_str)
+    if st.ok:
+        if st.detail == path_str:
+            print(f" OK (found at {path_str})")
+        else:
+            print(f" OK (found on PATH at {st.detail})")
+    else:
+        print(" FAILED (not found)")
+    return st.ok
 
 def check_pyvips() -> bool:
     """Check if pyvips/libvips is available."""
     print("Checking pyvips/libvips...", end="", flush=True)
-    try:
-        import pyvips
-        # Try to call a simple vips function to ensure native dll is loaded
-        version = pyvips.version(0)
-        print(f" OK (libvips version {pyvips.version(0)}.{pyvips.version(1)}.{pyvips.version(2)})")
-        return True
-    except Exception as e:
-        print(f" FAILED ({e})")
-        return False
+    st = toolcheck.check_pyvips()
+    if st.ok:
+        print(f" OK (libvips version {st.version})")
+    else:
+        print(f" FAILED ({st.detail})")
+    return st.ok
 
 def check_sharp_daemon(port: int = 8765) -> bool:
     """Check if the Sharp daemon is listening on the port."""
     print(f"Checking Sharp daemon (port {port})...", end="", flush=True)
-    try:
-        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-            print(" OK (connected)")
-            return True
-    except Exception as e:
-        print(f" WARNING (could not connect: {e})")
-        return False
+    st = toolcheck.check_sharp_daemon(port)
+    if st.ok:
+        print(" OK (connected)")
+    else:
+        # Extract exception message from down ({e})
+        err_msg = st.detail[6:-1] if (st.detail and st.detail.startswith("down (") and st.detail.endswith(")")) else st.detail
+        print(f" WARNING (could not connect: {err_msg})")
+    return st.ok
 
 def check_paths(source: str, target: str) -> bool:
     """Validate source and target paths and write permissions."""
@@ -87,28 +83,36 @@ def check_paths(source: str, target: str) -> bool:
         
     return ok
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="PixelPivot Batch Engine CLI tool for environment and path validation."
-    )
-    parser.add_argument(
-        "--source", "-s",
-        required=True,
-        help="Path to the source directory containing images to convert."
-    )
-    parser.add_argument(
-        "--target", "-t",
-        required=True,
-        help="Path to the target directory where output will be written."
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Perform validation of environment, paths, and binaries without running conversion."
-    )
-    
-    args = parser.parse_args()
-    
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="PixelPivot Batch Engine.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_serve = sub.add_parser("serve", help="Run the FastAPI API server.")
+    p_serve.add_argument("--host", default="0.0.0.0")
+    p_serve.add_argument("--port", type=int, default=8000)
+
+    p_conv = sub.add_parser("convert", help="Validate environment / run conversion.")
+    p_conv.add_argument("--source", "-s", required=True)
+    p_conv.add_argument("--target", "-t", required=True)
+    p_conv.add_argument("--dry-run", action="store_true")
+
+    sub.add_parser("tui", help="Launch the terminal UI (supervises the API).")
+
+    args = parser.parse_args(argv)
+    if args.command == "serve":
+        _run_serve(args.host, args.port)
+    elif args.command == "convert":
+        _run_convert(args.source, args.target, args.dry_run)
+    elif args.command == "tui":
+        _run_tui()
+
+
+def _run_serve(host: str, port: int) -> None:
+    import uvicorn
+    uvicorn.run("app.batch_api.main:app", host=host, port=port)
+
+
+def _run_convert(source: str, target: str, dry_run: bool) -> None:
     print("==================================================")
     print("      PixelPivot Environment Validation CLI       ")
     print("==================================================")
@@ -116,7 +120,7 @@ def main():
     validation_passed = True
     
     # 1. Check Paths
-    if not check_paths(args.source, args.target):
+    if not check_paths(source, target):
         validation_passed = False
         
     # 2. Check Native Binaries
@@ -150,5 +154,12 @@ def main():
         print(" Validation Result: FAILED")
         sys.exit(1)
 
+
+def _run_tui() -> None:
+    from app.tui.launcher import run_tui
+    run_tui()
+
+
 if __name__ == "__main__":
     main()
+
