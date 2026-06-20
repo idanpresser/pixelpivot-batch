@@ -5,7 +5,7 @@ Exposes /api/v1 routes for:
 - Hot folder management (/hotfolder/register, /hotfolder/list, /hotfolder/{id})
 """
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from .models import BatchRequest, BatchStatusResponse, HotFolderRequest
+from .models import BatchRequest, BatchStatusResponse, HotFolderRequest, ControlRequest
 from ..core.db.repositories.batch import BatchRepository
 from .orchestrator import BatchOrchestrator
 from ..core.db.connection import get_connection
@@ -162,3 +162,66 @@ async def unregister_hot_folder(watcher_id: str):
     if not manager.remove_hot_folder(watcher_id):
         raise HTTPException(status_code=404, detail="Watcher not found")
     return {"status": "removed"}
+
+
+@router.post("/batch/{run_id}/control")
+async def control_batch(
+    run_id: int,
+    req: ControlRequest,
+    orchestrator: BatchOrchestrator = Depends(get_orchestrator),
+):
+    """Pause, resume, or stop an in-flight batch run."""
+    ctrl = orchestrator.run_controls.get(run_id)
+    if ctrl is None:
+        raise HTTPException(status_code=404, detail="No active run with that id")
+    if req.action == "pause":
+        ctrl.pause()
+        new_status = "paused"
+    elif req.action == "resume":
+        ctrl.resume()
+        new_status = "running"
+    else:  # stop
+        ctrl.cancel()
+        new_status = None  # orchestrator marks 'cancelled' when the loop exits
+    if new_status is not None:
+        with get_connection() as conn:
+            repo.update_status(conn, run_id, new_status)
+    return {"run_id": run_id, "action": req.action}
+
+
+@router.post("/batch/{run_id}/restart")
+async def restart_batch(
+    run_id: int,
+    bg_tasks: BackgroundTasks,
+    orchestrator: BatchOrchestrator = Depends(get_orchestrator),
+):
+    """Re-run a finished batch using its originally stored configuration.
+
+    Note: category is not persisted on batch_runs, so a restart re-runs with
+    the default category ['general'].
+    """
+    from .models import BatchRequest, Tool
+    with get_connection() as conn:
+        run = repo.get_run(conn, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Batch run not found")
+        new_req = BatchRequest(
+            source_dir=run["source_dir"],
+            target_dir=run["target_dir"],
+            target_format=[f for f in run["target_format"].split(",") if f],
+            tool=[Tool(t) for t in run["tool"].split(",") if t],
+            category=["general"],
+            trigger_type="restart",
+        )
+        new_id = repo.create_run(
+            conn,
+            source_dir=new_req.source_dir,
+            target_dir=new_req.target_dir,
+            target_format=",".join(new_req.target_format),
+            tool=",".join([t.value for t in new_req.tool]),
+            trigger_type="restart",
+            heuristic_version=orchestrator.interpolator.version,
+        )
+    bg_tasks.add_task(orchestrator.execute_batch, new_id, new_req)
+    return {"run_id": new_id, "status": "queued"}
+
