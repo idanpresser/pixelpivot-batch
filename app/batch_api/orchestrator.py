@@ -130,6 +130,7 @@ class BatchOrchestrator:
         """Initialize orchestrator with converter instances and heuristic interpolator."""
         self.repo = BatchRepository()
         self.run_controls: RunControlRegistry = {}
+        self.progress: dict[int, dict] = {}
         self.interpolator = HeuristicInterpolator(HEURISTIC_TABLE_PATH)
 
         # Register HEIF/AVIF support for Pillow metadata probing
@@ -283,6 +284,15 @@ class BatchOrchestrator:
             multi_category = len(categories) > 1
             total_conversions = len(input_paths) * len(plan)
             
+            self.progress[run_id] = {
+                "cells_done": 0,
+                "cells_total": len(plan),
+                "current_cell": None,
+                "ok": 0,
+                "fail": 0,
+                "started_at": start_time,
+            }
+            
             log.info(f"Starting Matrix Batch: {len(input_paths)} images * {len(plan)} cells = {total_conversions} conversions")
 
             all_success_count = 0
@@ -345,6 +355,8 @@ class BatchOrchestrator:
                     cancelled = True
                     break
                 
+                self.progress[run_id]["current_cell"] = f"{cell.category}/{cell.tool}/{cell.target_format}"
+                
                 t_name = cell.tool
                 cat = cell.category
                 fmt = cell.target_format
@@ -401,6 +413,11 @@ class BatchOrchestrator:
                     all_telemetry_summaries.append(result["telemetry"])
                     
                 cells_processed += 1
+                p = self.progress[run_id]
+                p["cells_done"] = cells_processed
+                p["ok"] = all_success_count
+                p["fail"] = all_failure_count
+                
                 executed_cells.append(cell)
 
                 # Per-conversion analytics for the heuristic feedback loop. A path
@@ -514,3 +531,4 @@ class BatchOrchestrator:
             with_busy_retry(_fail, attempts=SQLITE_BUSY_ATTEMPTS, base_delay_s=SQLITE_BUSY_BASE_DELAY_S)
         finally:
             self.run_controls.pop(run_id, None)
+            self.progress.pop(run_id, None)
