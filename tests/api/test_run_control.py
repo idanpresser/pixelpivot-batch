@@ -31,3 +31,17 @@ def test_cancel_unblocks_paused_waiter():
     c.cancel()
     assert c.cancelled is True
     c.wait_if_paused(timeout=1.0)  # must not hang
+
+
+import pytest
+from pydantic import ValidationError
+from app.batch_api.models import ControlRequest
+
+def test_control_request_accepts_valid_actions():
+    for a in ("pause", "resume", "stop"):
+        assert ControlRequest(action=a).action == a
+
+def test_control_request_rejects_unknown_action():
+    with pytest.raises(ValidationError):
+        ControlRequest(action="explode")
+

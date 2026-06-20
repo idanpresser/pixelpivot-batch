@@ -96,3 +96,9 @@ class BatchStatusResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
     summary: Optional[dict] = None
+
+
+class ControlRequest(BaseModel):
+    """Request schema for controlling an in-flight batch run."""
+    action: Literal["pause", "resume", "stop"]
+
