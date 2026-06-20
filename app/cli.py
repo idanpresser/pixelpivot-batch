@@ -8,46 +8,42 @@ from pathlib import Path
 # Frozen-aware project root (PyInstaller bundles binaries next to the exe).
 # Centralised in app.core.paths so the seam lives in exactly one place.
 from app.core.paths import PROJ_ROOT
+from app.core import toolcheck
 
 def check_binary(name: str, path_str: str) -> bool:
     """Check if a binary exists at the path or is on PATH."""
     print(f"Checking {name}...", end="", flush=True)
-    if os.path.exists(path_str):
-        print(f" OK (found at {path_str})")
-        return True
-    
-    # Try finding on PATH
-    which_path = shutil.which(name)
-    if which_path:
-        print(f" OK (found on PATH at {which_path})")
-        return True
-        
-    print(" FAILED (not found)")
-    return False
+    st = toolcheck.check_binary(name, path_str)
+    if st.ok:
+        if st.detail == path_str:
+            print(f" OK (found at {path_str})")
+        else:
+            print(f" OK (found on PATH at {st.detail})")
+    else:
+        print(" FAILED (not found)")
+    return st.ok
 
 def check_pyvips() -> bool:
     """Check if pyvips/libvips is available."""
     print("Checking pyvips/libvips...", end="", flush=True)
-    try:
-        import pyvips
-        # Try to call a simple vips function to ensure native dll is loaded
-        version = pyvips.version(0)
-        print(f" OK (libvips version {pyvips.version(0)}.{pyvips.version(1)}.{pyvips.version(2)})")
-        return True
-    except Exception as e:
-        print(f" FAILED ({e})")
-        return False
+    st = toolcheck.check_pyvips()
+    if st.ok:
+        print(f" OK (libvips version {st.version})")
+    else:
+        print(f" FAILED ({st.detail})")
+    return st.ok
 
 def check_sharp_daemon(port: int = 8765) -> bool:
     """Check if the Sharp daemon is listening on the port."""
     print(f"Checking Sharp daemon (port {port})...", end="", flush=True)
-    try:
-        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-            print(" OK (connected)")
-            return True
-    except Exception as e:
-        print(f" WARNING (could not connect: {e})")
-        return False
+    st = toolcheck.check_sharp_daemon(port)
+    if st.ok:
+        print(" OK (connected)")
+    else:
+        # Extract exception message from down ({e})
+        err_msg = st.detail[6:-1] if (st.detail and st.detail.startswith("down (") and st.detail.endswith(")")) else st.detail
+        print(f" WARNING (could not connect: {err_msg})")
+    return st.ok
 
 def check_paths(source: str, target: str) -> bool:
     """Validate source and target paths and write permissions."""
