@@ -4,6 +4,7 @@ Exposes /api/v1 routes for:
 - Batch execution (/batch/start, /batch/status, /batch/{id}/errors, /batch/history)
 - Hot folder management (/hotfolder/register, /hotfolder/list, /hotfolder/{id})
 """
+import psutil
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from .models import BatchRequest, BatchStatusResponse, HotFolderRequest, ControlRequest
 from ..core.db.repositories.batch import BatchRepository
@@ -224,4 +225,20 @@ async def restart_batch(
         )
     bg_tasks.add_task(orchestrator.execute_batch, new_id, new_req)
     return {"run_id": new_id, "status": "queued"}
+
+
+@router.get("/batch/{run_id}/progress")
+async def get_batch_progress(
+    run_id: int,
+    orchestrator: BatchOrchestrator = Depends(get_orchestrator),
+):
+    """Return live in-flight progress for a running batch plus a resource sample."""
+    state = orchestrator.progress.get(run_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="No live progress for that run")
+    sample = {
+        "cpu_pct": psutil.cpu_percent(interval=None),
+        "ram_mb": round(psutil.virtual_memory().used / (1024 * 1024), 1),
+    }
+    return {**state, **sample}
 
