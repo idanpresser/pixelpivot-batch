@@ -48,7 +48,6 @@ def main() -> int:
     from app.core.converters.vips_converter import VipsConverter
     from app.core.converters.ffmpeg_converter import FFmpegConverter
     from app.core.converters.sharp_converter import SharpConverter
-    from app.core.converters.ffmpeg_nvenc_converter import FFmpegNvencConverter
 
     # ---------------------------------------------------------------- C1 magick
     banner("C1 magick PRESENT (webp + avif)")
@@ -152,31 +151,6 @@ def main() -> int:
         print(f"C2 ffmpeg ABSENT: raised {type(e).__name__}: {str(e)[:160]}")
         failures.append(f"C2 ffmpeg ABSENT: raised instead of returning dict: {type(e).__name__}")
 
-    # ---------------------------------------------------------------- C5 nvenc
-    banner("C5 ffmpeg_nvenc PRESENT (avif via av1_nvenc)")
-    nc = FFmpegNvencConverter(ffmpeg_path="ffmpeg")
-    out = target / "nvenc_present.avif"
-    try:
-        r = nc.convert(str(fixture), str(out), "avif", 80.0, use_gpu=True)
-        print(f"C5 nvenc avif: success={r.get('success')} size={out.stat().st_size if out.exists() else 0} err={(r.get('error') or '')[:200]}")
-        if not r.get("success"):
-            # Not necessarily a failure — av1_nvenc requires Ada Lovelace+
-            print("C5 nvenc: present-thread did not succeed; recording as BLOCKED-on-target if encoder not available")
-    except Exception as e:
-        failures.append(f"C5 nvenc: raised {e!r}")
-
-    banner("C5 ffmpeg_nvenc ABSENT (fatal marker on bogus binary)")
-    nc_bogus = FFmpegNvencConverter(ffmpeg_path=r"C:\not\ffmpeg.exe")
-    out = target / "nvenc_absent.avif"
-    try:
-        r = nc_bogus.convert(str(fixture), str(out), "avif", 80.0)
-        print(f"C5 nvenc ABSENT: success={r.get('success')} err={(r.get('error') or '')[:160]}")
-        if r.get("success"):
-            failures.append("C5 nvenc ABSENT: should not succeed")
-    except Exception as e:
-        print(f"C5 nvenc ABSENT: raised {type(e).__name__}: {str(e)[:160]}")
-        failures.append(f"C5 nvenc ABSENT: raised instead of returning dict: {type(e).__name__}")
-
     # ---------------------------------------------------------------- C4 sharp
     banner("C4 sharp PRESENT (daemon may be down)")
     sc = SharpConverter(port=8765)
@@ -215,7 +189,7 @@ def main() -> int:
         ("general", "webp", "magick", 1920, 1080),
         ("general", "avif", "ffmpeg", 100, 100),
         ("general", "jxl",  "vips",   4000, 3000),
-        ("xxx",     "webp", "ffmpeg_nvenc", 1, 1),  # bogus category
+        ("xxx",     "webp", "ffmpeg", 1, 1),  # bogus category
     ]
     for cat, fmt, tool, w, h in cases:
         q = hi.get_interpolated_quality(cat, fmt, tool, w, h)

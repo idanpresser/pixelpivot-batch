@@ -1,3 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Pin discovery to the app package. Without this, setuptools flat-layout
+# auto-discovery sees the many top-level runtime dirs (out, data, deploy,
+# vendor, node_modules, ...) and refuses to build (ambiguous packages).
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [project]
 name = "pixelpivot-batch"
 version = "0.1.0"
@@ -26,7 +36,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
@@ -42,7 +51,6 @@ dependencies = [
     "httpx>=0.27",
     "pydantic>=2.6",
     "watchdog>=4.0",
-    "streamlit>=1.32",
     "Pillow>=10.0",
     "pillow-heif>=0.15",
     "pyvips>=2.2",
@@ -51,12 +59,21 @@ dependencies = [
     "nvidia-ml-py>=12.535",
 ]
 
+[project.scripts]
+pixelpivot-cli = "app.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "respx>=0.21",
     "wand>=0.6",
+]
+# Optional Streamlit GUI (app/web/batch_gui). Not a runtime dependency of the
+# headless backend and excluded from the frozen air-gap build; install with
+# `pip install pixelpivot-batch[gui]` to run the dashboard separately.
+gui = [
+    "streamlit>=1.32",
 ]
 
 [project.urls]

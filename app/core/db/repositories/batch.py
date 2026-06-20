@@ -13,6 +13,11 @@ import json
 from datetime import datetime
 from typing import Optional
 
+from ... import config
+from ...logger import get_logger
+
+log = get_logger(__name__)
+
 
 class BatchRepository:
     """Manages batch_runs and batch_summary table persistence.
@@ -216,8 +221,6 @@ class BatchRepository:
         savings_pct: float,
         success_count: int,
         failure_count: int,
-        gpu_peak_pct: float = 0.0,
-        vram_peak_mb: float = 0.0,
     ) -> None:
         """Insert or update a batch_summary row.
 
@@ -235,8 +238,6 @@ class BatchRepository:
             savings_pct: Compression ratio savings (0-100).
             success_count: Number of successful image conversions.
             failure_count: Number of failed conversions.
-            gpu_peak_pct: Peak GPU utilization (0-100), optional.
-            vram_peak_mb: Peak VRAM usage in megabytes, optional.
         """
         cur = conn.cursor()
         try:
@@ -244,17 +245,14 @@ class BatchRepository:
                 """
                 INSERT INTO batch_summary (
                     batch_id, duration_ms, cpu_avg_pct, cpu_peak_pct, ram_peak_mb,
-                    gpu_peak_pct, vram_peak_mb,
                     yield_mb_sec, savings_pct, success_count, failure_count
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(batch_id) DO UPDATE SET
                     duration_ms   = excluded.duration_ms,
                     cpu_avg_pct   = excluded.cpu_avg_pct,
                     cpu_peak_pct  = excluded.cpu_peak_pct,
                     ram_peak_mb   = excluded.ram_peak_mb,
-                    gpu_peak_pct  = excluded.gpu_peak_pct,
-                    vram_peak_mb  = excluded.vram_peak_mb,
                     yield_mb_sec  = excluded.yield_mb_sec,
                     savings_pct   = excluded.savings_pct,
                     success_count = excluded.success_count,
@@ -262,7 +260,6 @@ class BatchRepository:
                 """,
                 (
                     batch_id, duration_ms, cpu_avg_pct, cpu_peak_pct, ram_peak_mb,
-                    gpu_peak_pct, vram_peak_mb,
                     yield_mb_sec, savings_pct, success_count, failure_count,
                 ),
             )
@@ -345,7 +342,15 @@ class BatchRepository:
             quality_found: Quality setting that achieved target_ssim.
             iterations: Number of binary-search iterations performed.
             data: list[dict] with per-iteration attempt details (serialized as JSON).
+
+        No-op when ``config.CALIBRATION_ENABLED`` is False (the default): the
+        table and this method are kept intact but inert — quality is resolved
+        heuristically, so there is nothing to persist.
         """
+        if not config.CALIBRATION_ENABLED:
+            log.debug("Calibration disabled; skipping calibration_results write for %s", input_path)
+            return
+
         cur = conn.cursor()
         try:
             cur.execute(

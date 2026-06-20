@@ -168,7 +168,7 @@ def pack_chunks(
     """Split (input_path, output_path) pairs into chunks respecting file and byte limits.
 
     Chunks respect Windows's CreateProcess command-line limit (8191 chars) by
-    approximating per-pair cost as len(input) + len(output) + per_pair_overhead + 8.
+    approximating per-pair cost as len(input) + len(output) + per_pair_overhead + 20.
 
     Args:
         pairs: List of (input_path, output_path) tuples.
@@ -185,8 +185,10 @@ def pack_chunks(
     current_bytes = fixed_overhead
 
     for in_path, out_path in pairs:
-        # 8 bytes buffer for quotes/spaces
-        pair_bytes = len(in_path) + len(out_path) + per_pair_overhead + 8
+        # 20 bytes/pair buffer: each path is quoted (2) + space-separated, plus
+        # the per-output map/flag tokens ffmpeg/mogrify emit. 8 underestimated
+        # the real cmdline cost and let oversized chunks slip past the cap.
+        pair_bytes = len(in_path) + len(out_path) + per_pair_overhead + 20
 
         would_exceed_files = len(current) >= max_files
         would_exceed_bytes = (current_bytes + pair_bytes) > max_cmdline_bytes
@@ -229,6 +231,7 @@ def build_multimap_args(
 
     for idx, (_, out_path) in enumerate(chunk):
         args.extend(["-map", f"{idx}:v"])
+        args.extend(["-map_metadata", str(idx)])
         args.extend(encoder_params)
         args.append(out_path)
 

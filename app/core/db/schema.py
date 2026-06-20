@@ -40,8 +40,6 @@ _DDL_STATEMENTS: tuple[str, ...] = (
         cpu_avg_pct     DOUBLE PRECISION,
         cpu_peak_pct    DOUBLE PRECISION,
         ram_peak_mb     DOUBLE PRECISION,
-        gpu_peak_pct    DOUBLE PRECISION,
-        vram_peak_mb    DOUBLE PRECISION,
         yield_mb_sec    DOUBLE PRECISION,
         savings_pct     DOUBLE PRECISION,
         success_count   INTEGER,
@@ -66,9 +64,7 @@ _DDL_STATEMENTS: tuple[str, ...] = (
         run_id          INTEGER NOT NULL REFERENCES batch_runs(id) ON DELETE CASCADE,
         timestamp       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         cpu_pct         DOUBLE PRECISION,
-        ram_mb          DOUBLE PRECISION,
-        gpu_pct         DOUBLE PRECISION,
-        vram_mb         DOUBLE PRECISION
+        ram_mb          DOUBLE PRECISION
     )
     """,
     """
@@ -252,17 +248,28 @@ def _create_tables(conn: sqlite3.Connection) -> None:
         if "heuristic_version" not in columns:
             log.info("Migrating batch_runs: adding heuristic_version column")
             cur.execute("ALTER TABLE batch_runs ADD COLUMN heuristic_version TEXT")
-            
-        # Migration: Add GPU columns to batch_summary (Task 21)
+
+        # Migration: Drop GPU columns from batch_summary and batch_telemetry.
+        # Idempotent via PRAGMA table_info gating. Requires SQLite >= 3.35
+        # for DROP COLUMN; Python 3.12+ ships with 3.45+. The pre-removal
+        # "Task 21" migration that ADDED these columns to old DBs has been
+        # deleted -- the order would otherwise be add/drop/add/... on every
+        # bootstrap. CPU-only deployment target; see CHANGELOG entry for
+        # 2026-05-29 GPU removal.
         cur.execute("PRAGMA table_info('batch_summary')")
-        summary_cols = [row[1] for row in cur.fetchall()]
-        if "gpu_peak_pct" not in summary_cols:
-            log.info("Migrating batch_summary: adding gpu_peak_pct")
-            cur.execute("ALTER TABLE batch_summary ADD COLUMN gpu_peak_pct DOUBLE PRECISION")
-        if "vram_peak_mb" not in summary_cols:
-            log.info("Migrating batch_summary: adding vram_peak_mb")
-            cur.execute("ALTER TABLE batch_summary ADD COLUMN vram_peak_mb DOUBLE PRECISION")
-            
+        summary_cols = {row[1] for row in cur.fetchall()}
+        for col in ("gpu_peak_pct", "vram_peak_mb"):
+            if col in summary_cols:
+                log.info("Migrating batch_summary: dropping %s", col)
+                cur.execute(f"ALTER TABLE batch_summary DROP COLUMN {col}")
+
+        cur.execute("PRAGMA table_info('batch_telemetry')")
+        tel_cols = {row[1] for row in cur.fetchall()}
+        for col in ("gpu_pct", "vram_mb"):
+            if col in tel_cols:
+                log.info("Migrating batch_telemetry: dropping %s", col)
+                cur.execute(f"ALTER TABLE batch_telemetry DROP COLUMN {col}")
+
         conn.commit()
     finally:
         cur.close()

@@ -1,7 +1,7 @@
 """
 Matrix smoke test against ./image_samples (mixed 500-file dataset).
 
-Iterates {ffmpeg, magick, vips, sharp, ffmpeg_nvenc} -> AVIF, one
+Iterates {ffmpeg, magick, vips, sharp} -> AVIF, one
 BatchOrchestrator run per tool. Each run is its own batch_runs row so
 per-tool wall-clock and savings show up cleanly in `bd memories` / the
 batch_summary table.
@@ -34,14 +34,13 @@ TARGET_BASE = REPO_ROOT / "converted_images" / "matrix_test_avif"
 CATEGORY = "general"
 TARGET_FORMAT = "avif"
 
-# Tool order picks cheap-and-reliable first so a circuit-breaker trip on
-# ffmpeg_nvenc (e.g. driver missing) does not poison earlier rows.
+# Cheap-and-reliable first so an unexpected circuit-breaker trip on a later
+# tool does not poison earlier rows in the persisted summary.
 TOOLS: List[str] = [
     Tool.magick.value,
     Tool.vips.value,
     Tool.sharp.value,
     Tool.ffmpeg.value,
-    Tool.ffmpeg_nvenc.value,
 ]
 
 

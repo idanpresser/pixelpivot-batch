@@ -24,7 +24,7 @@ def test_magick_batch_grouping(converter):
         # aggregator does max(float, sample[key]) and MagicMock won't compare.
         with patch("app.core.converters.magick_converter.TelemetryMonitor") as mock_tm:
             mock_tm.return_value.stop.return_value = {
-                "cpu_avg": 0.0, "cpu_peak": 0.0, "ram_peak": 0.0, "gpu_peak": 0.0,
+                "cpu_avg": 0.0, "cpu_peak": 0.0, "ram_peak": 0.0,
             }
             result = converter.convert_batch(input_paths, output_dir, "webp", qualities)
 

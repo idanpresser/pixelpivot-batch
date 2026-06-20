@@ -34,7 +34,7 @@ const server = net.createServer((socket) => {
 
                     const startTime = Date.now();
 
-                    let pipeline = sharp(inputPath);
+                    let pipeline = sharp(inputPath).withMetadata();
 
                     if (format === 'webp') {
                         pipeline = pipeline.webp({ quality: parseInt(quality) });

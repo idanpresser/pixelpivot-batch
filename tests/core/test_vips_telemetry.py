@@ -13,8 +13,9 @@ def test_vips_telemetry_capture(tmp_path):
     # We need a real image or a very good mock of pyvips
     conv = VipsConverter()
     
-    # Mock pyvips to simulate memory usage
-    with patch("app.core.converters.vips_converter.pyvips") as mock_vips:
+    # Mock pyvips (loaded lazily via get_pyvips()) to simulate memory usage.
+    with patch("app.core.converters.vips_converter.get_pyvips") as mock_get_vips:
+        mock_vips = mock_get_vips.return_value
         mock_img = mock_vips.Image.new_from_file.return_value
         
         # We need to mock psutil to return some memory usage

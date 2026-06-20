@@ -34,8 +34,10 @@ def test_list_hot_folders_returns_registered_folder():
             })
             response = client.get("/api/v1/hotfolder/list")
             assert response.status_code == 200
-            dirs = [h["source_dir"] for h in response.json()]
-            assert source_dir in dirs
+            # The manager stores Path(...).resolve()d dirs, which canonicalises
+            # Windows 8.3 short names (IDANP~1 -> "Idan P"); compare realpaths.
+            dirs = [os.path.realpath(h["source_dir"]) for h in response.json()]
+            assert os.path.realpath(source_dir) in dirs
     finally:
         shutil.rmtree(source_dir)
         shutil.rmtree(target_dir)

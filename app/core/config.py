@@ -113,8 +113,11 @@ SQLITE_BUSY_ATTEMPTS = 5            # Number of retries for busy locks
 SQLITE_BUSY_BASE_DELAY_S = 0.1      # Base delay for exponential backoff
 
 # Thread pool for concurrent encodes (if tool doesn't support native batching)
-CONCURRENT_ENCODES_SCALING_FACTOR = 2.0  # multiplier for os.cpu_count()
+CONCURRENT_ENCODES_SCALING_FACTOR = float(os.getenv("PIXELPIVOT_CONCURRENT_ENCODES_SCALING_FACTOR", "2.0"))
 CONCURRENT_ENCODES_MIN_RAM_MB = 200      # min available RAM to spawn a new worker
+CONCURRENT_ENCODES_MAX_WORKERS = os.getenv("PIXELPIVOT_CONCURRENT_ENCODES_MAX_WORKERS")
+if CONCURRENT_ENCODES_MAX_WORKERS is not None:
+    CONCURRENT_ENCODES_MAX_WORKERS = int(CONCURRENT_ENCODES_MAX_WORKERS)
 
 # Magick batch chunking — keep cmdline under Windows' 8191-char CreateProcess limit.
 # At ~80 chars/path: 200 files * 80 = 16 KB headroom on Linux; on Windows tune lower.
@@ -130,7 +133,6 @@ SHARP_PIPELINE_CHUNK = 64
 # ---------------------------------------------------------------------------
 TELEMETRY_BATCH_SIZE = 20           # Flush every N samples
 TELEMETRY_QUEUE_TIMEOUT = 2.0       # Max seconds to wait before periodic flush
-TELEMETRY_GPU_FAIL_LIMIT = 5        # Number of consecutive failures before disabling GPU sampling
 
 # How often to re-discover the process tree (children/grandchildren). Sampling
 # (CPU/RAM per PID) still happens every TELEMETRY_INTERVAL — only the recursive
@@ -220,6 +222,17 @@ HOT_FOLDER_POLLING_INTERVAL_S = 10.0
 # ---------------------------------------------------------------------------
 # Calibration
 # ---------------------------------------------------------------------------
+# Calibration (iterative SSIM-targeted quality search) is disabled: quality is
+# resolved exclusively via HeuristicInterpolator (config.default_quality_for
+# fallback). The calibration_results table and BatchRepository calibration
+# methods are kept intact but inert — gated by this flag, not deleted — so the
+# feature can be re-enabled without a migration. Override with
+# PIXELPIVOT_CALIBRATION_ENABLED=true.
+CALIBRATION_ENABLED = os.getenv("PIXELPIVOT_CALIBRATION_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 CALIBRATION_SSIM_TOLERANCE = 0.005
 MAX_CALIBRATION_ITERS = 10
 TARGET_SSIM = 0.98

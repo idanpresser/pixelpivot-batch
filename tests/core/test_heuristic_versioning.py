@@ -36,8 +36,8 @@ def test_heuristic_table_version_recorded(mock_table, tmp_path):
         conn,
         source_dir="src",
         target_dir="dst",
-        target_format=["webp"],
-        tool=["ffmpeg"],
+        target_format="webp",
+        tool="ffmpeg",
         trigger_type="manual",
         heuristic_version=interpolator.version
     )

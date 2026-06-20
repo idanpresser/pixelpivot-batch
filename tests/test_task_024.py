@@ -55,23 +55,6 @@ def test_vips_webpsave_records_fractional_quality(tmp_path) -> None:
     )
 
 
-def test_nvenc_lambda_uses_round_not_truncate() -> None:
-    """At q=86.6 the formula (100-q)/2 = 6.7 -- round=7, int=6. Must be 7."""
-    from app.core.converters.ffmpeg_nvenc_converter import FFmpegNvencConverter
-    avif_args = FFmpegNvencConverter.FORMAT_PARAMS["avif"](86.6)
-    # Find the value following "-cq"
-    cq_idx = avif_args.index("-cq")
-    cq_val = avif_args[cq_idx + 1]
-    assert cq_val == "7", (
-        f"-cq value for q=86.6 was {cq_val!r}; expected '7' (round of 6.7), "
-        f"not '6' (truncate)"
-    )
-    # Boundary clamp still works
-    extreme = FFmpegNvencConverter.FORMAT_PARAMS["avif"](-999)
-    cq_extreme = extreme[extreme.index("-cq") + 1]
-    assert int(cq_extreme) <= 51, f"CQ must clamp to <= 51; got {cq_extreme}"
-
-
 def test_magick_wand_uses_round() -> None:
     """The Wand fallback in MagickConverter must use round(quality) (still
     int-valued, but unbiased)."""
@@ -85,13 +68,3 @@ def test_magick_wand_uses_round() -> None:
     assert fn == "round", f"expected round(); got {fn}() for img.quality assignment"
 
 
-def test_nvenc_converter_imports_optional() -> None:
-    """ffmpeg_nvenc_converter.py uses Optional[int] on its convert signature
-    but did not import it; only `from __future__ import annotations` saves
-    it. Fix that to make the typing-honest."""
-    src = (PROJ / "app" / "core" / "converters" / "ffmpeg_nvenc_converter.py").read_text(
-        encoding="utf-8"
-    )
-    assert re.search(
-        r"from\s+typing\s+import[^\n]*\bOptional\b", src
-    ), "ffmpeg_nvenc_converter.py must import Optional from typing"

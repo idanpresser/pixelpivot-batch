@@ -54,8 +54,7 @@ don't ship blurry thumbnails or oversized hero images.
 │  ├─ MagickConverter     │    │  - batch_summary        │
 │  ├─ FFmpegConverter     │    │  - images / conversions │
 │  ├─ VipsConverter       │    │  - metrics / priors     │
-│  ├─ SharpConverter      │    └─────────────────────────┘
-│  └─ FFmpegNvencConverter│
+│  └─ SharpConverter      │    └─────────────────────────┘
 └─────────────────────────┘
 ```
 
@@ -74,7 +73,9 @@ Every constraint there is load-bearing — read it before refactoring.
   - **ImageMagick 7** (`magick` / `mogrify` on PATH)
   - **libvips** (Windows: DLL discoverable via `os.add_dll_directory`)
   - **Node.js 18+** for the Sharp daemon
-- *(optional)* NVIDIA GPU + drivers for `FFmpegNvencConverter`
+
+The project is CPU-only; the NVENC backend was removed in v0.2.0 because
+the target deployment server has no GPU. See `CHANGELOG.md` for context.
 
 ### From source
 

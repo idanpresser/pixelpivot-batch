@@ -19,7 +19,6 @@ from ..core.converters.magick_converter import MagickConverter
 from ..core.converters.ffmpeg_converter import FFmpegConverter
 from ..core.converters.vips_converter import VipsConverter
 from ..core.converters.sharp_converter import SharpConverter
-from ..core.converters.ffmpeg_nvenc_converter import FFmpegNvencConverter
 from ..core.logger import get_logger
 from ..core.config import (
     FFMPEG_TIMEOUT,
@@ -31,6 +30,7 @@ from ..core.config import (
     MIN_FREE_DISK_BYTES,
     DISK_RECHECK_EVERY_CELLS,
     default_quality_for,
+    MASSIVE_IMAGE_THRESHOLD,
 )
 from ..core.paths import APP_ROOT, PROJ_ROOT
 
@@ -150,11 +150,10 @@ class BatchOrchestrator:
             magick_bin = "magick"
 
         self.converters = {
-            "magick":       MagickConverter(magick_path=magick_bin),
-            "ffmpeg":       FFmpegConverter(ffmpeg_path=ffmpeg_bin),
-            "vips":         VipsConverter(),
-            "sharp":        SharpConverter(port=8765),
-            "ffmpeg_nvenc": FFmpegNvencConverter(ffmpeg_path=ffmpeg_bin),
+            "magick": MagickConverter(magick_path=magick_bin),
+            "ffmpeg": FFmpegConverter(ffmpeg_path=ffmpeg_bin),
+            "vips":   VipsConverter(),
+            "sharp":  SharpConverter(port=8765),
         }
     def _preflight_resources(self, target_dir: str) -> None:
         """Validate available memory and disk space before batch execution.
@@ -209,17 +208,22 @@ class BatchOrchestrator:
     def _probe_all_dimensions(self, paths: list[str]) -> Dict[str, tuple[int, int]]:
         """Probe dimensions of all input images in parallel.
 
-        Args:
-            paths: List of image file paths.
-
-        Returns:
-            Dict mapping path to (width, height) tuple.
+        Returns (0, 0) for any file that cannot be probed instead of propagating
+        the exception — callers treat (0, 0) as unreadable and reject the file.
         """
         from ..core.utils import probe_image_dimensions
-        workers = min(32, (os.cpu_count() or 4) * 4)
         from concurrent.futures import ThreadPoolExecutor
+
+        def _safe_probe(path: str) -> tuple[int, int]:
+            try:
+                return probe_image_dimensions(path)
+            except Exception as e:
+                log.warning("Could not probe dimensions for %s: %s", Path(path).name, e)
+                return (0, 0)
+
+        workers = min(32, (os.cpu_count() or 4) * 4)
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            dims = list(ex.map(probe_image_dimensions, paths))
+            dims = list(ex.map(_safe_probe, paths))
         return dict(zip(paths, dims))
 
     def execute_batch(self, run_id: int, request: BatchRequest) -> None:
@@ -255,6 +259,17 @@ class BatchOrchestrator:
                     self.repo.update_status(conn, run_id, "completed", total_images=0)
                 return
 
+            # Per-batch circuit-breaker isolation (issue 49x): converters are
+            # long-lived singletons shared across batches. Reset every breaker at
+            # the start of each run so poison-pill files from a prior batch cannot
+            # bleed into this one and quarantine healthy files during the cooldown.
+            # Guarded: a converter without the BaseConverter breaker (e.g. a test
+            # stub) simply has no state to reset.
+            for converter in self.converters.values():
+                reset = getattr(converter, "_reset_failures", None)
+                if callable(reset):
+                    reset()
+
             # Matrix Configuration
             categories = request.category if isinstance(request.category, list) else [request.category]
             tools = request.tool if isinstance(request.tool, list) else [request.tool]
@@ -272,7 +287,30 @@ class BatchOrchestrator:
             all_telemetry_summaries = []
             
             dim_cache = self._probe_all_dimensions(input_paths)
-            
+
+            # Filter unreadable and massive images upfront
+            filtered_input_paths = []
+            for path in input_paths:
+                w, h = dim_cache.get(path, (0, 0))
+                if w == 0 and h == 0:
+                    err_msg = f"Image {Path(path).name} could not be probed (unreadable or corrupt) — skipped."
+                    log.error(err_msg)
+                    all_failure_count += len(plan)
+                    for cell in plan:
+                        all_errors.append({"path": path, "error": err_msg})
+                elif w * h > MASSIVE_IMAGE_THRESHOLD:
+                    err_msg = (
+                        f"Image {Path(path).name} exceeds MASSIVE_IMAGE_THRESHOLD "
+                        f"({w}x{h} = {w*h} px > {MASSIVE_IMAGE_THRESHOLD} px) and was rejected."
+                    )
+                    log.error(err_msg)
+                    all_failure_count += len(plan)
+                    for cell in plan:
+                        all_errors.append({"path": path, "error": err_msg})
+                else:
+                    filtered_input_paths.append(path)
+            input_paths = filtered_input_paths
+
             from concurrent.futures import ThreadPoolExecutor
             probe_workers = min(32, (os.cpu_count() or 4) * 4)
 
@@ -304,6 +342,9 @@ class BatchOrchestrator:
 
                 converter = self.converters.get(t_name)
                 if not converter:
+                    # Skip an unregistered tool's cell so sibling cells still run
+                    # (partial success). If NO cell executes, the post-loop guard
+                    # fails the whole batch.
                     err_msg = f"Unsupported tool: {t_name}"
                     log.error(err_msg)
                     all_failure_count += len(input_paths)
@@ -311,10 +352,11 @@ class BatchOrchestrator:
                     continue
                 
                 if converter.is_broken:
-                    err_msg = f"Aborting sub-batch: {t_name} is marked as BROKEN."
-                    log.error(err_msg)
+                    err_msg = f"Quarantined: {t_name} circuit breaker tripped — not attempted."
+                    log.error(f"Aborting sub-batch: {t_name} is marked as BROKEN. Quarantining {len(input_paths)} files.")
                     all_failure_count += len(input_paths)
-                    all_errors.append({"path": "N/A", "error": err_msg})
+                    for _p in input_paths:
+                        all_errors.append({"path": _p, "error": err_msg, "quarantined": True})
                     continue
 
                 if DISK_RECHECK_EVERY_CELLS > 0 and cells_processed > 0 and cells_processed % DISK_RECHECK_EVERY_CELLS == 0:
@@ -361,6 +403,15 @@ class BatchOrchestrator:
                         "quality": q, "success": p not in error_paths,
                     })
 
+            # Nothing ran at all (every tool unregistered, all images unreadable)
+            # while failures accrued → the batch failed; raise so the except
+            # handler marks it 'failed'. Exception: a fully-quarantined batch
+            # (broken converter) is a handled outcome — fall through so its
+            # per-file quarantine errors are still persisted via save_errors.
+            if not executed_cells and all_failure_count > 0:
+                if not any(e.get("quarantined") for e in all_errors):
+                    raise ValueError("Batch produced no executed cells (all tools unsupported or all images unreadable).")
+
             # 4. Save Summary & Finalize Status
             duration_ms = (time.time() - start_time) * 1000
             from ..core.telemetry import aggregate_telemetry
@@ -391,6 +442,11 @@ class BatchOrchestrator:
             yield_mb_sec = (output_bytes / (1024 * 1024)) / duration_s
             savings_pct = (1.0 - output_bytes / input_bytes) * 100.0 if input_bytes else 0.0
 
+            # A batch that produced zero successful conversions while accruing
+            # failures (e.g. every tool unregistered, all images unreadable) is a
+            # failure, not a silent "completed". Partial success stays "completed".
+            final_status = "failed" if all_success_count == 0 and all_failure_count > 0 else "completed"
+
             def _save_summary():
                 with get_connection() as conn:
                     self.repo.save_summary(
@@ -400,14 +456,12 @@ class BatchOrchestrator:
                         cpu_avg_pct=telemetry.get("cpu_avg", 0.0),
                         cpu_peak_pct=telemetry.get("cpu_peak", 0.0),
                         ram_peak_mb=telemetry.get("ram_peak", 0.0),
-                        gpu_peak_pct=telemetry.get("gpu_peak", 0.0),
-                        vram_peak_mb=telemetry.get("vram_peak_mb", 0.0),
                         yield_mb_sec=yield_mb_sec,
                         savings_pct=savings_pct,
                         success_count=all_success_count,
-                        failure_count=all_failure_count
+                        failure_count=all_failure_count,
                     )
-                    self.repo.update_status(conn, run_id, "completed", total_images=total_conversions)
+                    self.repo.update_status(conn, run_id, final_status, total_images=total_conversions)
             
             with_busy_retry(_save_summary, attempts=SQLITE_BUSY_ATTEMPTS, base_delay_s=SQLITE_BUSY_BASE_DELAY_S)
 

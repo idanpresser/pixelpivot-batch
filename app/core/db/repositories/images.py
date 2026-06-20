@@ -55,8 +55,13 @@ def register_image(
         with PILImage.open(filepath) as img:
             width, height = img.size
             fmt = img.format.lower() if img.format else fmt
+            # Verify file structure
+            img.verify()
+        # Re-open to verify pixel decoding (verify closes file handle or alters state)
+        with PILImage.open(filepath) as img:
+            img.load()
     except Exception as e:
-        log.warning(f"Metadata extraction failed for {filename}: {e}")
+        log.warning(f"Metadata extraction/verification failed for {filename}: {e}")
         is_corrupt = True
 
     sha256_hash_str = "CORRUPT_OR_SKIPPED"

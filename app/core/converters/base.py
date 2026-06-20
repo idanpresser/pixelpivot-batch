@@ -18,15 +18,84 @@ from ..config import (
     MAX_LOG_BUFFER,
     CONCURRENT_ENCODES_SCALING_FACTOR,
     CONCURRENT_ENCODES_MIN_RAM_MB,
+    CONCURRENT_ENCODES_MAX_WORKERS,
 )
 
 log = get_logger(__name__)
+
+
+def _win32_safe_path(path: str) -> str:
+    """Prefix absolute Windows paths with \\\\?\\ to bypass the 260-char MAX_PATH limit.
+
+    UNC paths (\\\\\\\\server\\\\share\\\\...) become \\\\\\\\?\\\\UNC\\\\server\\\\share\\\\...
+    Already-prefixed paths and relative paths are returned unchanged.
+    Non-Windows platforms receive the input unchanged.
+    """
+    if sys.platform != "win32":
+        return path
+    from pathlib import PureWindowsPath
+    import os as _os
+    if not _os.path.isabs(path):
+        return path
+    s = str(PureWindowsPath(path))
+    if s.startswith("\\\\?\\"):
+        return s
+    if s.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + s[2:]
+    return "\\\\?\\" + s
 
 
 def _truncate(s: str | None, limit: int = 2048) -> str | None:
     if not s:
         return s
     return s if len(s) <= limit else s[:limit] + f"... ({len(s) - limit} bytes truncated)"
+
+
+# Conservative per-pixel working-set estimate for an in-process decode+encode:
+# a decoded RGBA frame is 4 bytes/px; encoders typically hold ~3x that in
+# intermediate buffers. Tunable via env for unusual workloads.
+_WORKER_BYTES_PER_PX = int(os.getenv("PIXELPIVOT_WORKER_BYTES_PER_PX", str(4 * 3)))
+# Fraction of currently-available RAM we are willing to commit to frame buffers.
+_WORKER_RAM_HEADROOM = float(os.getenv("PIXELPIVOT_WORKER_RAM_HEADROOM", "0.7"))
+# Frame size assumed when dimensions are unknown, so missing dims never grant
+# unbounded concurrency (this gap caused the system-wide OOM). ~24 MP default.
+_WORKER_UNKNOWN_MP = float(os.getenv("PIXELPIVOT_WORKER_UNKNOWN_MP", "24.0"))
+
+
+def memory_aware_worker_cap(
+    base_workers: int,
+    dimensions: dict | None,
+    input_paths: list,
+    available_ram_mb: float,
+) -> int:
+    """Bound worker count so concurrent decoded frames fit in available RAM.
+
+    The CPU-derived worker count ignores per-image footprint. With large frames
+    and many workers, all decodes land at once and exhaust RAM *after* the
+    one-time availability check. This caps workers by projected peak memory,
+    using the largest frame in the batch. Missing dimensions are treated as a
+    conservative default frame so an unprobed batch can never grant full
+    concurrency. Never returns below 1, never above base_workers.
+    """
+    if base_workers <= 1:
+        return max(1, base_workers)
+
+    dims = dimensions or {}
+    max_area = 0
+    for p in input_paths:
+        wh = dims.get(p)
+        if wh and wh[0] and wh[1]:
+            max_area = max(max_area, wh[0] * wh[1])
+    if max_area <= 0:
+        # No usable dims for any input: assume a conservative frame (fail-safe).
+        max_area = int(_WORKER_UNKNOWN_MP * 1_000_000)
+
+    frame_mb = (max_area * _WORKER_BYTES_PER_PX) / (1024 * 1024)
+    if frame_mb <= 0:
+        return base_workers
+
+    affordable = int((available_ram_mb * _WORKER_RAM_HEADROOM) / frame_mb)
+    return max(1, min(base_workers, affordable))
 
 
 class BaseConverter(ABC):
@@ -82,7 +151,6 @@ class BaseConverter(ABC):
         output_path: str,
         target_format: str,
         quality: Union[int, float],
-        use_gpu: bool = False,
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -93,7 +161,6 @@ class BaseConverter(ABC):
             output_path: Path where output should be written.
             target_format: Output format (e.g., 'webp', 'avif', 'jxl').
             quality: Format-native quality value. Higher values indicate better quality.
-            use_gpu: Enable GPU acceleration if supported by the converter.
             is_intermediate: Hint that this is a calibration encode (may optimize speed over quality).
             run_id: Optional batch run ID for telemetry tracking.
 
@@ -128,7 +195,7 @@ class BaseConverter(ABC):
             and 'fatal_error' keys.
         """
         # Circuit Breaker with 30s self-healing cooldown bypass
-        if self.is_broken:
+        if self.is_broken and not getattr(self, "_bypass_breaker", False):
             if self.broken_since and (time.time() - self.broken_since) > self.cooldown_period:
                 log.warning(f"Cooldown period elapsed. Retrying broken converter: {self.get_name()}")
                 self._reset_failures()
@@ -233,7 +300,7 @@ class BaseConverter(ABC):
         Returns:
             Dict with 'success', 'duration_ms', 'telemetry', 'parameters_used', and 'error' keys.
         """
-        if self.is_broken:
+        if self.is_broken and not getattr(self, "_bypass_breaker", False):
             if self.broken_since and (time.time() - self.broken_since) > self.cooldown_period:
                 log.warning(f"Cooldown period elapsed. Retrying broken library converter: {self.get_name()}")
                 self._reset_failures()
@@ -337,15 +404,19 @@ class BaseConverter(ABC):
             "cpu_avg": 0.0,
             "cpu_peak": 0.0,
             "ram_peak": 0.0,
-            "gpu_peak": 0.0,
         }
         telemetry_samples = []
 
         os.makedirs(output_dir, exist_ok=True)
 
-        # 1. Calculate ideal max workers based on CPU
+        # 1. Calculate ideal max workers based on CPU with OS/API core reservation
         cpu_count = os.cpu_count() or 4
-        max_workers = int(cpu_count * CONCURRENT_ENCODES_SCALING_FACTOR)
+        if CONCURRENT_ENCODES_MAX_WORKERS is not None:
+            max_workers = CONCURRENT_ENCODES_MAX_WORKERS
+        else:
+            reserved = 2 if cpu_count > 4 else (1 if cpu_count > 2 else 0)
+            effective_cpus = max(1, cpu_count - reserved)
+            max_workers = int(effective_cpus * CONCURRENT_ENCODES_SCALING_FACTOR)
 
         # 2. Resource Guard: throttle if RAM is low
         try:
@@ -359,6 +430,24 @@ class BaseConverter(ABC):
         except Exception as e:
             log.debug(f"Resource guard check failed: {e}")
 
+        # 3. Memory-aware cap: bound workers so concurrent decoded frames fit in
+        #    RAM. The one-time check above is point-in-time; without this a batch
+        #    of large frames spawns cpu_count*SCALING workers that all decode at
+        #    once and exhaust RAM (root cause of the system-wide OOM).
+        try:
+            available_ram_mb = psutil.virtual_memory().available / (1024 * 1024)
+            capped = memory_aware_worker_cap(
+                max_workers, dimensions, input_paths, available_ram_mb
+            )
+            if capped < max_workers:
+                log.info(
+                    f"Memory-aware cap: {max_workers} -> {capped} workers "
+                    f"(largest frame in batch, {available_ram_mb:.0f} MB free)"
+                )
+            max_workers = capped
+        except Exception as e:
+            log.debug(f"Memory-aware worker cap skipped: {e}")
+
         max_workers = min(len(input_paths), max_workers)
         log.info(f"Starting batch conversion with {max_workers} concurrent workers (CPU cores={cpu_count})")
 
@@ -368,8 +457,12 @@ class BaseConverter(ABC):
             out_path = str(Path(output_dir) / f"{filename}{suffix}.{target_format}")
             return self.convert(in_path, out_path, target_format, q, run_id=run_id)
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = list(executor.map(worker, zip(input_paths, qualities)))
+        self._bypass_breaker = True
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                results = list(executor.map(worker, zip(input_paths, qualities)))
+        finally:
+            self._bypass_breaker = False
 
         summaries = []
         for in_path, res in zip(input_paths, results):

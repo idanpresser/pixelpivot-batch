@@ -21,8 +21,8 @@ def test_batch_repository_sqlite_full_cycle():
         conn,
         source_dir="/in",
         target_dir="/out",
-        target_format=["avif"],
-        tool=["ffmpeg"],
+        target_format="avif",
+        tool="ffmpeg",
         trigger_type="manual"
     )
     assert run_id is not None

@@ -64,14 +64,15 @@ class VipsConverter(BaseConverter):
 
         params: Dict[str, Any] = {}
         if target_format == "webp":
-            log.debug(f"pyvips webpsave: Q={int(quality)}")
-            image.webpsave(output_path, Q=int(quality))
-            params = {"method": "webpsave", "Q": int(quality)}
+            log.debug(f"pyvips webpsave: Q={round(quality)} (frac={quality})")
+            # Encoder needs an int scalar; record the fractional quality for analytics.
+            image.webpsave(output_path, Q=round(quality))
+            params = {"method": "webpsave", "Q": quality}
         elif target_format == "avif":
-            log.debug(f"pyvips heifsave (AVIF): Q={int(quality)}")
+            log.debug(f"pyvips heifsave (AVIF): Q={round(quality)} (frac={quality})")
             # pyvips uses heifsave for AVIF when built with libheif/libaom
-            image.heifsave(output_path, compression="av1", Q=int(quality))
-            params = {"method": "heifsave", "compression": "av1", "Q": int(quality)}
+            image.heifsave(output_path, compression="av1", Q=round(quality))
+            params = {"method": "heifsave", "compression": "av1", "Q": quality}
         elif target_format == "jxl":
             dist = float(quality_to_jxl_distance(quality))
             log.debug(f"pyvips jxlsave: distance={dist}")
@@ -92,7 +93,6 @@ class VipsConverter(BaseConverter):
         output_path: str,
         target_format: str,
         quality: Union[int, float],
-        use_gpu: bool = False,
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -103,7 +103,6 @@ class VipsConverter(BaseConverter):
             output_path: Path where output should be written.
             target_format: Output format ('webp', 'avif', or 'jxl').
             quality: Quality value 0-100 (higher is better).
-            use_gpu: Unused (for interface compatibility).
             is_intermediate: Unused.
             run_id: Optional batch run ID for telemetry.
 

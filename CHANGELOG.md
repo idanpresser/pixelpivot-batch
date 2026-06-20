@@ -15,6 +15,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Removed
+- **GPU / NVENC backend.** `FFmpegNvencConverter`, the `Tool.ffmpeg_nvenc`
+  enum value, `app/core/gpu_utils.py`, all `use_gpu` kwargs on converter
+  `convert()` signatures, the NVML telemetry sampling path, the
+  `gpu_peak_pct` / `vram_peak_mb` columns in `batch_summary`, and the
+  `gpu_pct` / `vram_mb` columns in `batch_telemetry` are gone. The
+  decision was driven by a 2026-05-29 matrix E2E run that surfaced two
+  independent issues: 488/500 nvenc conversions failed with `av1_nvenc:
+  No capable devices found` because the converter inherited the base
+  48-worker concurrency cap that exceeds consumer-GPU NVENC session
+  limits, and `gpu_peak_pct` came back 0.0 across every tool because the
+  NVML sampling never actually fired. Combined with the target deployment
+  server being CPU-only, full removal was preferred over per-tool
+  concurrency tuning. **Breaking:** callers passing `tool=ffmpeg_nvenc`
+  to the batch API or calling `converter.convert(..., use_gpu=True)`
+  will get an error. The schema migration is idempotent and runs on
+  `init_db()` -- existing DBs have the columns dropped on first bootstrap
+  after upgrade; fresh DBs never get them.
 
 ## [0.1.0] - 2026-05-28
 

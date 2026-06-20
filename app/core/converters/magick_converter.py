@@ -7,7 +7,7 @@ import subprocess
 import time
 import os
 import sys
-from .base import BaseConverter
+from .base import BaseConverter, _win32_safe_path
 from ..logger import get_logger
 from ..telemetry import TelemetryMonitor, aggregate_telemetry
 from ..utils import kill_process_tree, quality_to_jxl_distance, get_resolution_bucket_from_path
@@ -102,7 +102,6 @@ class MagickConverter(BaseConverter):
         output_path: str,
         target_format: str,
         quality: Union[int, float],
-        use_gpu: bool = False,
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -116,7 +115,6 @@ class MagickConverter(BaseConverter):
             output_path: Path where output should be written.
             target_format: Output format ('webp', 'avif', or 'jxl').
             quality: Quality value 0-100 (higher is better).
-            use_gpu: Unused (ImageMagick GPU acceleration not configured).
             is_intermediate: Unused.
             run_id: Optional batch run ID for telemetry.
 
@@ -130,7 +128,7 @@ class MagickConverter(BaseConverter):
             return {"success": False, "error": f"Unsupported format: {target_format}"}
 
         params = param_builder(quality)
-        cmd = [self.magick_path, input_path] + params + [output_path]
+        cmd = [self.magick_path, _win32_safe_path(input_path)] + params + [_win32_safe_path(output_path)]
 
         try:
             return self._run_subprocess(cmd, "ImageMagick", params, quality, run_id=run_id)
@@ -352,24 +350,34 @@ class MagickConverter(BaseConverter):
             where tripped indicates whether the circuit breaker was triggered.
         """
         saved_failures = self.consecutive_failures
+        saved_broken = self.is_broken
+        saved_broken_since = self.broken_since
+        self._bypass_breaker = True
+        
         ok = 0
         fail = 0
         errs: List[Dict[str, Any]] = []
         sums: List[Dict[str, Any]] = []
-        for p in chunk:
-            out_path = str(Path(output_dir) / f"{Path(p).stem}{suffix}.{target_format}")
-            try:
-                res = self.convert(p, out_path, target_format, q, run_id=run_id)
-            except Exception as e2:
-                fail += 1
-                errs.append({"path": p, "error": str(e2)})
-                continue
-            if res.get("success"):
-                ok += 1
-                sums.append(res.get("telemetry", {}))
-            else:
-                fail += 1
-                errs.append({"path": p, "error": res.get("error") or f"Failed to convert {p}"})
+        try:
+            for p in chunk:
+                out_path = str(Path(output_dir) / f"{Path(p).stem}{suffix}.{target_format}")
+                try:
+                    res = self.convert(p, out_path, target_format, q, run_id=run_id)
+                except Exception as e2:
+                    fail += 1
+                    errs.append({"path": p, "error": str(e2)})
+                    continue
+                if res.get("success"):
+                    ok += 1
+                    sums.append(res.get("telemetry", {}))
+                else:
+                    fail += 1
+                    errs.append({"path": p, "error": res.get("error") or f"Failed to convert {p}"})
+        finally:
+            self._bypass_breaker = False
+
         tripped = self.is_broken
         self.consecutive_failures = saved_failures
+        self.is_broken = saved_broken
+        self.broken_since = saved_broken_since
         return ok, fail, errs, sums, tripped

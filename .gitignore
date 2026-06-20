@@ -62,3 +62,6 @@ ffmpeg_refactoring_plan.md
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Air-gap deploy bundle (build artifact, ~18k files)
+deploy/
