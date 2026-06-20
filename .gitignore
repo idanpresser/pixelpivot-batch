@@ -45,6 +45,18 @@ scratch/
 # Legacy planning/brainstorm artifacts
 ffmpeg_multi_image_brainstorm.html
 ffmpeg_refactoring_plan.md
+dev_plan.md
+implementation_plan.md
+tasks.md
+
+# Parked WIP — removed features kept as local reminder, not shipped
+*.py.old
+
+# Generated/scratch artifacts (stale scans, manual matrix runs, run logs)
+_test.avif
+test_results_snippet.txt
+project_metadata_v3.yml
+test_150_matrix.py
 
 # Beads / Dolt local state (also handled by .beads/.gitignore)
 .dolt/
