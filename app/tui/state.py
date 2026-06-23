@@ -25,6 +25,8 @@ class UiState:
     settings: dict = field(default_factory=dict)
     toast: str | None = None
     progress_cache: dict = field(default_factory=dict)
+    run_finalized: bool = False
+    final_status: dict | None = None
 
     def toggle_tool(self, tool: str) -> None:
         if tool not in self.enabled_tools:

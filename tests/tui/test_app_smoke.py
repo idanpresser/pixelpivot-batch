@@ -84,3 +84,28 @@ def test_focus_filter_blocks_digits_and_q_in_textarea():
             # Filter should evaluate to False, blocking global actions
             assert b_2[0].filter() is False
             assert b_q[0].filter() is False
+
+def test_poller_thread_stops_on_finalization():
+    state = UiState(active_run_id=770)
+    api = MagicMock()
+    api.get_progress.side_effect = Exception("404")
+    api.get_status.return_value = {"status": "completed", "savings_pct": 10.0, "cells_total": 5}
+    
+    with create_pipe_input() as inp, create_app_session(input=inp, output=DummyOutput()):
+        app = build_application(state, api=api, supervisor=None)
+        
+        from prompt_toolkit.application import Application
+        with patch.object(Application, "is_running", new_callable=PropertyMock) as mock_is_running:
+            mock_is_running.return_value = True
+            
+            import time
+            for _ in range(20):
+                if state.run_finalized:
+                    break
+                time.sleep(0.1)
+                
+            assert state.run_finalized is True
+            assert state.final_status is not None
+            assert state.final_status["status"] == "completed"
+            api.get_progress.assert_called_with(770)
+            api.get_status.assert_called_with(770)

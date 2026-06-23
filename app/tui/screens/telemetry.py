@@ -39,6 +39,16 @@ def create_screen(state, api, supervisor) -> Screen:
         if state.active_run_id is None or api is None:
             return "No active run. Submit a batch first."
 
+        if state.run_finalized and state.final_status is not None:
+            s = state.final_status
+            return (
+                f"Run {state.active_run_id}: {s.get('status')}\n"
+                f"Saved: {s.get('savings_pct', 0.0):.1f}%\n"
+                f"Total cells: {s.get('cells_total', 0)}\n"
+                f"Result: {s.get('result', '-')}\n\n"
+                f"[R] restart"
+            )
+
         try:
             # Try to fetch/render progress
             p_data = state.progress_cache if state.progress_cache else api.get_progress(state.active_run_id)

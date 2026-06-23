@@ -193,13 +193,21 @@ def build_application(state: UiState, api=None, supervisor=None) -> Application:
             elif has_started:
                 break
                 
-            if a.is_running and state.active_run_id is not None and api is not None:
+            if a.is_running and state.active_run_id is not None and api is not None and not state.run_finalized:
                 try:
                     progress = api.get_progress(state.active_run_id)
                     state.progress_cache = progress
                     a.invalidate()
                 except Exception:
-                    pass
+                    try:
+                        s = api.get_status(state.active_run_id)
+                        if s and s.get("status") in ("completed", "failed", "cancelled"):
+                            state.run_finalized = True
+                            state.final_status = s
+                            state.progress_cache = {}
+                            a.invalidate()
+                    except Exception:
+                        pass
             time.sleep(1.0)
 
     poller_thread = threading.Thread(target=poll_loop, daemon=True)

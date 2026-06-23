@@ -20,6 +20,8 @@ from app.tui.settings import load_settings, save_settings as save_toml, classify
 def submit(state: UiState, api: Any) -> None:
     state.toast = None
     state.progress_cache = {}
+    state.run_finalized = False
+    state.final_status = None
     if api is None:
         state.toast = "API client not available"
         return
@@ -51,6 +53,8 @@ def control(state: UiState, api: Any, action: str) -> None:
     try:
         if action == "restart":
             state.progress_cache = {}
+            state.run_finalized = False
+            state.final_status = None
             res = api.restart(state.active_run_id)
             if res and "run_id" in res:
                 state.active_run_id = res["run_id"]
