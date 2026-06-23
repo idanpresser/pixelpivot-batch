@@ -50,3 +50,25 @@ def history_table(runs: List[Dict]) -> str:
                   str(r.get("tool", "")), str(r.get("target_format", "")),
                   f"{r.get('savings_pct') or 0:.1f}")
     return _render(t)
+
+
+def progress_bar(p: Dict) -> str:
+    from rich.progress_bar import ProgressBar
+    from rich.console import Group
+    from rich.panel import Panel
+    
+    cells_done = p.get('cells_done', 0)
+    cells_total = p.get('cells_total', 0)
+    pct = (cells_done / cells_total) if cells_total > 0 else 0.0
+    
+    bar = ProgressBar(total=1.0, completed=pct, width=40)
+    details = (
+        f"Progress: {pct * 100:.1f}%\n"
+        f"Cells: {cells_done}/{cells_total}\n"
+        f"Current: {p.get('current_cell', '-')}\n"
+        f"OK/Fail: {p.get('ok', 0)} / {p.get('fail', 0)}\n"
+        f"CPU: {p.get('cpu_pct', 0):.1f}% | RAM: {p.get('ram_mb', 0):.1f} MB"
+    )
+    group = Group(bar, details)
+    panel = Panel(group, title="Batch Progress Details")
+    return _render(panel)
