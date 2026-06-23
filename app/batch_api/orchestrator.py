@@ -253,15 +253,26 @@ class BatchOrchestrator:
             self._preflight_resources(request.target_dir)
             
             valid_exts = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".heic", ".heif", ".avif"}
-            input_paths = [
-                str(p) for p in source_path.iterdir() 
-                if p.is_file() and p.suffix.lower() in valid_exts
-            ]
+            
+            input_paths = []
+            max_attempts = 3
+            for attempt in range(1, max_attempts + 1):
+                input_paths = [
+                    str(p) for p in source_path.iterdir() 
+                    if p.is_file() and p.suffix.lower() in valid_exts
+                ]
+                if input_paths:
+                    break
+                if attempt < max_attempts:
+                    log.info(f"Empty scan for source_dir {request.source_dir}, retrying in 0.5s (attempt {attempt}/{max_attempts})...")
+                    time.sleep(0.5)
             
             if not input_paths:
-                log.warning(f"No valid images found in {request.source_dir}")
+                err_msg = f"No images found in {request.source_dir} after {max_attempts} scan attempts — check the path is reachable and contains supported files."
+                log.error(err_msg)
                 with get_connection() as conn:
-                    self.repo.update_status(conn, run_id, "completed", total_images=0)
+                    self.repo.update_status(conn, run_id, "failed", total_images=0)
+                    self.repo.save_errors(conn, run_id, [{"path": None, "error": err_msg}])
                 return
 
             # Per-batch circuit-breaker isolation (issue 49x): converters are
@@ -333,19 +344,9 @@ class BatchOrchestrator:
             executed_cells: List[MatrixCell] = []
             analytics_records: List[dict] = []
 
-            # Snapshot existing predicted-output mtimes so the savings math only
-            # credits this run with files it actually produced (new or modified),
-            # not leftovers from a previous run sharing the same predicted name.
+            # Resolve target directory path. The pre-run mtime snapshot loop is deleted
+            # to prevent a pre-loop stat storm over network paths.
             target_dir_path = Path(request.target_dir)
-            pre_run_mtimes: Dict[str, float] = {}
-            for p in input_paths:
-                stem = Path(p).stem
-                for c in plan:
-                    out = target_dir_path / output_name(stem, c, multi_category=multi_category)
-                    try:
-                        pre_run_mtimes[str(out)] = out.stat().st_mtime
-                    except OSError:
-                        pass
 
             for cell in plan:
                 if abort_matrix:
@@ -475,8 +476,11 @@ class BatchOrchestrator:
                         st = out.stat()
                     except OSError:
                         continue
-                    prev = pre_run_mtimes.get(str(out))
-                    if prev is None or st.st_mtime != prev:
+                    # Compare the output file's mtime against start_time to determine
+                    # if the file was written/updated during this run.
+                    # Assumption: local converters write to the target on the same host,
+                    # so mtime >= start_time is sufficient.
+                    if st.st_mtime >= start_time:
                         output_bytes += st.st_size
 
             duration_s = max(duration_ms / 1000.0, 1e-3)
