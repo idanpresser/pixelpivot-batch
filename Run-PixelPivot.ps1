@@ -43,7 +43,7 @@ Write-Host "  API PID  : $($apiProc.Id)"
 $deadline = (Get-Date).AddSeconds(30)
 $ready = $false
 while ((Get-Date) -lt $deadline) {
-    try { $r = Invoke-RestMethod "http://localhost:$Port/" -TimeoutSec 2 -EA Stop; $ready=$true; break } catch {}
+    try { $r = Invoke-RestMethod "http://127.0.0.1:$Port/" -TimeoutSec 2 -EA Stop; $ready=$true; break } catch {}
     Start-Sleep -Seconds 2
 }
 if (-not $ready) {

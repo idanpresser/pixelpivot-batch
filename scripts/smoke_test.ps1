@@ -14,7 +14,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$ApiUrl     = 'http://localhost:8000',
+    [string]$ApiUrl     = 'http://127.0.0.1:8000',
     [string]$ProjectRoot = (Resolve-Path '.').Path,
     [string[]]$Tools    = @('magick','vips'),
     [string]$Format     = 'webp',
