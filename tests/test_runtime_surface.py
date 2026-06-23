@@ -19,9 +19,20 @@ banned = [name for name in sys.modules
 assert not banned, f"banned runtime imports: {banned}"
 
 # 2. Routes are limited to batch / telemetry / hotfolder.
-paths = sorted({r.path for r in m.app.routes if r.path.startswith("/api/")})
+paths = set()
+for r in m.app.routes:
+    if hasattr(r, "path"):
+        if r.path.startswith("/api/"):
+            paths.add(r.path)
+    elif type(r).__name__ == "_IncludedRouter":
+        prefix = getattr(r.include_context, "prefix", "")
+        for sr in r.original_router.routes:
+            p = f"{prefix}{sr.path}"
+            if p.startswith("/api/"):
+                paths.add(p)
+
 assert paths, "no /api routes registered"
-for p in paths:
+for p in sorted(paths):
     assert "calibrat" not in p.lower(), f"calibration endpoint exposed: {p}"
     assert p.startswith("/api/v1/batch") or p.startswith("/api/v1/hotfolder"), p
 
