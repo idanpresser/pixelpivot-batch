@@ -48,6 +48,16 @@ def check_sharp_daemon(port: int = 8765) -> bool:
         print(f" WARNING (could not connect: {err_msg})")
     return st.ok
 
+def check_sharp_install() -> bool:
+    """Check if Node.js and sharp module are installed."""
+    print("Checking Sharp installation...", end="", flush=True)
+    st = toolcheck.check_sharp_install()
+    if st.ok:
+        print(f" OK ({st.detail})")
+    else:
+        print(f" WARNING ({st.detail})")
+    return st.ok
+
 def check_paths(source: str, target: str) -> bool:
     """Validate source and target paths and write permissions."""
     ok = True
@@ -148,8 +158,8 @@ def _run_convert(source: str, target: str, dry_run: bool) -> None:
     if not check_pyvips():
         validation_passed = False
         
-    # 4. Check Sharp Daemon
-    # Note: sharp daemon missing is a warning rather than hard failure since other tools can handle conversion.
+    # 4. Check Sharp Installation & Daemon
+    check_sharp_install()
     check_sharp_daemon()
     
     print("==================================================")
@@ -192,7 +202,8 @@ def _run_doctor() -> None:
     if not check_pyvips():
         validation_passed = False
         
-    # 3. Check Sharp Daemon
+    # 3. Check Sharp Installation & Daemon
+    check_sharp_install()
     check_sharp_daemon()
     
     print("==================================================")

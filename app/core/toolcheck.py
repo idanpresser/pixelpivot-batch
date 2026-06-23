@@ -58,11 +58,35 @@ def check_sharp_daemon(port: int = 8765, timeout: float = 1.0) -> ToolStatus:
         return ToolStatus("sharp", ok=False, detail=f"down ({e})")
 
 
+def check_sharp_install() -> ToolStatus:
+    """Check that Node.js is available and the sharp module is installed."""
+    from .paths import PROJ_ROOT
+    import sys
+    
+    # 1. Resolve node executable
+    portable_node = (
+        os.path.join(PROJ_ROOT, "node", "node.exe")
+        if sys.platform == "win32"
+        else os.path.join(PROJ_ROOT, "node", "node")
+    )
+    node_cmd = portable_node if os.path.exists(portable_node) else shutil.which("node")
+    if not node_cmd:
+        return ToolStatus("sharp_install", ok=False, detail="Node.js binary not found")
+        
+    # 2. Check node_modules/sharp presence
+    sharp_module = os.path.join(PROJ_ROOT, "node_modules", "sharp")
+    if not os.path.exists(sharp_module):
+        return ToolStatus("sharp_install", ok=False, detail="node_modules/sharp not found")
+        
+    return ToolStatus("sharp_install", ok=True, detail=f"found Node ({node_cmd}) and sharp module")
+
+
 def check_all(ffmpeg_path: str, magick_path: str, sharp_port: int = 8765) -> list[ToolStatus]:
-    """Probe all four tools and return their statuses in display order."""
+    """Probe all tools and return their statuses in display order."""
     return [
         check_binary("magick", magick_path),
         check_binary("ffmpeg", ffmpeg_path),
         check_pyvips(),
+        check_sharp_install(),
         check_sharp_daemon(sharp_port),
     ]

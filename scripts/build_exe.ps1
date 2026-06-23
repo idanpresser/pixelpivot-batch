@@ -23,8 +23,13 @@ if (Test-Path $buildDir) {
     Remove-Item -Recurse -Force $buildDir
 }
 if (Test-Path $distDir) {
-    Write-Host "Removing $distDir"
-    Remove-Item -Recurse -Force $distDir
+    Write-Host "Cleaning contents of $distDir"
+    Remove-Item -Path "$distDir\*" -Recurse -Force -ErrorAction SilentlyContinue
+    try {
+        Remove-Item -Path $distDir -Force -ErrorAction Stop
+    } catch {
+        Write-Host "  -> Dist directory is locked by another process; contents cleared." -ForegroundColor Yellow
+    }
 }
 
 # --- 2. Build ---
