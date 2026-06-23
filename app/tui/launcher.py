@@ -27,7 +27,10 @@ def run_tui() -> None:
     ready = sup.wait_ready(f"http://{host}:{port}/")
     api = TuiApiClient(base_url)
 
-    state = UiState(enabled_tools=list(cfg["tools"]["enabled"]))
+    state = UiState(
+        enabled_tools=list(cfg["tools"]["enabled"]),
+        settings=cfg
+    )
     app = build_application(state, api=api, supervisor=sup)
     if not ready:
         sup_logs = "\n".join(sup.get_logs()[-5:])
