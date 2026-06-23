@@ -49,6 +49,14 @@ if (-not (Test-Path $exePath)) {
 }
 Write-Host "Executable built successfully at $exePath" -ForegroundColor Green
 
+# Copy the commands guide batch file next to the executable
+$guideSrc = Join-Path $ProjectRoot "pixelpivot_guide.bat"
+$guideDst = Join-Path $distDir "pixelpivot_guide.bat"
+if (Test-Path $guideSrc) {
+    Copy-Item -Force $guideSrc $guideDst
+    Write-Host "Copied guide batch file to $guideDst"
+}
+
 # --- 4. Smoke Test ---
 Step "Running smoke test: pixelpivot.exe doctor..."
 
