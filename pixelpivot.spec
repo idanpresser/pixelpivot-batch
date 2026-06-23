@@ -31,6 +31,7 @@ datas = [
     ('app/core/heuristic_table.json', 'app/core'),
     ('app/core/heuristic_weights.json', 'app/core'),
     ('app/heuristic_table.json', 'app'),
+    ('app/scripts', 'app/scripts'),
     ('vendor/node', 'node'),
     ('bin/ffmpeg', 'bin/ffmpeg'),
     ('bin/magick', 'bin/magick'),
