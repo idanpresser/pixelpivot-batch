@@ -40,6 +40,8 @@ def check_binary(name: str, path_str: str) -> ToolStatus:
 def check_pyvips() -> ToolStatus:
     """Check that pyvips/libvips imports and its native library loads."""
     try:
+        from .utils import ensure_vips_dlls
+        ensure_vips_dlls()
         import pyvips
         ver = f"{pyvips.version(0)}.{pyvips.version(1)}.{pyvips.version(2)}"
         return ToolStatus("vips", ok=True, version=ver)

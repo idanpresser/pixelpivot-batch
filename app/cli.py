@@ -8,6 +8,9 @@ from pathlib import Path
 # Frozen-aware project root (PyInstaller bundles binaries next to the exe).
 # Centralised in app.core.paths so the seam lives in exactly one place.
 from app.core.paths import PROJ_ROOT
+from app.core.utils import ensure_vips_dlls
+ensure_vips_dlls()
+
 from app.core import toolcheck
 
 def check_binary(name: str, path_str: str) -> bool:
@@ -97,6 +100,7 @@ def main(argv=None):
     p_conv.add_argument("--dry-run", action="store_true")
 
     sub.add_parser("tui", help="Launch the terminal UI (supervises the API).")
+    sub.add_parser("doctor", help="Check system environment and dependencies.")
 
     args = parser.parse_args(argv)
     if args.command == "serve":
@@ -105,6 +109,8 @@ def main(argv=None):
         _run_convert(args.source, args.target, args.dry_run)
     elif args.command == "tui":
         _run_tui()
+    elif args.command == "doctor":
+        _run_doctor()
 
 
 def _run_serve(host: str, port: int) -> None:
@@ -158,6 +164,44 @@ def _run_convert(source: str, target: str, dry_run: bool) -> None:
 def _run_tui() -> None:
     from app.tui.launcher import run_tui
     run_tui()
+
+
+def _run_doctor() -> None:
+    print("==================================================")
+    print("      PixelPivot System Doctor / Validation       ")
+    print("==================================================")
+    
+    validation_passed = True
+    
+    # 1. Check Native Binaries
+    ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg.exe")
+    if not os.path.exists(ffmpeg_bin):
+        alt_ffmpeg = str(PROJ_ROOT / "bin" / "ffmpeg" / "8.1.1-essentials_build" / "ffmpeg.exe")
+        if os.path.exists(alt_ffmpeg):
+            ffmpeg_bin = alt_ffmpeg
+            
+    magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick.exe")
+    
+    if not check_binary("FFmpeg", ffmpeg_bin):
+        validation_passed = False
+        
+    if not check_binary("ImageMagick", magick_bin):
+        validation_passed = False
+        
+    # 2. Check pyvips
+    if not check_pyvips():
+        validation_passed = False
+        
+    # 3. Check Sharp Daemon
+    check_sharp_daemon()
+    
+    print("==================================================")
+    if validation_passed:
+        print(" Doctor Result: PASSED")
+        sys.exit(0)
+    else:
+        print(" Doctor Result: FAILED")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -27,7 +27,11 @@ def resolve_proj_root() -> Path:
     if env_override:
         return Path(env_override)
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
+        exe_dir = Path(sys.executable).resolve().parent
+        internal_dir = exe_dir / "_internal"
+        if internal_dir.exists():
+            return internal_dir
+        return exe_dir
     return _DEFAULT_PROJ_ROOT
 
 

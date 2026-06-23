@@ -1,9 +1,14 @@
 <Configuration>
-  <Networking>Disable</Networking>
+  <Networking>Default</Networking>
   <MappedFolders>
     <MappedFolder>
       <HostFolder>.</HostFolder>
       <SandboxFolder>C:\PixelPivot</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+    <MappedFolder>
+      <HostFolder>.\image_samples</HostFolder>
+      <SandboxFolder>Z:</SandboxFolder>
       <ReadOnly>false</ReadOnly>
     </MappedFolder>
   </MappedFolders>
