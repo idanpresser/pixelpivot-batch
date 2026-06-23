@@ -16,21 +16,29 @@ class TuiApiClient:
     def __init__(self, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
         self._transport: Optional[httpx.BaseTransport] = None
+        self._client_instance: Optional[httpx.Client] = None
 
     def _client(self) -> httpx.Client:
-        return httpx.Client(transport=self._transport, timeout=10.0)
+        if self._client_instance is None:
+            self._client_instance = httpx.Client(transport=self._transport, timeout=10.0)
+        return self._client_instance
 
     def _get(self, path: str) -> Any:
-        with self._client() as c:
-            r = c.get(f"{self.base_url}{path}")
-            r.raise_for_status()
-            return r.json()
+        c = self._client()
+        r = c.get(f"{self.base_url}{path}")
+        r.raise_for_status()
+        return r.json()
 
     def _post(self, path: str, json: Optional[dict] = None) -> Any:
-        with self._client() as c:
-            r = c.post(f"{self.base_url}{path}", json=json)
-            r.raise_for_status()
-            return r.json()
+        c = self._client()
+        r = c.post(f"{self.base_url}{path}", json=json)
+        r.raise_for_status()
+        return r.json()
+
+    def close(self) -> None:
+        if self._client_instance is not None:
+            self._client_instance.close()
+            self._client_instance = None
 
     def start_batch(self, source_dir: str, target_dir: str,
                     target_format: List[str], tool: List[str],

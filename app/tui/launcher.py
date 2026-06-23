@@ -38,4 +38,5 @@ def run_tui() -> None:
     try:
         app.run()
     finally:
+        api.close()
         sup.shutdown()

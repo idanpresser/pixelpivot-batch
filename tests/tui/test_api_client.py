@@ -32,3 +32,24 @@ def test_control_and_restart():
     api = _client_with(handler)
     assert api.control(9, "pause")["action"] == "pause"
     assert api.restart(9)["run_id"] == 10
+
+def test_client_instance_reuse():
+    def handler(request):
+        return httpx.Response(200, json=[])
+    api = _client_with(handler)
+    assert api._client_instance is None
+    api.get_history()
+    cli1 = api._client_instance
+    assert cli1 is not None
+    api.get_history()
+    cli2 = api._client_instance
+    assert cli1 is cli2
+
+def test_client_close_releases_instance():
+    def handler(request):
+        return httpx.Response(200, json=[])
+    api = _client_with(handler)
+    api.get_history()
+    assert api._client_instance is not None
+    api.close()
+    assert api._client_instance is None

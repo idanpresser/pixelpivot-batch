@@ -68,7 +68,9 @@ def main():
     st.sidebar.markdown("### SYSTEM STATUS")
     st.sidebar.info(f"CONNECTED: `{API_URL}`")
 
-    client = APIClient(base_url=API_URL)
+    if "api_client" not in st.session_state:
+        st.session_state["api_client"] = APIClient(base_url=API_URL)
+    client = st.session_state["api_client"]
 
     tab_names = ["⚡ EXECUTE", "📂 HOT FOLDERS", "📊 HISTORY"]
     tabs = st.tabs(tab_names)
