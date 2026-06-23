@@ -22,6 +22,9 @@ class UiState:
     category: str = "general"
     active_tab: str = "submit"
     active_run_id: int | None = None
+    settings: dict = field(default_factory=dict)
+    toast: str | None = None
+    progress_cache: dict = field(default_factory=dict)
 
     def toggle_tool(self, tool: str) -> None:
         if tool not in self.enabled_tools:

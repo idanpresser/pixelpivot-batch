@@ -57,7 +57,10 @@ async def start_batch(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/batch/status/{run_id}")
-async def get_batch_status(run_id: int):
+async def get_batch_status(
+    run_id: int,
+    orchestrator: BatchOrchestrator = Depends(get_orchestrator)
+):
     """Retrieve batch job status and summary metrics.
 
     Args:
@@ -78,7 +81,7 @@ async def get_batch_status(run_id: int):
         if run["status"] == "completed":
             summary = repo.get_summary(conn, run_id)
             
-        return {
+        res = {
             "run_id": run["id"],
             "status": run["status"],
             "total_images": run["total_images"],
@@ -86,6 +89,16 @@ async def get_batch_status(run_id: int):
             "completed_at": run["completed_at"],
             "summary": summary
         }
+        
+        # Fold in live progress counters when in-flight and available in-memory
+        if run["status"] not in ("completed", "failed", "cancelled"):
+            state = orchestrator.progress.get(run_id)
+            if state:
+                for key in ("cells_done", "cells_total", "current_cell", "ok", "fail"):
+                    if key in state:
+                        res[key] = state[key]
+                        
+        return res
 
 @router.get("/batch/{run_id}/errors")
 async def get_batch_errors(run_id: int):
