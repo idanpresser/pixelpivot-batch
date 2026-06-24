@@ -251,6 +251,7 @@ a libaom CRF where *lower is better*). See the
 
 ## See also
 
+- [API_REFERENCE.md](API_REFERENCE.md) — complete endpoint-by-endpoint REST reference (all routes, schemas, status codes, out-of-scope)
 - [README](../README.md) — install, configuration, quality scale
 - [ARCHITECTURE.md](ARCHITECTURE.md) — service topology and converter internals
 - [WINDOWS_SERVICE.md](WINDOWS_SERVICE.md) — run the API as a Windows service
