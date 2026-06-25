@@ -353,6 +353,7 @@ class MagickConverter(BaseConverter):
         saved_failures = self.consecutive_failures
         saved_broken = self.is_broken
         saved_broken_since = self.broken_since
+        self._set_active_run_id(run_id)
         self._bypass_breaker = True
         
         ok = 0

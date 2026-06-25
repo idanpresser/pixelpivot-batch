@@ -101,8 +101,9 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_serve = sub.add_parser("serve", help="Run the FastAPI API server.")
-    p_serve.add_argument("--host", default="0.0.0.0")
+    p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8000)
+    p_serve.add_argument("--allow-public", action="store_true", help="Allow public interface exposure.")
 
     p_conv = sub.add_parser("convert", help="Validate environment / run conversion.")
     p_conv.add_argument("--source", "-s", required=True)
@@ -114,6 +115,8 @@ def main(argv=None):
 
     args = parser.parse_args(argv)
     if args.command == "serve":
+        if args.allow_public:
+            os.environ["PIXELPIVOT_ALLOW_PUBLIC"] = "1"
         _run_serve(args.host, args.port)
     elif args.command == "convert":
         _run_convert(args.source, args.target, args.dry_run)
@@ -125,6 +128,7 @@ def main(argv=None):
 
 def _run_serve(host: str, port: int) -> None:
     import uvicorn
+    os.environ["PIXELPIVOT_HOST"] = host
     uvicorn.run("app.batch_api.main:app", host=host, port=port)
 
 

@@ -12,7 +12,12 @@ class APIClient:
             transport: Optional pluggable httpx transport.
         """
         self.base_url = base_url
-        self._client = httpx.Client(transport=transport, timeout=10.0)
+        import os
+        headers = {}
+        token = os.environ.get("PIXELPIVOT_API_TOKEN")
+        if token:
+            headers["X-API-Token"] = token
+        self._client = httpx.Client(transport=transport, timeout=10.0, headers=headers)
 
     def start_batch(
         self,

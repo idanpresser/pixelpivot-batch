@@ -20,7 +20,16 @@ class TuiApiClient:
 
     def _client(self) -> httpx.Client:
         if self._client_instance is None:
-            self._client_instance = httpx.Client(transport=self._transport, timeout=10.0)
+            import os
+            headers = {}
+            token = os.environ.get("PIXELPIVOT_API_TOKEN")
+            if token:
+                headers["X-API-Token"] = token
+            self._client_instance = httpx.Client(
+                transport=self._transport,
+                timeout=10.0,
+                headers=headers
+            )
         return self._client_instance
 
     def _get(self, path: str) -> Any:

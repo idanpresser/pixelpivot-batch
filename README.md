@@ -117,7 +117,7 @@ docker-compose up --build
 $env:PIXELPIVOT_DB_PATH = "./data/pixelpivot.db"
 
 # API
-uvicorn app.batch_api.main:app --host 0.0.0.0 --port 8000
+uvicorn app.batch_api.main:app --host 127.0.0.1 --port 8000
 
 # GUI (separate terminal)
 $env:BATCH_API_URL = "http://localhost:8000/api/v1"
@@ -177,6 +177,25 @@ curl -X POST http://localhost:8000/api/v1/hotfolder/register \
 
 Global timeouts, batch limits, fatal-error markers, and the
 default-quality table live in [`app/core/config.py`](app/core/config.py).
+
+---
+
+## Security & Trust Boundary
+
+### Default Bind Behavior
+By default, the API binds to loopback (`127.0.0.1`), ensuring it is only accessible locally.
+
+### LAN / Public Interface Exposure (0.0.0.0)
+Binding the server to `0.0.0.0` or a public/LAN IP exposes the API endpoints (which accept arbitrary source and target directory paths) to the network. To protect against unauthorized access and arbitrary file manipulation, the following safeguards are enforced:
+1. **Explicit Opt-in**: You must explicitly allow binding to public interfaces by passing the `--allow-public` flag (when running `cli serve`) or setting the environment variable `PIXELPIVOT_ALLOW_PUBLIC=1`.
+2. **Token Authentication**: When bound to a public interface, you must configure a shared secret via the environment variable `PIXELPIVOT_API_TOKEN`.
+
+If network exposure is detected without both configurations, the application will raise a safety error and refuse to start.
+
+### Client Authentication
+When `PIXELPIVOT_API_TOKEN` is configured:
+* All mutating API routes (`POST`, `PUT`, `DELETE`) require the `X-API-Token` header.
+* The Streamlit GUI, TUI, and CLI clients will automatically read `PIXELPIVOT_API_TOKEN` from the environment and inject the `X-API-Token` header on all outbound requests.
 
 ---
 

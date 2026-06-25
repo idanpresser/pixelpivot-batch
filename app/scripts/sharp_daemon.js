@@ -17,8 +17,9 @@ const server = net.createServer((socket) => {
             for (const line of lines) {
                 if (!line.trim()) continue;
 
+                let request;
                 try {
-                    const request = JSON.parse(line);
+                    request = JSON.parse(line);
 
                     if (request.ping) {
                         socket.write(JSON.stringify({ success: true, pong: true }) + '\n');
@@ -28,7 +29,7 @@ const server = net.createServer((socket) => {
                     const { inputPath, outputPath, format, quality } = request;
 
                     if (!inputPath || !outputPath) {
-                        socket.write(JSON.stringify({ success: false, error: 'Missing paths' }) + '\n');
+                        socket.write(JSON.stringify({ success: false, error: 'Missing paths', inputPath }) + '\n');
                         continue;
                     }
 
@@ -59,11 +60,16 @@ const server = net.createServer((socket) => {
                         success: true,
                         duration_ms,
                         format,
-                        quality
+                        quality,
+                        inputPath
                     }) + '\n');
 
                 } catch (err) {
-                    socket.write(JSON.stringify({ success: false, error: err.message }) + '\n');
+                    socket.write(JSON.stringify({
+                        success: false,
+                        error: err.message,
+                        inputPath: request ? request.inputPath : undefined
+                    }) + '\n');
                 }
             }
         }

@@ -162,6 +162,31 @@ class BaseConverter(ABC):
     def broken_since(self, val: Optional[float]):
         self._get_state()["broken_since"] = val
 
+    @property
+    def _bypass_breaker(self) -> bool:
+        run_id = self._get_active_run_id()
+        with self._breaker_lock:
+            state = self._breaker_states.get(run_id)
+            if state:
+                return state.get("bypass_breaker", False)
+            global_state = self._breaker_states.get(None)
+            if global_state:
+                return global_state.get("bypass_breaker", False)
+            return False
+
+    @_bypass_breaker.setter
+    def _bypass_breaker(self, val: bool):
+        run_id = self._get_active_run_id()
+        with self._breaker_lock:
+            if run_id not in self._breaker_states:
+                self._breaker_states[run_id] = {
+                    "consecutive_failures": 0,
+                    "is_broken": False,
+                    "broken_since": None,
+                    "bypass_breaker": False
+                }
+            self._breaker_states[run_id]["bypass_breaker"] = val
+
     def _mark_failure(self):
         state = self._get_state()
         state["consecutive_failures"] += 1
@@ -455,6 +480,7 @@ class BaseConverter(ABC):
             Dict with 'success_count', 'failure_count', 'duration_ms', 'telemetry',
             and 'errors' keys.
         """
+        self._set_active_run_id(run_id)
         start = time.time()
         success_count = 0
         failure_count = 0

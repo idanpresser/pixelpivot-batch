@@ -1,6 +1,7 @@
 import pytest
 import time
 import os
+import asyncio
 from unittest.mock import MagicMock, patch
 from app.batch_api.hot_folder import HotFolderHandler
 
@@ -59,3 +60,67 @@ def test_hot_folder_debouncer(tmp_path):
                 
                 # First arg is the coroutine, second is the loop
                 assert args[1] == mock_loop
+
+@pytest.mark.asyncio
+async def test_hot_folder_two_waves(tmp_path):
+    """
+    Verify that hot folder only triggers conversion for new/changed files
+    by dropping files in two waves.
+    """
+    mock_orchestrator = MagicMock()
+    mock_loop = asyncio.get_running_loop()
+    
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+    
+    config = {
+        "source_dir": str(source_dir),
+        "target_dir": str(target_dir),
+        "target_format": ["webp"],
+        "tool": ["magick"],
+        "category": ["general"]
+    }
+    
+    handler = HotFolderHandler(mock_orchestrator, mock_loop, config, debounce_seconds=0.1)
+    
+    # Wave 1: Write file1.png and file2.png
+    f1 = source_dir / "file1.png"
+    f2 = source_dir / "file2.png"
+    f1.write_text("dummy")
+    f2.write_text("dummy")
+    
+    handler.repo.create_run = MagicMock(side_effect=[123, 124])
+    
+    with patch("app.batch_api.hot_folder.get_connection") as mock_get_conn:
+        mock_get_conn.return_value.__enter__.return_value = MagicMock()
+        
+        # Trigger Wave 1
+        await handler._async_trigger_batch()
+        
+        # Assert execute_batch was called with both files
+        mock_orchestrator.execute_batch.assert_called_once()
+        run_id, request = mock_orchestrator.execute_batch.call_args[0]
+        assert run_id == 123
+        assert set(request.input_files) == {str(f1), str(f2)}
+        
+        # Reset mock
+        mock_orchestrator.reset_mock()
+        
+        # Simulate that Wave 1 finished and created outputs (touch output files)
+        (target_dir / "file1.webp").write_text("output")
+        (target_dir / "file2.webp").write_text("output")
+        
+        # Wave 2: Write file3.png
+        f3 = source_dir / "file3.png"
+        f3.write_text("dummy")
+        
+        # Trigger Wave 2
+        await handler._async_trigger_batch()
+        
+        # Assert execute_batch was called with ONLY file3.png
+        mock_orchestrator.execute_batch.assert_called_once()
+        run_id2, request2 = mock_orchestrator.execute_batch.call_args[0]
+        assert run_id2 == 124
+        assert request2.input_files == [str(f3)]

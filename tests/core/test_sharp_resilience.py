@@ -80,3 +80,60 @@ def test_sharp_socket_resilience_types(mock_daemon, error_type):
         assert not res["success"]
         # With max_retries = 3, it should try 3 times and stop 2 times
         assert mock_stop.call_count == 2
+
+def test_sharp_batch_error_path_correlation(mock_daemon):
+    """
+    Verify that if a batch of files is processed and one of them fails,
+    the error in the result is correctly correlated to the failing input path.
+    """
+    conv = SharpConverter()
+    
+    mock_sock = MagicMock()
+    # Mock the daemon response for two files: first succeeds, second fails.
+    resp1 = json.dumps({"success": True, "duration_ms": 50, "inputPath": "good.jpg"}).encode("utf-8") + b"\n"
+    resp2 = json.dumps({"success": False, "error": "Sharp processing error", "inputPath": "bad.jpg"}).encode("utf-8") + b"\n"
+    
+    mock_sock.recv.return_value = resp1 + resp2
+    mock_daemon["connect"].return_value = mock_sock
+    
+    res = conv.convert_batch(
+        input_paths=["good.jpg", "bad.jpg"],
+        output_dir="dummy_out",
+        target_format="webp",
+        qualities=[80, 80]
+    )
+    
+    assert res["success_count"] == 1
+    assert res["failure_count"] == 1
+    assert len(res["errors"]) == 1
+    assert res["errors"][0]["path"] == "bad.jpg"
+    assert "Sharp processing error" in res["errors"][0]["error"]
+
+def test_sharp_batch_error_path_correlation_fallback(mock_daemon):
+    """
+    Verify that if the daemon doesn't echo the inputPath, the converter
+    still maps the errors correctly based on the send order.
+    """
+    conv = SharpConverter()
+    
+    mock_sock = MagicMock()
+    # Mock responses with NO inputPath echoed.
+    resp1 = json.dumps({"success": True, "duration_ms": 50}).encode("utf-8") + b"\n"
+    resp2 = json.dumps({"success": False, "error": "Order fallback error"}).encode("utf-8") + b"\n"
+    
+    mock_sock.recv.return_value = resp1 + resp2
+    mock_daemon["connect"].return_value = mock_sock
+    
+    res = conv.convert_batch(
+        input_paths=["first_good.jpg", "second_bad.jpg"],
+        output_dir="dummy_out",
+        target_format="webp",
+        qualities=[80, 80]
+    )
+    
+    assert res["success_count"] == 1
+    assert res["failure_count"] == 1
+    assert len(res["errors"]) == 1
+    assert res["errors"][0]["path"] == "second_bad.jpg"
+    assert "Order fallback error" in res["errors"][0]["error"]
+

@@ -19,6 +19,9 @@ log = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage FastAPI app lifecycle: startup initialization and shutdown cleanup."""
+    from .security import check_security_config
+    check_security_config()
+
     # Fail loudly on a wrong Python (air-gap deploy onto a host below the
     # declared floor) here at lifespan, not cryptically at native-wheel import.
     if sys.version_info[:2] < MIN_PYTHON_VERSION:
@@ -108,6 +111,21 @@ async def lifespan(app: FastAPI):
                 log.warning("Failed to stop Sharp Node daemon on shutdown: %s", e)
 
 app = FastAPI(title="PixelPivot Batch Engine", lifespan=lifespan)
+
+@app.middleware("http")
+async def api_token_auth_middleware(request, call_next):
+    import os
+    token = os.environ.get("PIXELPIVOT_API_TOKEN")
+    if token:
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            req_token = request.headers.get("X-API-Token")
+            if not req_token or req_token != token:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Unauthorized: Invalid or missing X-API-Token header."}
+                )
+    return await call_next(request)
 
 app.include_router(router, prefix="/api/v1")
 

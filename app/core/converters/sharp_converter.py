@@ -490,14 +490,16 @@ class SharpConverter(BaseConverter):
                         continue
                     try:
                         result = json.loads(line.decode("utf-8"))
+                        path = result.get("inputPath") or (input_paths[received_count] if received_count < len(input_paths) else None)
                         if result.get("success"):
                             success_count += 1
                         else:
                             failure_count += 1
-                            errors.append({"path": None, "error": result.get("error") or "Unknown daemon error"})
+                            errors.append({"path": path, "error": result.get("error") or "Unknown daemon error"})
                     except Exception as e:
                         failure_count += 1
-                        errors.append({"path": None, "error": f"Response parse error: {e}"})
+                        path = input_paths[received_count] if received_count < len(input_paths) else None
+                        errors.append({"path": path, "error": f"Response parse error: {e}"})
                     received_count += 1
 
             self._account_native_batch(failed=failure_count > 0)

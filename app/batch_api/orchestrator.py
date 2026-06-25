@@ -255,20 +255,29 @@ class BatchOrchestrator:
             valid_exts = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".heic", ".heif", ".avif"}
             
             input_paths = []
-            max_attempts = 3
-            for attempt in range(1, max_attempts + 1):
-                input_paths = [
-                    str(p) for p in source_path.iterdir() 
-                    if p.is_file() and p.suffix.lower() in valid_exts
-                ]
-                if input_paths:
-                    break
-                if attempt < max_attempts:
-                    log.info(f"Empty scan for source_dir {request.source_dir}, retrying in 0.5s (attempt {attempt}/{max_attempts})...")
-                    time.sleep(0.5)
+            if request.input_files is not None:
+                for p in request.input_files:
+                    path_obj = Path(p)
+                    if path_obj.is_file() and path_obj.suffix.lower() in valid_exts:
+                        input_paths.append(str(path_obj))
+            else:
+                max_attempts = 3
+                for attempt in range(1, max_attempts + 1):
+                    input_paths = [
+                        str(p) for p in source_path.iterdir() 
+                        if p.is_file() and p.suffix.lower() in valid_exts
+                    ]
+                    if input_paths:
+                        break
+                    if attempt < max_attempts:
+                        log.info(f"Empty scan for source_dir {request.source_dir}, retrying in 0.5s (attempt {attempt}/{max_attempts})...")
+                        time.sleep(0.5)
             
             if not input_paths:
-                err_msg = f"No images found in {request.source_dir} after {max_attempts} scan attempts — check the path is reachable and contains supported files."
+                if request.input_files is not None:
+                    err_msg = f"No images found in {request.source_dir} after filtering specific files."
+                else:
+                    err_msg = f"No images found in {request.source_dir} after {max_attempts} scan attempts — check the path is reachable and contains supported files."
                 log.error(err_msg)
                 with get_connection() as conn:
                     self.repo.update_status(conn, run_id, "failed", total_images=0)

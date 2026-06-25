@@ -247,6 +247,7 @@ class FFmpegConverter(BaseConverter):
             Dict with 'success_count', 'failure_count', 'duration_ms', 'telemetry',
             and 'errors' keys. Note: does NOT return per-image results.
         """
+        self._set_active_run_id(run_id)
         self._bypass_breaker = True
         try:
             start = time.time()

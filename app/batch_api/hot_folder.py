@@ -55,6 +55,7 @@ class HotFolderHandler(FileSystemEventHandler):
         self.lock = threading.Lock()
         self.repo = BatchRepository()
         self._is_triggering = False
+        self.processed_files = set()
 
     def on_created(self, event):
         """Handle file creation event."""
@@ -129,15 +130,65 @@ class HotFolderHandler(FileSystemEventHandler):
                 log.warning(f"Hot folder batch cancelled: files in {source_dir} never stabilized.")
                 return
 
+            # Find new/changed files to process
+            valid_exts = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".heic", ".heif", ".avif"}
+            all_files = list(source_dir.glob("*"))
+            
+            files_to_process = []
+            for f in all_files:
+                if not f.is_file() or f.suffix.lower() not in valid_exts:
+                    continue
+                try:
+                    st = f.stat()
+                    file_key = (str(f), st.st_mtime, st.st_size)
+                    
+                    # Check in-memory processed set
+                    if file_key in self.processed_files:
+                        continue
+                        
+                    # Check output existence/mtime
+                    already_converted = True
+                    target_dir = Path(self.config["target_dir"])
+                    suffix = self.config.get("suffix", "")
+                    
+                    target_formats = self.config["target_format"]
+                    if isinstance(target_formats, str):
+                        target_formats = [target_formats]
+                    
+                    for fmt in target_formats:
+                        out_name = f"{f.stem}{suffix}.{fmt}"
+                        out_path = target_dir / out_name
+                        if not out_path.exists() or out_path.stat().st_mtime < st.st_mtime:
+                            already_converted = False
+                            break
+                            
+                    if already_converted:
+                        self.processed_files.add(file_key)
+                        continue
+                        
+                    files_to_process.append((str(f), file_key))
+                except OSError:
+                    pass
+
+            if not files_to_process:
+                log.info(f"No new or changed files detected in {source_dir}. Skipping batch trigger.")
+                return
+
+            input_paths = [path for path, _ in files_to_process]
+            file_keys = [key for _, key in files_to_process]
+
             # 2. Create DB entry
             try:
+                db_formats = ",".join(self.config["target_format"]) if isinstance(self.config["target_format"], list) else self.config["target_format"]
+                db_tools = ",".join(self.config["tool"]) if isinstance(self.config["tool"], list) else self.config["tool"]
+                
                 with get_connection() as conn:
                     run_id = self.repo.create_run(
                         conn,
                         source_dir=self.config["source_dir"],
                         target_dir=self.config["target_dir"],
-                        target_format=self.config["target_format"],
-                        tool=self.config["tool"],
+                        target_format=db_formats,
+                        tool=db_tools,
                         trigger_type="hot_folder",
                         heuristic_version=self.orchestrator.interpolator.version
                     )
@@ -148,8 +199,9 @@ class HotFolderHandler(FileSystemEventHandler):
                     target_dir=self.config["target_dir"],
                     target_format=self.config["target_format"],
                     tool=self.config["tool"],
-                    category=self.config.get("category", "general"),
-                    trigger_type="hot_folder"
+                    category=self.config.get("category", ["general"]),
+                    trigger_type="hot_folder",
+                    input_files=input_paths
                 )
                 
                 # 4. Dispatch to orchestrator (sync → thread pool to avoid blocking event loop)
@@ -157,6 +209,10 @@ class HotFolderHandler(FileSystemEventHandler):
                 await loop.run_in_executor(
                     None, self.orchestrator.execute_batch, run_id, request
                 )
+                
+                # Mark as processed after dispatch
+                for key in file_keys:
+                    self.processed_files.add(key)
                     
             except Exception as e:
                 log.error(f"Failed to trigger hot folder batch: {e}")

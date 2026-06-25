@@ -62,6 +62,7 @@ class BatchRequest(BaseModel):
     tool: Annotated[List[Tool], Field(min_length=1)]
     category: Annotated[List[str], Field(min_length=1)] = ["general"]
     trigger_type: str = "manual"
+    input_files: Optional[List[str]] = None
 
     @field_validator("source_dir", "target_dir")
     @classmethod
