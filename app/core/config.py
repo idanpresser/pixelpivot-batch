@@ -210,6 +210,25 @@ def quality_range_for(tool: str, target_format: str) -> tuple[float, float]:
     return QUALITY_RANGE_BY_TOOL_FORMAT.get((tool, fmt), QUALITY_RANGE_GENERIC)
 
 
+# Search direction per (tool, format): "descending" means a LOWER native value
+# is better quality (ffmpeg avif is a libaom CRF, 0..63, lower = better). All
+# other paths are 0..100 "higher is better". Used by the calibration search.
+QUALITY_DIRECTION_BY_TOOL_FORMAT: dict[tuple[str, str], str] = {
+    ("ffmpeg", "avif"): "descending",
+}
+
+
+def quality_direction_for(tool: str, target_format: str) -> str:
+    """Resolve the search direction for (tool, format).
+
+    Returns "descending" when a lower native quality value yields better
+    quality, else "ascending".
+    """
+    fmt = target_format.lower()
+    return QUALITY_DIRECTION_BY_TOOL_FORMAT.get((tool, fmt), "ascending")
+
+
+
 # ---------------------------------------------------------------------------
 # Hot Folder
 # ---------------------------------------------------------------------------
