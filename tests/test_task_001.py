@@ -32,7 +32,7 @@ def test_tool_enum_suffix_no_tool_prefix(tmp_path):
             from pathlib import Path as _P
             for p in input_paths:
                 (_P(output_dir) / f"{_P(p).stem}{suffix}.{target_format}").write_bytes(b"a" * 512)
-            return {"success_count": len(input_paths), "failure_count": 0, "errors": [], "telemetry": {}}
+            return {"success_count": len(input_paths), "failure_count": 0, "errors": [], "telemetry": {}, "bytes_written": len(input_paths) * 512}
 
         mock_magick = MagicMock()
         mock_magick.is_broken = False

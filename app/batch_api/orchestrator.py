@@ -320,6 +320,7 @@ class BatchOrchestrator:
 
             all_success_count = 0
             all_failure_count = 0
+            total_bytes_written = 0
             all_errors = []
             all_telemetry_summaries = []
             
@@ -425,6 +426,7 @@ class BatchOrchestrator:
                 
                 all_success_count += result["success_count"]
                 all_failure_count += result["failure_count"]
+                total_bytes_written += result.get("bytes_written", 0)
                 all_errors.extend(result.get("errors", []))
                 if result.get("telemetry"):
                     all_telemetry_summaries.append(result["telemetry"])
@@ -483,21 +485,7 @@ class BatchOrchestrator:
                 except OSError: pass
             input_bytes = per_image_input_bytes * len(executed_cells)
 
-            output_bytes = 0
-            for p in input_paths:
-                stem = Path(p).stem
-                for cell in executed_cells:
-                    out = target_dir_path / output_name(stem, cell, multi_category=multi_category)
-                    try:
-                        st = out.stat()
-                    except OSError:
-                        continue
-                    # Compare the output file's mtime against start_time to determine
-                    # if the file was written/updated during this run.
-                    # Assumption: local converters write to the target on the same host,
-                    # so mtime >= start_time - 2.0 is sufficient (handles filesystem timestamp truncation).
-                    if st.st_mtime >= start_time - 2.0:
-                        output_bytes += st.st_size
+            output_bytes = total_bytes_written
 
             duration_s = max(duration_ms / 1000.0, 1e-3)
             yield_mb_sec = (output_bytes / (1024 * 1024)) / duration_s

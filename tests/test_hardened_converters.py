@@ -54,7 +54,7 @@ def test_ffmpeg_convert_batch_signature():
     conv = FFmpegConverter(ffmpeg_path="ffmpeg")
     with patch("app.core.converters.ffmpeg_converter.group_by_dimensions") as mock_group:
         mock_group.return_value = { (100, 100): ["test.png"] }
-        with patch.object(conv, "_run_multimap_path", return_value=(1, 0, [], {})):
+        with patch.object(conv, "_run_multimap_path", return_value=(1, 0, [], {}, 0)):
             with patch("app.core.converters.ffmpeg_converter.encoder_params_for", return_value=["-some-param"]):
                 res = conv.convert_batch(
                     input_paths=["test.png"],

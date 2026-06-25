@@ -132,7 +132,7 @@ class MagickConverter(BaseConverter):
         cmd = [self.magick_path, _win32_safe_path(input_path)] + params + [_win32_safe_path(output_path)]
 
         try:
-            return self._run_subprocess(cmd, "ImageMagick", params, quality, run_id=run_id)
+            return self._run_subprocess(cmd, "ImageMagick", params, quality, run_id=run_id, output_path=output_path)
         except Exception as e:
             # Last-ditch fallback to Wand if subprocess fails for some reason
             if WAND_AVAILABLE:
@@ -146,7 +146,8 @@ class MagickConverter(BaseConverter):
                         output_path,
                         target_format,
                         quality,
-                        run_id=run_id
+                        run_id=run_id,
+                        output_path=output_path
                     )
                 except Exception as e2:
                     log.error(f"Wand also failed: {e2}")
@@ -185,6 +186,7 @@ class MagickConverter(BaseConverter):
         success_count = 0
         failure_count = 0
         errors = []
+        bytes_written = 0
 
         # 1. Group images by identical quality AND resolution bucket
         from ..utils import get_resolution_bucket
@@ -276,11 +278,16 @@ class MagickConverter(BaseConverter):
                                                 os.unlink(p_out)
                                             os.rename(mogrify_out, p_out)
                                         success_count += 1
+                                        try:
+                                            bytes_written += os.path.getsize(p_out)
+                                        except OSError:
+                                            pass
                                     except Exception as re_err:
                                         log.error(f"Failed to rename magick output {mogrify_out} to {p_out}: {re_err}")
                                         res = self.convert(p_in, p_out, target_format, q, run_id=run_id)
                                         if res.get("success"):
                                             success_count += 1
+                                            bytes_written += res.get("bytes_written", 0)
                                             summaries.append(res.get("telemetry", {}))
                                         else:
                                             failure_count += 1
@@ -290,6 +297,7 @@ class MagickConverter(BaseConverter):
                                     res = self.convert(p_in, p_out, target_format, q, run_id=run_id)
                                     if res.get("success"):
                                         success_count += 1
+                                        bytes_written += res.get("bytes_written", 0)
                                         summaries.append(res.get("telemetry", {}))
                                     else:
                                         failure_count += 1
@@ -297,15 +305,20 @@ class MagickConverter(BaseConverter):
                             else:
                                 # No suffix, trust mogrify success directly
                                 success_count += 1
+                                try:
+                                    bytes_written += os.path.getsize(p_out)
+                                except OSError:
+                                    pass
                         self._account_native_batch(failed=False)
                     else:
                         self._mark_failure()
                         log.warning(f"Mogrify batch chunk failed. Falling back to individual conversion.")
-                        ok, fail, errs, sums, tripped = self._recover_chunk_per_file(
+                        ok, fail, errs, sums, tripped, chunk_bytes = self._recover_chunk_per_file(
                             chunk_paths, output_dir, target_format, q, suffix, run_id
                         )
                         success_count += ok
                         failure_count += fail
+                        bytes_written += chunk_bytes
                         errors.extend(errs)
                         summaries.extend(sums)
                         self._account_native_batch(failed=fail > 0)
@@ -315,11 +328,12 @@ class MagickConverter(BaseConverter):
                 except Exception as e:
                     self._mark_failure()
                     log.error(f"Magick batch error for chunk: {e}")
-                    ok, fail, errs, sums, tripped = self._recover_chunk_per_file(
+                    ok, fail, errs, sums, tripped, chunk_bytes = self._recover_chunk_per_file(
                         chunk_paths, output_dir, target_format, q, suffix, run_id
                     )
                     success_count += ok
                     failure_count += fail
+                    bytes_written += chunk_bytes
                     errors.extend(errs)
                     summaries.extend(sums)
                     errors.append({"path": None, "error": str(e)})
@@ -333,6 +347,7 @@ class MagickConverter(BaseConverter):
             "duration_ms": (time.time() - start) * 1000,
             "telemetry": aggregate_telemetry(summaries),
             "errors": errors,
+            "bytes_written": bytes_written,
         }
 
     def _recover_chunk_per_file(self, chunk, output_dir, target_format, q, suffix, run_id):
@@ -347,7 +362,7 @@ class MagickConverter(BaseConverter):
             run_id: Optional batch run ID.
 
         Returns:
-            Tuple of (ok_count, fail_count, errors, telemetry_samples, tripped),
+            Tuple of (ok_count, fail_count, errors, telemetry_samples, tripped, bytes_written),
             where tripped indicates whether the circuit breaker was triggered.
         """
         saved_failures = self.consecutive_failures
@@ -360,6 +375,7 @@ class MagickConverter(BaseConverter):
         fail = 0
         errs: List[Dict[str, Any]] = []
         sums: List[Dict[str, Any]] = []
+        bytes_written = 0
         try:
             for p in chunk:
                 out_path = str(Path(output_dir) / f"{Path(p).stem}{suffix}.{target_format}")
@@ -371,6 +387,7 @@ class MagickConverter(BaseConverter):
                     continue
                 if res.get("success"):
                     ok += 1
+                    bytes_written += res.get("bytes_written", 0)
                     sums.append(res.get("telemetry", {}))
                 else:
                     fail += 1
@@ -382,4 +399,4 @@ class MagickConverter(BaseConverter):
         self.consecutive_failures = saved_failures
         self.is_broken = saved_broken
         self.broken_since = saved_broken_since
-        return ok, fail, errs, sums, tripped
+        return ok, fail, errs, sums, tripped, bytes_written

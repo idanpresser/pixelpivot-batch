@@ -184,10 +184,16 @@ class FFmpegConverter(BaseConverter):
 
         # Output-file verification stays in the converter — the wrapper doesn't
         # know which arg is the output path.
+        bytes_written = 0
         if success:
             if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
                 success = False
                 error = f"ffmpeg claimed success but output is missing or empty: {output_path}"
+            else:
+                try:
+                    bytes_written = os.path.getsize(output_path)
+                except OSError:
+                    pass
 
         if success:
             self._reset_failures()
@@ -212,6 +218,7 @@ class FFmpegConverter(BaseConverter):
             },
             "error": error,
             "fatal_error": result.fatal,
+            "bytes_written": bytes_written,
         }
 
     def convert_batch(
@@ -260,10 +267,12 @@ class FFmpegConverter(BaseConverter):
                     "duration_ms": 0.0,
                     "telemetry": {},
                     "errors": [],
+                    "bytes_written": 0,
                 }
 
             success_count = 0
             failure_count = 0
+            bytes_written = 0
             errors: List[Dict[str, Any]] = []
             telemetry_samples: List[Dict[str, Any]] = []
 
@@ -279,6 +288,7 @@ class FFmpegConverter(BaseConverter):
                     res = self._fallback_per_file(group_paths, output_dir, target_format, [q] * len(group_paths), run_id, suffix=suffix)
                     success_count += res["success_count"]
                     failure_count += res["failure_count"]
+                    bytes_written += res.get("bytes_written", 0)
                     errors.extend(res["errors"])
                     if res["telemetry"]:
                         telemetry_samples.append(res["telemetry"])
@@ -294,6 +304,7 @@ class FFmpegConverter(BaseConverter):
                         res = self._fallback_per_file(sub_paths, output_dir, target_format, [q] * len(sub_paths), run_id, suffix=suffix)
                         success_count += res["success_count"]
                         failure_count += res["failure_count"]
+                        bytes_written += res.get("bytes_written", 0)
                         errors.extend(res["errors"])
                         if res["telemetry"]:
                             telemetry_samples.append(res["telemetry"])
@@ -307,29 +318,32 @@ class FFmpegConverter(BaseConverter):
                     )
 
                     if can_use_image2 and len(sub_paths) >= IMAGE2_THRESHOLD and all_same_resolution(sub_paths):
-                        ok, fail, errs, tele, leftovers = self._run_image2_path(
+                        ok, fail, errs, tele, leftovers, image2_bytes = self._run_image2_path(
                             sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix
                         )
                         success_count += ok
                         failure_count += fail
+                        bytes_written += image2_bytes
                         errors.extend(errs)
                         if tele:
                             telemetry_samples.append(tele)
                         if leftovers:
-                            ok2, fail2, errs2, tele2 = self._run_multimap_path(
+                            ok2, fail2, errs2, tele2, multimap_bytes2 = self._run_multimap_path(
                                 leftovers, output_dir, target_format, q, batch_params, run_id, suffix=suffix
                             )
                             success_count += ok2
                             failure_count += fail2
+                            bytes_written += multimap_bytes2
                             errors.extend(errs2)
                             if tele2:
                                 telemetry_samples.append(tele2)
                     else:
-                        ok, fail, errs, tele = self._run_multimap_path(
+                        ok, fail, errs, tele, multimap_bytes = self._run_multimap_path(
                             sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix
                         )
                         success_count += ok
                         failure_count += fail
+                        bytes_written += multimap_bytes
                         errors.extend(errs)
                         if tele:
                             telemetry_samples.append(tele)
@@ -340,6 +354,7 @@ class FFmpegConverter(BaseConverter):
                 "duration_ms": (time.time() - start) * 1000,
                 "telemetry": aggregate_telemetry(telemetry_samples),
                 "errors": errors,
+                "bytes_written": bytes_written,
             }
         finally:
             self._bypass_breaker = False
@@ -371,7 +386,7 @@ class FFmpegConverter(BaseConverter):
             suffix: Optional filename suffix.
 
         Returns:
-            Tuple of (success_count, failure_count, errors, telemetry, leftover_paths).
+            Tuple of (success_count, failure_count, errors, telemetry, leftover_paths, bytes_written).
             Leftover paths are those whose outputs were not produced by ffmpeg.
         """
         ext = Path(paths[0]).suffix.lstrip(".").lower() or "png"
@@ -382,7 +397,7 @@ class FFmpegConverter(BaseConverter):
                 rename_map = stage_inputs_for_image2(paths, stage, ext=ext)
             except Exception as e:
                 log.warning("Image2 staging failed (%s); routing to multimap.", e)
-                return 0, 0, [], {}, list(paths)
+                return 0, 0, [], {}, list(paths), 0
 
             args = build_image2_args(
                 staging_dir_path=stage,
@@ -400,7 +415,7 @@ class FFmpegConverter(BaseConverter):
                 pid = proc.spawn()
             except FileNotFoundError as e:
                 log.error("ffmpeg binary not found: %s", e)
-                return 0, count, [{"path": p, "error": f"ffmpeg not found: {e}"} for p in paths], {}, []
+                return 0, count, [{"path": p, "error": f"ffmpeg not found: {e}"} for p in paths], {}, [], 0
 
             monitor = TelemetryMonitor(pid=pid, interval_ms=int(TELEMETRY_INTERVAL * 1000), run_id=run_id)
             monitor.start()
@@ -411,6 +426,7 @@ class FFmpegConverter(BaseConverter):
 
             success_count = 0
             failure_count = 0
+            bytes_written = 0
             errors: List[Dict[str, Any]] = []
             leftovers: List[str] = []
 
@@ -419,10 +435,12 @@ class FFmpegConverter(BaseConverter):
                 target = os.path.join(output_dir, f"{rename_map[idx]}{suffix}.{target_format}")
                 if os.path.exists(produced) and os.path.getsize(produced) > 0:
                     try:
+                        sz = os.path.getsize(produced)
                         if os.path.exists(target):
                             os.remove(target)
                         os.replace(produced, target)
                         success_count += 1
+                        bytes_written += sz
                     except OSError as e:
                         log.warning("Failed to move %s -> %s: %s", produced, target, e)
                         leftovers.append(original_path)
@@ -436,7 +454,7 @@ class FFmpegConverter(BaseConverter):
                     len(leftovers),
                 )
 
-            return success_count, failure_count, errors, telemetry, leftovers
+            return success_count, failure_count, errors, telemetry, leftovers, bytes_written
 
     def _run_multimap_path(
         self,
@@ -465,7 +483,7 @@ class FFmpegConverter(BaseConverter):
             suffix: Optional filename suffix.
 
         Returns:
-            Tuple of (success_count, failure_count, errors, telemetry).
+            Tuple of (success_count, failure_count, errors, telemetry, bytes_written).
         """
         pairs = [
             (p, os.path.join(output_dir, f"{Path(p).stem}{suffix}.{target_format}"))
@@ -486,6 +504,7 @@ class FFmpegConverter(BaseConverter):
 
         success_count = 0
         failure_count = 0
+        bytes_written = 0
         errors: List[Dict[str, Any]] = []
         telemetry_samples: List[Dict[str, Any]] = []
 
@@ -514,6 +533,10 @@ class FFmpegConverter(BaseConverter):
             for in_path, out_path in chunk:
                 if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
                     success_count += 1
+                    try:
+                        bytes_written += os.path.getsize(out_path)
+                    except OSError:
+                        pass
                 else:
                     missing.append(in_path)
 
@@ -526,9 +549,10 @@ class FFmpegConverter(BaseConverter):
                                               [quality] * len(missing), run_id, suffix=suffix)
                 success_count += fb["success_count"]
                 failure_count += fb["failure_count"]
+                bytes_written += fb.get("bytes_written", 0)
                 errors.extend(fb["errors"])
 
-        return success_count, failure_count, errors, aggregate_telemetry(telemetry_samples)
+        return success_count, failure_count, errors, aggregate_telemetry(telemetry_samples), bytes_written
 
     def _fallback_per_file(
         self,
@@ -550,10 +574,11 @@ class FFmpegConverter(BaseConverter):
             suffix: Optional filename suffix.
 
         Returns:
-            Dict with 'success_count', 'failure_count', 'telemetry', and 'errors' keys.
+            Dict with 'success_count', 'failure_count', 'telemetry', 'errors', and 'bytes_written' keys.
         """
         success_count = 0
         failure_count = 0
+        bytes_written = 0
         errors: List[Dict[str, Any]] = []
         telemetry_samples: List[Dict[str, Any]] = []
 
@@ -562,6 +587,7 @@ class FFmpegConverter(BaseConverter):
             res = self.convert(in_path, out_path, target_format, q, run_id=run_id)
             if res.get("success"):
                 success_count += 1
+                bytes_written += res.get("bytes_written", 0)
             else:
                 failure_count += 1
                 errors.append({"path": in_path, "error": res.get("error") or "Unknown error"})
@@ -572,4 +598,5 @@ class FFmpegConverter(BaseConverter):
             "failure_count": failure_count,
             "telemetry": aggregate_telemetry(telemetry_samples),
             "errors": errors,
+            "bytes_written": bytes_written,
         }

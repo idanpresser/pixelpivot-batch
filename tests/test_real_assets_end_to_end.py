@@ -73,7 +73,7 @@ async def test_end_to_end_real_tools(tool, executable, real_images_dir, setup_di
                     
                     # Verify output files actually exist and are non-empty
                     for p in source_dir.iterdir():
-                        out_file = target_dir / f"{p.stem}.webp"
+                        out_file = target_dir / f"{p.stem}_{tool}.webp"
                         assert out_file.exists()
                         assert out_file.stat().st_size > 0
 
@@ -109,7 +109,7 @@ async def test_vips_real_assets(real_images_dir, setup_dirs):
             assert mock_save.called
             assert mock_save.call_args[1]["success_count"] == 1
             
-            out_file = target_dir / f"{jpgs[0].stem}.avif"
+            out_file = target_dir / f"{jpgs[0].stem}_vips.avif"
             assert out_file.exists()
 
 @pytest.mark.asyncio
@@ -146,7 +146,7 @@ async def test_sharp_real_assets(real_images_dir, setup_dirs):
                 assert mock_save.called
                 assert mock_save.call_args[1]["success_count"] == 1
                 
-                out_file = target_dir / f"{jpgs[0].stem}.webp"
+                out_file = target_dir / f"{jpgs[0].stem}_sharp.webp"
                 assert out_file.exists()
             finally:
                 if "sharp" in orchestrator.converters:

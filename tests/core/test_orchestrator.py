@@ -43,7 +43,7 @@ def test_empty_scan_retry_succeeds(tmp_path, monkeypatch):
         def convert_batch(self, *args, **kwargs):
             out_file = target_dir / "test_magick.webp"
             out_file.write_bytes(b"dummy webp")
-            return {"success_count": 1, "failure_count": 0, "errors": [], "telemetry": {}}
+            return {"success_count": 1, "failure_count": 0, "errors": [], "telemetry": {}, "bytes_written": 10}
             
     orchestrator.converters["magick"] = DummyConverter()
     
@@ -213,7 +213,7 @@ def test_no_pre_loop_stat_storm_and_savings_math(tmp_path, monkeypatch):
             out1 = Path(target_dir) / "image1_magick.webp"
             out1.write_bytes(b"new output webp file content") # 28 bytes
             
-            return {"success_count": 1, "failure_count": 0, "errors": [], "telemetry": {}}
+            return {"success_count": 1, "failure_count": 0, "errors": [], "telemetry": {}, "bytes_written": 28}
             
     orchestrator.converters["magick"] = MockConverter()
     

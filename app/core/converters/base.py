@@ -260,6 +260,7 @@ class BaseConverter(ABC):
         params: List[str],
         quality: Union[int, float],
         run_id: Optional[int] = None,
+        output_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute a subprocess command with telemetry capture and circuit-breaker logic.
 
@@ -350,6 +351,13 @@ class BaseConverter(ABC):
                     self.broken_since = time.time()
                 log.error(f"  [FATAL] {tool_name} encountered an unrecoverable error: {error.splitlines()[0] if error.splitlines() else error}")
 
+        bytes_written = 0
+        if success and output_path:
+            try:
+                bytes_written = os.path.getsize(output_path)
+            except OSError:
+                pass
+
         return {
             "success": success,
             "duration_ms": duration_ms,
@@ -357,6 +365,7 @@ class BaseConverter(ABC):
             "parameters_used": {"cli_args": params, "quality_value": quality, "method": "subprocess"},
             "error": error,
             "fatal_error": fatal_error,
+            "bytes_written": bytes_written,
         }
 
     def _run_library(
@@ -366,6 +375,7 @@ class BaseConverter(ABC):
         quality: Union[int, float],
         *args,
         run_id: Optional[int] = None,
+        output_path: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """Execute an in-process library call with telemetry capture and circuit-breaker logic.
@@ -414,12 +424,20 @@ class BaseConverter(ABC):
             duration_ms = (time.time() - start) * 1000
             telemetry = monitor.stop()
 
+        bytes_written = 0
+        if success and output_path:
+            try:
+                bytes_written = os.path.getsize(output_path)
+            except OSError:
+                pass
+
         return {
             "success": success,
             "duration_ms": duration_ms,
             "telemetry": telemetry,
             "parameters_used": params,
             "error": error,
+            "bytes_written": bytes_written,
         }
 
     def convert_batch(
@@ -551,9 +569,11 @@ class BaseConverter(ABC):
             self._bypass_breaker = False
 
         summaries = []
+        bytes_written = 0
         for in_path, res in zip(input_paths, results):
             if res.get("success"):
                 success_count += 1
+                bytes_written += res.get("bytes_written", 0)
             else:
                 failure_count += 1
                 errors.append({"path": in_path, "error": res.get("error") or "Unknown error"})
@@ -566,4 +586,5 @@ class BaseConverter(ABC):
             "duration_ms": (time.time() - start) * 1000,
             "telemetry": aggregate_telemetry(summaries),
             "errors": errors,
+            "bytes_written": bytes_written,
         }

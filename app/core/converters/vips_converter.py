@@ -119,5 +119,6 @@ class VipsConverter(BaseConverter):
             output_path,
             target_format,
             quality,
-            run_id=run_id
+            run_id=run_id,
+            output_path=output_path
         )

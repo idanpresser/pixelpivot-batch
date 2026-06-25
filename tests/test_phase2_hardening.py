@@ -15,7 +15,7 @@ def test_ffmpeg_convert_batch_signature(monkeypatch):
         mock_group.return_value = { (100, 100): ["test.png"] }
         
         # We also need to mock other things to avoid actual execution
-        with patch.object(conv, "_run_multimap_path", return_value=(1, 0, [], {})):
+        with patch.object(conv, "_run_multimap_path", return_value=(1, 0, [], {}, 0)):
             with patch("app.core.converters.ffmpeg_converter.encoder_params_for", return_value=["-some-param"]):
                 res = conv.convert_batch(
                     input_paths=["test.png"],
@@ -43,9 +43,9 @@ def test_image2_gated_off_for_avif_by_default(monkeypatch):
          patch("app.core.converters.ffmpeg_converter.encoder_params_for",
                return_value=["-c:v", "libaom-av1"]), \
          patch.object(conv, "_run_image2_path",
-                      return_value=(0, 0, [], {}, [])) as mock_img2, \
+                      return_value=(0, 0, [], {}, [], 0)) as mock_img2, \
          patch.object(conv, "_run_multimap_path",
-                      return_value=(len(paths), 0, [], {})) as mock_multi:
+                      return_value=(len(paths), 0, [], {}, 0)) as mock_multi:
         conv.convert_batch(paths, "out", "avif", [50.0] * len(paths))
 
     assert not mock_img2.called, "image2 path must stay gated for AVIF when flag is OFF"
@@ -67,9 +67,9 @@ def test_image2_enabled_for_avif_when_flag_on(monkeypatch):
          patch("app.core.converters.ffmpeg_converter.encoder_params_for",
                return_value=["-c:v", "libaom-av1"]), \
          patch.object(conv, "_run_image2_path",
-                      return_value=(len(paths), 0, [], {}, [])) as mock_img2, \
+                      return_value=(len(paths), 0, [], {}, [], 0)) as mock_img2, \
          patch.object(conv, "_run_multimap_path",
-                      return_value=(0, 0, [], {})) as mock_multi:
+                      return_value=(0, 0, [], {}, 0)) as mock_multi:
         conv.convert_batch(paths, "out", "avif", [50.0] * len(paths))
 
     assert mock_img2.called, "image2 must run for AVIF when flag is ON"

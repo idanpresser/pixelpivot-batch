@@ -76,6 +76,7 @@ class _StubConverter:
             "duration_ms": 1.0,
             "telemetry": {},
             "errors": [] if produced else [{"path": p, "error": "stub fail"} for p in input_paths],
+            "bytes_written": produced * self._write_bytes if self._write_bytes is not None else 0,
         }
 
 

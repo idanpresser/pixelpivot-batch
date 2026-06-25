@@ -72,9 +72,11 @@ async def test_full_pipeline_with_real_assets(real_images_dir, tmp_path):
                     else:
                         mock_proc.returncode = 0
                         mock_proc.communicate.return_value = ("", "")
-                        # Simulate output file creation
-                        out_path = cmd[-1]
-                        with open(out_path, "w") as f: f.write("fake output")
+                        # Simulate output file creation (only if it's a converter command, not ffprobe)
+                        if "ffprobe" not in cmd:
+                            out_path = cmd[-1]
+                            with open(out_path, "w") as f: f.write("fake output")
+                mock_proc.poll.return_value = mock_proc.returncode
                 return mock_proc
 
             with patch("app.core.converters.base.subprocess.Popen", side_effect=side_effect):

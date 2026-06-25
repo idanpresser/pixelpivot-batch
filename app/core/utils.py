@@ -191,7 +191,7 @@ def probe_image_dimensions(path: str) -> tuple[int, int]:
     except (subprocess.SubprocessError, FileNotFoundError, KeyError, IndexError, json.JSONDecodeError) as e:
         log.debug(f"ffprobe failed for {path} ({e}), falling back to PIL.")
         from PIL import Image
-        with Image.open(safe) as img:
+        with Image.open(path) as img:
             return img.size
 
 

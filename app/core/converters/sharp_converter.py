@@ -352,6 +352,11 @@ class SharpConverter(BaseConverter):
 
                 if result.get("success"):
                     self._reset_failures()
+                    bytes_written = 0
+                    try:
+                        bytes_written = os.path.getsize(output_path)
+                    except OSError:
+                        pass
                     log.debug(f"Sharp success: Q={quality}, format={target_format}")
                     return {
                         "success": True,
@@ -364,12 +369,13 @@ class SharpConverter(BaseConverter):
                         },
                         "telemetry": telemetry,
                         "error": None,
+                        "bytes_written": bytes_written,
                     }
                 else:
                     self._mark_failure()
                     error_msg = result.get("error") or "Unknown Sharp daemon error"
                     log.error(f"Sharp daemon error: {error_msg}")
-                    return {"success": False, "error": error_msg}
+                    return {"success": False, "error": error_msg, "bytes_written": 0}
 
             except OSError as e:
                 # OSError covers socket.timeout, all ConnectionError subclasses
@@ -458,9 +464,11 @@ class SharpConverter(BaseConverter):
         try:
             sock = self._get_connection()
             # 1. Send all requests (pipelining)
+            output_paths = []
             for in_path, q in zip(input_paths, qualities):
                 filename = Path(in_path).stem
                 out_path = str(Path(output_dir) / f"{filename}{suffix}.{target_format}")
+                output_paths.append(out_path)
                 # Fix: Preserve float distance values for JXL, otherwise cast to int
                 val_quality = float(q) if target_format == "jxl" else int(q)
                 request = {
@@ -475,6 +483,7 @@ class SharpConverter(BaseConverter):
             response_buffer = b""
             expected_responses = len(input_paths)
             received_count = 0
+            bytes_written = 0
 
             # Set a generous timeout for the whole batch
             sock.settimeout(60.0 + (len(input_paths) * 0.5))
@@ -493,6 +502,12 @@ class SharpConverter(BaseConverter):
                         path = result.get("inputPath") or (input_paths[received_count] if received_count < len(input_paths) else None)
                         if result.get("success"):
                             success_count += 1
+                            out_p = output_paths[received_count] if received_count < len(output_paths) else None
+                            if out_p:
+                                try:
+                                    bytes_written += os.path.getsize(out_p)
+                                except OSError:
+                                    pass
                         else:
                             failure_count += 1
                             errors.append({"path": path, "error": result.get("error") or "Unknown daemon error"})
@@ -523,4 +538,5 @@ class SharpConverter(BaseConverter):
             "duration_ms": (time.time() - start) * 1000,
             "telemetry": telemetry,
             "errors": errors,
+            "bytes_written": bytes_written,
         }
