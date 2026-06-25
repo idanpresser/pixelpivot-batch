@@ -1,4 +1,4 @@
-# Serial DSSIM Calibration → Heuristic Prior Regeneration
+# Serial SSIM Calibration → Heuristic Prior Regeneration
 
 **Date:** 2026-06-25
 **Status:** Approved design, pending implementation plan
@@ -23,13 +23,12 @@ curves. That step was stripped from the batch engine ("−2.9k SSIM cleanup") bu
 left inert scaffolding behind (config flags, DB table, repository methods).
 
 This design re-introduces calibration to the batch engine as an **offline
-prior-generation pass**, run **serially**, scoring similarity with the bundled
-`vendor/ravif/dssim.exe` instead of the main app's skimage / pytorch_msssim /
-GPU stack.
+prior-generation pass**, run **serially**, scoring similarity with an
+**in-process OpenCV (cv2) SSIM** computed over pyvips-decoded pixels.
 
 ## Goals
 
-- Add a serial, dssim-scored calibration run that finds the quality hitting a
+- Add a serial, SSIM-scored calibration run that finds the quality hitting a
   target SSIM per `(image, category, format, tool)`.
 - Persist measured qualities to `conversions` (+ rich audit to
   `calibration_results`) so `generate_heuristic_table` learns from ground truth.
@@ -40,31 +39,52 @@ GPU stack.
 ## Non-goals (YAGNI)
 
 - Parallelism / process pools (the run is explicitly serial).
-- GPU acceleration, MS-SSIM (single dssim metric only).
+- GPU acceleration, MS-SSIM.
 - `ffmpeg_nvenc` tool support.
 - API or GUI/TUI trigger surface.
 
-## Key constraints discovered
+## Metric decision (why cv2, not dssim.exe / skimage)
 
-1. **`dssim.exe` reads PNG only.** Verified: it rejects webp/avif/jxl
-   ("doesn't look like any of the supported image formats"); PNG-vs-PNG works.
-   Every candidate (and the original, if not already PNG) must be decoded to a
-   temporary PNG before scoring. pyvips (already a converter dependency) decodes
-   all relevant formats in-process and is the decode engine.
-2. **dssim output is a dissimilarity:** it prints `1/SSIM - 1` (0 = identical).
-   Convert with `SSIM = 1 / (1 + D)`. Target `SSIM = 0.98` → `D ≈ 0.020408`.
-   Lower is better.
-3. **dssim requires identical dimensions.** Conversion never resizes, so the
-   original and candidate always match.
-4. **The heuristic generator reads `conversions` + `images`, not
+Any similarity metric must first decode the candidate (webp/avif/jxl) to pixels.
+`vendor/ravif/dssim.exe` cannot accept pixels — only PNG file paths — so it
+forces an extra PNG encode + disk write + subprocess spawn + re-decode on top of
+the decode already paid. Benchmarked on a realistic 2 MP photo-like image (mean
+of 20 scores, decode included):
+
+| Method | ms/score | Native bin | Temp PNG | Subprocess | SSIM scale |
+|---|---|---|---|---|---|
+| **cv2 (float32) in-proc** | **179** | no | no | no | standard SSIM |
+| dssim.exe + fast PNG | 194 | yes | yes | yes | DSSIM = 1/SSIM−1 |
+| skimage in-proc | 575 | no | no | no | standard SSIM |
+
+cv2 is the fastest and the simplest: no native binary, no temp files, no
+subprocess. It yields **standard SSIM**, so the existing `TARGET_SSIM = 0.98`
+stays meaningful and consistent with the main app (which also targeted standard
+SSIM, via the slower skimage path). The encode dominates each iteration
+(hundreds of ms to seconds for avif/webp at multi-MP), so the scorer is
+secondary — which further favors the dependency-free in-process path. cv2,
+scipy, skimage, numpy and pyvips (with `.numpy()`) are all already installed;
+calibration is an **offline operator tool**, never shipped in the air-gapped
+runtime bundle, so metric-library weight is irrelevant.
+
+`vendor/ravif/dssim.exe` is **not used** by this feature.
+
+## Key constraints
+
+1. **Decode once, in-process.** `pyvips.Image.new_from_file(path).numpy()`
+   returns an `H×W×C` uint8 array for any supported format with no temp file.
+   The original is decoded once per image and cached across the search.
+2. **SSIM requires identical dimensions.** Conversion never resizes, so original
+   and candidate always match. Alpha is dropped (`[:, :, :3]`) before scoring.
+3. **The heuristic generator reads `conversions` + `images`, not
    `calibration_results`.** It filters `success = 1 AND quality IS NOT NULL` and
    uses `i.width/height` for megapixels. Calibration must therefore land the
    measured quality in `conversions` with the image registered in `images`
    (`register_image` already probes and stores width/height via PIL).
-5. **Tool naming.** `BatchOrchestrator` registers converters under
+4. **Tool naming.** `BatchOrchestrator` registers converters under
    `magick, ffmpeg, vips, sharp`. The ported quality range/direction map must
    key on these names (not the main app's `imagemagick/pyvips`).
-6. **Quality scale is non-uniform.** Only `(ffmpeg, avif)` is descending (CRF
+5. **Quality scale is non-uniform.** Only `(ffmpeg, avif)` is descending (CRF
    0–63, lower is better). Everything else is ascending 0–100 (jxl is passed as
    0–100 and mapped to a Butteraugli distance inside each converter, so 0–100 is
    the correct search scale here).
@@ -89,28 +109,33 @@ pixelpivot-cli calibrate --source ... --tools ... --formats ...
               ├── for each (image, cell) serially:
               │     find_optimal_quality()  (app/core/calibrator.py)
               │       └── per iter: converter.convert(is_intermediate=True)
-              │                     → score_ssim()  (app/core/dssim.py)
+              │                     → score_ssim()  (app/core/similarity.py)
               │       persist: insert_conversion(quality_found, calib_ssim,...)
               │                save_calibration_result(history)
               └── generate_heuristic_table()   → heuristic_table.json
 ```
 
-### New module: `app/core/dssim.py`
+### New module: `app/core/similarity.py`
 
-Pure scoring helpers, no orchestration.
+Pure scoring helpers, no orchestration, no subprocess.
 
-- `decode_to_png(src_path, tmp_dir) -> str`
-  Decode any supported image to a temporary PNG via pyvips. Returns the PNG
-  path. Raises on decode failure.
-- `compute_dssim(orig_png, conv_png) -> float`
-  Run `vendor/ravif/dssim.exe orig_png conv_png` as a subprocess; parse the
-  first whitespace-delimited float on stdout; return `D`. Binary path resolved
-  via `paths` (frozen-aware), env override `PIXELPIVOT_DSSIM_PATH` for tests.
-- `dssim_to_ssim(d: float) -> float` = `1.0 / (1.0 + d)`.
-- `score_ssim(orig_path, conv_path, *, orig_png=None, tmp_dir) -> float`
-  Decode original (or reuse cached `orig_png`) and candidate to PNG, run dssim,
-  return SSIM in (0, 1]. On any failure returns `-1.0` (sentinel the search
-  treats as "this quality point failed", mirroring the main app).
+- `decode_rgb(path) -> np.ndarray`
+  `pyvips.Image.new_from_file(path).numpy()`, sliced to the first 3 channels,
+  uint8. Raises on decode failure.
+- `compute_ssim(a, b) -> float`
+  Reference Wang et al. SSIM over two `H×W×3` uint8 arrays: cast to float32,
+  11×11 Gaussian (σ=1.5) via `cv2.GaussianBlur`, `C1=(0.01·255)²`,
+  `C2=(0.03·255)²`, return the mean of the SSIM map. Result in (−1, 1], normally
+  (0, 1].
+- `score_ssim(orig_path, conv_path, *, orig_rgb=None) -> float`
+  Decode the original (or reuse cached `orig_rgb`) and the candidate, then
+  `compute_ssim`. On any failure (decode error, shape mismatch) returns `-1.0` —
+  the sentinel the search treats as "this quality point failed", mirroring the
+  main app.
+
+A small-image guard is unnecessary: cv2 Gaussian SSIM is defined for any image
+≥ the 11×11 window; for smaller inputs the search treats a thrown error as a
+failed point (`-1.0`).
 
 ### New module: `app/core/calibrator.py`
 
@@ -119,7 +144,8 @@ Pure serial search; no DB, no scanning. Mirrors the main app's
 
 - `find_optimal_quality(converter, input_path, target_format, tool, output_dir,
   *, target_ssim=TARGET_SSIM, max_iters=MAX_CALIBRATION_ITERS,
-  initial_quality=None, tolerance=CALIBRATION_SSIM_TOLERANCE) -> dict`
+  initial_quality=None, tolerance=CALIBRATION_SSIM_TOLERANCE,
+  orig_rgb=None) -> dict`
   Returns `{quality_found, ssim_achieved, iterations, history, best_path,
   output_size_bytes, duration_ms}` or `{error: ...}`.
 - Range and direction from `config.quality_range_for(tool, fmt)` and a new
@@ -131,13 +157,13 @@ Pure serial search; no DB, no scanning. Mirrors the main app's
   `initial_quality` when provided.
 - Per iteration: `converter.convert(input_path, out_path, target_format, q,
   is_intermediate=True)`; on `result["fatal_error"]` abort the cell; on
-  non-fatal failure shrink the search bound and continue; else `score_ssim`,
-  append to history, update best (smallest output meeting `target_ssim`; if none
-  meets it, the highest-SSIM attempt), update binary bounds, early-stop on
-  tolerance or 2-iteration SSIM convergence.
-- Best `is_intermediate` encode is kept as `best_path` and reused as the final
-  output size — no separate re-encode pass (the batch converter `convert()`
-  signature has no telemetry-reencode step; size is read from `best_path`).
+  non-fatal failure shrink the search bound and continue; else `score_ssim`
+  (reusing the cached `orig_rgb`), append to history, update best (smallest
+  output meeting `target_ssim`; if none meets it, the highest-SSIM attempt),
+  update binary bounds, early-stop on tolerance or 2-iteration SSIM convergence.
+- The best `is_intermediate` encode is kept as `best_path`; its size is read
+  directly — no separate re-encode pass (the batch converter `convert()`
+  signature has no telemetry-reencode step).
 
 ### New module: `app/core/calibration_runner.py`
 
@@ -154,19 +180,20 @@ serves the live request path).
      `target_format`/`tool`; the runner passes `trigger_type="calibration"` and
      comma-joined format/tool lists as the representative scalar fields (the row
      is a provenance parent, not a per-cell record).
-  4. Probe dimensions once per image.
+  4. Decode + cache each image's original RGB array once (shared across that
+     image's cells).
   5. For each cell, take up to `sample` images. Serially, for each image:
      - seed `initial_quality` from
        `HeuristicInterpolator.get_interpolated_quality(category, fmt, tool, w, h)`,
-     - `find_optimal_quality(...)`,
+     - `find_optimal_quality(..., orig_rgb=cached)`,
      - on success: `register_image` + `insert_conversion(quality=quality_found,
-       calib_ssim=ssim_achieved, calib_method="dssim", success=1,
+       calib_ssim=ssim_achieved, calib_method="ssim", success=1,
        output_size_bytes, duration_ms)`, and
        `save_calibration_result(batch_id, input_path, target_ssim,
-       quality_found, iterations, data_json=history)`,
+       quality_found, iterations, data=history)`,
      - on failure: log, record nothing to `conversions` (so the generator never
        trains on a failed point).
-  6. Clean up all temp PNGs / intermediate encodes.
+  6. Clean up all intermediate encodes.
   7. Mark `batch_runs` `completed`.
   8. If `regenerate_table`: call `generate_heuristic_table()`.
   Returns a summary dict (cells, images calibrated, failures, table paths).
@@ -203,8 +230,9 @@ def quality_direction_for(tool, target_format) -> str:
 ## Data flow summary
 
 ```
-image ──probe──► (w,h) ──heuristic seed──► find_optimal_quality
-                                              │ iterate: convert→decode→dssim→SSIM
+image ──decode(pyvips.numpy, cached)──► orig_rgb
+      ──probe──► (w,h) ──heuristic seed──► find_optimal_quality
+                                              │ iterate: convert→decode→cv2 SSIM
                                               ▼
                               quality_found, ssim_achieved, history
                                               │
@@ -219,19 +247,20 @@ image ──probe──► (w,h) ──heuristic seed──► find_optimal_qual
 
 ## Error handling
 
-- dssim/decoder failure on a candidate → `score_ssim` returns `-1.0`; the search
-  shrinks the bound and continues, exactly like the main app.
+- Decoder failure or shape mismatch on a candidate → `score_ssim` returns
+  `-1.0`; the search shrinks the bound and continues, like the main app.
 - Converter `fatal_error` → abort that cell's image, log, record nothing.
 - A run with zero successful calibrations skips table regeneration and reports
   failure (refuses to emit a table from no data — matches
-  `generate_heuristic_table` which raises on an empty result set).
-- Temp directories are always cleaned in a `finally`.
+  `generate_heuristic_table`, which raises on an empty result set).
+- Intermediate encode directories are always cleaned in a `finally`.
 
 ## Testing
 
 Unit (no native binaries; user rule: no icons in test output):
-- `dssim.py`: stdout parse (incl. multi-image output line), `dssim_to_ssim`,
-  `score_ssim` sentinel on decode failure (monkeypatched decode/subprocess).
+- `similarity.py`: `compute_ssim` returns ~1.0 for identical arrays and lower
+  for degraded; `score_ssim` returns `-1.0` on decode failure / shape mismatch
+  (monkeypatched `decode_rgb`).
 - `config.quality_direction_for`: ascending default, descending for ffmpeg/avif.
 - `calibrator.find_optimal_quality` against a **fake converter** + deterministic
   monotone `ssim(quality)` injected via a patched scorer:
@@ -241,19 +270,19 @@ Unit (no native binaries; user rule: no icons in test output):
   - early-stops within tolerance,
   - returns `error` when every attempt fails.
 
-Integration (marked, requires ffmpeg/magick/vips + dssim.exe):
+Integration (marked, requires ffmpeg/magick/vips; cv2 + pyvips already present):
 - `run_calibration` over 2 sample images, 1 cell → asserts `conversions` rows
-  written with `calib_method="dssim"` and a `calibration_results` row, then
+  written with `calib_method="ssim"` and a `calibration_results` row, then
   `generate_heuristic_table` emits at least one cell (sample ≥
   `HEURISTIC_MIN_SAMPLES` or the test lowers the gate).
 
 ## Files touched
 
 New:
-- `app/core/dssim.py`
+- `app/core/similarity.py`
 - `app/core/calibrator.py`
 - `app/core/calibration_runner.py`
-- `tests/test_dssim.py`, `tests/test_calibrator.py`,
+- `tests/test_similarity.py`, `tests/test_calibrator.py`,
   `tests/test_calibration_runner.py` (integration-marked)
 
 Modified:
