@@ -77,8 +77,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.error("Startup reaper failed: %s", e)
 
+    # Enable the calibration write gate in the API process so the /calibrate
+    # endpoint's save_calibration_result writes fire.
+    from app.core import config
+    config.CALIBRATION_ENABLED = True
+
     loop = asyncio.get_running_loop()
     app.state.orchestrator = BatchOrchestrator()
+    from .queue_manager import init_queue_manager
+    app.state.queue_manager = init_queue_manager(app.state.orchestrator)
 
     # Eagerly start Sharp daemon on startup
     sharp_conv = app.state.orchestrator.converters.get("sharp")
@@ -101,6 +108,11 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         manager.stop()
+        if hasattr(app.state, "queue_manager") and app.state.queue_manager:
+            try:
+                app.state.queue_manager.stop()
+            except Exception as e:
+                log.warning("Failed to stop BatchQueueManager on shutdown: %s", e)
         # Eagerly stop Sharp daemon on shutdown
         sharp_conv = getattr(app.state, "orchestrator", None) and app.state.orchestrator.converters.get("sharp")
         if sharp_conv:
