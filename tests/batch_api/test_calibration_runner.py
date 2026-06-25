@@ -32,6 +32,9 @@ def test_run_calibration_writes_conversions_and_regenerates(tmp_path, monkeypatc
     from app.core import config
     monkeypatch.setattr(config, "CALIBRATION_ENABLED", True)
     monkeypatch.setattr(config, "HEURISTIC_MIN_SAMPLES", 1)
+    import app.core.heuristic
+    monkeypatch.setattr(app.core.heuristic, "HEURISTIC_MIN_SAMPLES", 1)
+
 
     src = tmp_path / "samples"
     src.mkdir()
