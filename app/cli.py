@@ -113,6 +113,15 @@ def main(argv=None):
     sub.add_parser("tui", help="Launch the terminal UI (supervises the API).")
     sub.add_parser("doctor", help="Check system environment and dependencies.")
 
+    p_cal = sub.add_parser("calibrate", help="Serial SSIM calibration; regenerates the heuristic table.")
+    p_cal.add_argument("--source", "-s", required=True, help="Directory of sample images.")
+    p_cal.add_argument("--tools", default="magick,ffmpeg,vips,sharp", help="Comma-separated tools.")
+    p_cal.add_argument("--formats", default="webp,avif,jxl", help="Comma-separated target formats.")
+    p_cal.add_argument("--categories", default="general", help="Comma-separated categories.")
+    p_cal.add_argument("--sample", type=int, default=30, help="Max images per matrix cell.")
+    p_cal.add_argument("--target-ssim", type=float, default=0.98, help="Target SSIM.")
+    p_cal.add_argument("--no-regen", action="store_true", help="Skip heuristic table regeneration.")
+
     args = parser.parse_args(argv)
     if args.command == "serve":
         if args.allow_public:
@@ -124,6 +133,8 @@ def main(argv=None):
         _run_tui()
     elif args.command == "doctor":
         _run_doctor()
+    elif args.command == "calibrate":
+        _run_calibrate(args)
 
 
 def _run_serve(host: str, port: int) -> None:
@@ -178,6 +189,37 @@ def _run_convert(source: str, target: str, dry_run: bool) -> None:
 def _run_tui() -> None:
     from app.tui.launcher import run_tui
     run_tui()
+
+
+def _run_calibrate(args) -> None:
+    # Enable the calibration write gate live (config reads this attribute at call
+    # time; setting the module attribute is robust regardless of import order).
+    os.environ["PIXELPIVOT_CALIBRATION_ENABLED"] = "true"
+    from app.core import config
+    config.CALIBRATION_ENABLED = True
+
+    from app.batch_api.calibration_runner import run_calibration
+
+    def _split(s):
+        return [x.strip() for x in s.split(",") if x.strip()]
+
+    summary = run_calibration(
+        args.source,
+        _split(args.categories),
+        _split(args.tools),
+        _split(args.formats),
+        sample=args.sample,
+        target_ssim=args.target_ssim,
+        regenerate_table=not args.no_regen,
+    )
+    print(
+        f"Calibration run {summary['run_id']}: {summary['calibrated']} calibrated, "
+        f"{summary['failures']} failed, across {summary['cells']} cells."
+    )
+    if summary.get("table"):
+        print(f"Heuristic table regenerated: {summary['table']['heuristic_table']}")
+    else:
+        print("Heuristic table not regenerated.")
 
 
 def _run_doctor() -> None:
