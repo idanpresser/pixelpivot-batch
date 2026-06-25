@@ -135,7 +135,11 @@ class SharpConverter(BaseConverter):
         """Stop the Node.js sharp daemon and close its socket."""
         self._close_socket()
         if self.daemon_process and self.daemon_process.poll() is None:
-            log.info("Stopping Sharp daemon...")
+            if not sys.is_finalizing():
+                try:
+                    log.info("Stopping Sharp daemon...")
+                except Exception:
+                    pass
             try:
                 self.daemon_process.terminate()
                 self.daemon_process.wait(timeout=2)
@@ -186,11 +190,19 @@ class SharpConverter(BaseConverter):
         # Find a free port dynamically to avoid TIME_WAIT / EADDRINUSE issues on restart
         # Hardened with retry loop to minimize TOCTOU race
         max_spawn_retries = 3
+        configured_port = self.port
         for spawn_attempt in range(max_spawn_retries):
-            import socket
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("", 0))
-                self.port = s.getsockname()[1]
+            target_port = configured_port if spawn_attempt == 0 else 0
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    s.bind(("", target_port))
+                    self.port = s.getsockname()[1]
+            except OSError as bind_err:
+                log.debug(f"Could not bind to port {target_port}: {bind_err}")
+                if target_port == 0:
+                    raise
+                continue
 
             # Run daemon with cwd=project root so require('sharp') resolves to ./node_modules
             log.info(f"Starting Sharp daemon on port {self.port} (attempt {spawn_attempt+1})...")
@@ -269,6 +281,7 @@ class SharpConverter(BaseConverter):
             Dict with conversion result including success status, duration, telemetry,
             and error details.
         """
+        self._set_active_run_id(run_id)
         self._ensure_daemon_running()
 
         start_total = time.perf_counter()

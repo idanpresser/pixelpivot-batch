@@ -282,6 +282,9 @@ class BatchOrchestrator:
             # Guarded: a converter without the BaseConverter breaker (e.g. a test
             # stub) simply has no state to reset.
             for converter in self.converters.values():
+                set_run = getattr(converter, "_set_active_run_id", None)
+                if callable(set_run):
+                    set_run(run_id)
                 reset = getattr(converter, "_reset_failures", None)
                 if callable(reset):
                     reset()
@@ -363,6 +366,10 @@ class BatchOrchestrator:
                 fmt = cell.target_format
 
                 converter = self.converters.get(t_name)
+                if converter:
+                    set_run = getattr(converter, "_set_active_run_id", None)
+                    if callable(set_run):
+                        set_run(run_id)
                 if not converter:
                     # Skip an unregistered tool's cell so sibling cells still run
                     # (partial success). If NO cell executes, the post-loop guard
@@ -479,8 +486,8 @@ class BatchOrchestrator:
                     # Compare the output file's mtime against start_time to determine
                     # if the file was written/updated during this run.
                     # Assumption: local converters write to the target on the same host,
-                    # so mtime >= start_time is sufficient.
-                    if st.st_mtime >= start_time:
+                    # so mtime >= start_time - 2.0 is sufficient (handles filesystem timestamp truncation).
+                    if st.st_mtime >= start_time - 2.0:
                         output_bytes += st.st_size
 
             duration_s = max(duration_ms / 1000.0, 1e-3)

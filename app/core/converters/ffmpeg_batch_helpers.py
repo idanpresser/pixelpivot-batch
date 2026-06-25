@@ -23,6 +23,7 @@ log = get_logger(__name__)
 
 def group_by_dimensions(
     paths: List[str],
+    dimensions: Optional[Dict[str, Tuple[int, int]]] = None,
 ) -> Dict[Optional[Tuple[int, int]], List[str]]:
     """Bucket input paths by exact (width, height) and return deterministically ordered dict.
 
@@ -32,6 +33,7 @@ def group_by_dimensions(
 
     Args:
         paths: List of input image paths.
+        dimensions: Optional dict mapping input paths to (width, height) tuples.
 
     Returns:
         Dict mapping (width, height) tuples to lists of paths, ordered by
@@ -39,12 +41,19 @@ def group_by_dimensions(
     """
     buckets: Dict[Optional[Tuple[int, int]], List[str]] = defaultdict(list)
     for path in paths:
-        try:
-            wh = probe_image_dimensions(path)
-        except Exception as e:
-            log.debug("Dimension probe failed for %s (%s); routing to fallback.", path, e)
-            buckets[None].append(path)
-            continue
+        wh = None
+        if dimensions and path in dimensions:
+            wh = dimensions[path]
+            if wh == (0, 0):
+                wh = None
+
+        if wh is None:
+            try:
+                wh = probe_image_dimensions(path)
+            except Exception as e:
+                log.debug("Dimension probe failed for %s (%s); routing to fallback.", path, e)
+                buckets[None].append(path)
+                continue
         buckets[wh].append(path)
 
     for key in buckets:

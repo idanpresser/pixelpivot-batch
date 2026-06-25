@@ -1,0 +1,3894 @@
+{
+  "scan_info": {
+    "workspace": "F:\\dev\\pixelpivot_batch",
+    "scan_time": "2026-06-24 22:08:39",
+    "files_scanned": 424,
+    "elapsed_seconds": 16.499967699986883
+  },
+  "separation_of_concerns": {
+    "god_files": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\orchestrator.py",
+        "lines": 538
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\ffmpeg_converter.py",
+        "lines": 573
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\sharp_converter.py",
+        "lines": 511
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\ffmpeg_converter.py",
+        "lines": 573
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\engine\\phases\\calibration.py",
+        "lines": 596
+      }
+    ],
+    "mixed_concerns": []
+  },
+  "security": {
+    "hardcoded_secrets": [],
+    "sql_injection_risks": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\db\\export.py",
+        "line": 96,
+        "snippet": "df = pd.read_sql_query(f\"SELECT * FROM {table}\", src_conn)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\db\\repositories\\batch.py",
+        "line": 127,
+        "snippet": "cur.execute(f\"UPDATE batch_runs SET {', '.join(clauses)} WHERE id = ?\", tuple(params))"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\db\\repositories\\metrics.py",
+        "line": 40,
+        "snippet": "query = f\"UPDATE metrics SET {column} = ?, updated_at = CURRENT_TIMESTAMP WHERE conversion_id = ?\""
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\db\\export.py",
+        "line": 96,
+        "snippet": "df = pd.read_sql_query(f\"SELECT * FROM {table}\", src_conn)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\db\\repositories\\batch.py",
+        "line": 122,
+        "snippet": "cur.execute(f\"UPDATE batch_runs SET {', '.join(clauses)} WHERE id = ?\", tuple(params))"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\db\\repositories\\metrics.py",
+        "line": 40,
+        "snippet": "query = f\"UPDATE metrics SET {column} = ?, updated_at = CURRENT_TIMESTAMP WHERE conversion_id = ?\""
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\export.py",
+        "line": 78,
+        "snippet": "df = pd.read_sql_query(f\"SELECT * FROM {table}\", src_conn)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\repositories\\batch.py",
+        "line": 64,
+        "snippet": "query = f\"UPDATE batch_runs SET {', '.join(query_parts)} WHERE id = {p}\""
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\repositories\\batch.py",
+        "line": 74,
+        "snippet": "cur.execute(f\"SELECT * FROM batch_runs WHERE id = {p}\", (run_id,))"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\repositories\\batch.py",
+        "line": 82,
+        "snippet": "cur.execute(f\"SELECT * FROM batch_summary WHERE batch_id = {p}\", (batch_id,))"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\repositories\\conversions.py",
+        "line": 87,
+        "snippet": "f\"SELECT id FROM conversions WHERE image_id = {p} AND tool = {p} AND format = {p}\","
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\repositories\\images.py",
+        "line": 81,
+        "snippet": "f\"SELECT id FROM images WHERE filename = {p} AND category = {p}\","
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\repositories\\images.py",
+        "line": 94,
+        "snippet": "cur.execute(f\"SELECT * FROM images WHERE id = {p}\", (image_id,))"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\repositories\\metrics.py",
+        "line": 20,
+        "snippet": "query = f\"UPDATE metrics SET {column} = ?, updated_at = CURRENT_TIMESTAMP WHERE conversion_id = ?\""
+      }
+    ],
+    "xss_risks": [],
+    "unprotected_endpoints": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\main.py",
+        "line": 91,
+        "endpoint": "@app.get(\"/\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 22,
+        "endpoint": "@router.post(\"/batch/start\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 59,
+        "endpoint": "@router.get(\"/batch/status/{run_id}\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 103,
+        "endpoint": "@router.get(\"/batch/{run_id}/errors\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 116,
+        "endpoint": "@router.get(\"/batch/history\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 127,
+        "endpoint": "@router.post(\"/hotfolder/register\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 149,
+        "endpoint": "@router.get(\"/hotfolder/list\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 162,
+        "endpoint": "@router.delete(\"/hotfolder/{watcher_id}\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 181,
+        "endpoint": "@router.post(\"/batch/{run_id}/control\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 206,
+        "endpoint": "@router.post(\"/batch/{run_id}/restart\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 243,
+        "endpoint": "@router.get(\"/batch/{run_id}/progress\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\main.py",
+        "line": 80,
+        "endpoint": "@app.get(\"/\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\routes.py",
+        "line": 21,
+        "endpoint": "@router.post(\"/batch/start\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\routes.py",
+        "line": 58,
+        "endpoint": "@router.get(\"/batch/status/{run_id}\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\routes.py",
+        "line": 89,
+        "endpoint": "@router.get(\"/batch/{run_id}/errors\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\routes.py",
+        "line": 102,
+        "endpoint": "@router.get(\"/batch/history\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\routes.py",
+        "line": 113,
+        "endpoint": "@router.post(\"/hotfolder/register\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\routes.py",
+        "line": 135,
+        "endpoint": "@router.get(\"/hotfolder/list\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\routes.py",
+        "line": 148,
+        "endpoint": "@router.delete(\"/hotfolder/{watcher_id}\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\main.py",
+        "line": 32,
+        "endpoint": "@app.get(\"/\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\routes.py",
+        "line": 14,
+        "endpoint": "@router.post(\"/batch/start\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\routes.py",
+        "line": 39,
+        "endpoint": "@router.get(\"/batch/status/{run_id}\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\routes.py",
+        "line": 60,
+        "endpoint": "@router.get(\"/batch/{run_id}/errors\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\routes.py",
+        "line": 66,
+        "endpoint": "@router.get(\"/batch/history\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\routes.py",
+        "line": 73,
+        "endpoint": "@router.post(\"/hotfolder/register\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\routes.py",
+        "line": 85,
+        "endpoint": "@router.get(\"/hotfolder/list\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\routes.py",
+        "line": 94,
+        "endpoint": "@router.delete(\"/hotfolder/{watcher_id}\")",
+        "reason": "Route is defined but no typical authentication or authorization guards/decorators were detected on it."
+      }
+    ]
+  },
+  "dependency_chaos": {
+    "summary": {
+      "package_files_found": [
+        "package.json",
+        "pyproject.toml"
+      ],
+      "total_dependencies": 4
+    },
+    "audit_results": {
+      "success": true,
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      }
+    }
+  },
+  "state_management": {
+    "global_mutations": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\hot_folder.py",
+        "line": 363,
+        "snippet": "global _manager"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\logger.py",
+        "line": 23,
+        "snippet": "global _current_run_id"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\logger.py",
+        "line": 77,
+        "snippet": "global _configured"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 103,
+        "snippet": "global _pyvips_cache, _VIPS_AVAILABLE"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\hot_folder.py",
+        "line": 363,
+        "snippet": "global _manager"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\gpu_utils.py",
+        "line": 34,
+        "snippet": "global _GPU_INFO"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\logger.py",
+        "line": 23,
+        "snippet": "global _current_run_id"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\logger.py",
+        "line": 77,
+        "snippet": "global _configured"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 103,
+        "snippet": "global _pyvips_cache, _VIPS_AVAILABLE"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\hot_folder.py",
+        "line": 285,
+        "snippet": "global _manager"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\gpu_utils.py",
+        "line": 34,
+        "snippet": "global _GPU_INFO"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\logger.py",
+        "line": 12,
+        "snippet": "global _current_run_id"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 100,
+        "snippet": "global _pyvips_cache, _VIPS_AVAILABLE"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\engine\\phases\\calibration.py",
+        "line": 54,
+        "snippet": "global _worker_stop_event, _worker_runner"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\engine\\phases\\calibration.py",
+        "line": 570,
+        "snippet": "global _worker_runner"
+      }
+    ],
+    "mutable_defaults": []
+  },
+  "observability": {
+    "swallowed_errors": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\hot_folder.py",
+        "line": 347,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\orchestrator.py",
+        "line": 477,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\logger.py",
+        "line": 62,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\paths.py",
+        "line": 53,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\telemetry.py",
+        "line": 123,
+        "snippet": "except (psutil.NoSuchProcess, psutil.AccessDenied):"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\telemetry.py",
+        "line": 290,
+        "snippet": "except (TypeError, ValueError):"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 36,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 47,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 50,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\sharp_converter.py",
+        "line": 81,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\sharp_converter.py",
+        "line": 361,
+        "snippet": "except OSError as e:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\process.py",
+        "line": 185,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\process.py",
+        "line": 266,
+        "snippet": "except subprocess.TimeoutExpired:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\app.py",
+        "line": 209,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\settings.py",
+        "line": 53,
+        "snippet": "except ValueError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\supervisor.py",
+        "line": 84,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\screens\\settings.py",
+        "line": 36,
+        "snippet": "except ValueError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 21,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\hot_folder.py",
+        "line": 347,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\orchestrator.py",
+        "line": 322,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\orchestrator.py",
+        "line": 412,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\gpu_utils.py",
+        "line": 110,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\gpu_utils.py",
+        "line": 126,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\logger.py",
+        "line": 62,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\paths.py",
+        "line": 29,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\telemetry.py",
+        "line": 123,
+        "snippet": "except (psutil.NoSuchProcess, psutil.AccessDenied):"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\telemetry.py",
+        "line": 290,
+        "snippet": "except (TypeError, ValueError):"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 36,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 47,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 50,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\sharp_converter.py",
+        "line": 68,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\process.py",
+        "line": 185,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\process.py",
+        "line": 266,
+        "snippet": "except subprocess.TimeoutExpired:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 21,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\hot_folder.py",
+        "line": 269,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\orchestrator.py",
+        "line": 122,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\orchestrator.py",
+        "line": 133,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\gpu_utils.py",
+        "line": 110,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\gpu_utils.py",
+        "line": 126,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\logger.py",
+        "line": 51,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\paths.py",
+        "line": 23,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\telemetry.py",
+        "line": 134,
+        "snippet": "except (psutil.NoSuchProcess, psutil.AccessDenied):"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\telemetry.py",
+        "line": 336,
+        "snippet": "except (TypeError, ValueError):"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 32,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 43,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 46,
+        "snippet": "except psutil.NoSuchProcess:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\sharp_converter.py",
+        "line": 44,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\connection.py",
+        "line": 44,
+        "snippet": "except sqlite3.OperationalError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\process.py",
+        "line": 135,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\process.py",
+        "line": 198,
+        "snippet": "except subprocess.TimeoutExpired:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_ffmpeg_batch_helpers.py",
+        "line": 137,
+        "snippet": "except RuntimeError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_schema_sqlite.py",
+        "line": 34,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_021.py",
+        "line": 84,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_02_converters_heuristic.py",
+        "line": 222,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_db_connection_churn.py",
+        "line": 38,
+        "snippet": "except RuntimeError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\fixtures\\fake_ffmpeg\\__main__.py",
+        "line": 77,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 80,
+        "snippet": "except psutil.Error:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 87,
+        "snippet": "except psutil.Error:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 92,
+        "snippet": "except psutil.Error:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_ffmpeg_batch_helpers.py",
+        "line": 137,
+        "snippet": "except RuntimeError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_schema_sqlite.py",
+        "line": 34,
+        "snippet": "except OSError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_002.py",
+        "line": 26,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_021.py",
+        "line": 84,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_02_converters_heuristic.py",
+        "line": 222,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_db_connection_churn.py",
+        "line": 38,
+        "snippet": "except RuntimeError:"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\fixtures\\fake_ffmpeg\\__main__.py",
+        "line": 77,
+        "snippet": "except Exception:"
+      }
+    ],
+    "generic_prints": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\debug_st.py",
+        "line": 3,
+        "snippet": "print(f\"DEBUG PATH: {sys.path}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\main.py",
+        "line": 2,
+        "snippet": "print(\"Hello from pixelpivot-batch!\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 18,
+        "snippet": "print(f\"Checking {name}...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 22,
+        "snippet": "print(f\" OK (found at {path_str})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 24,
+        "snippet": "print(f\" OK (found on PATH at {st.detail})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 26,
+        "snippet": "print(\" FAILED (not found)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 31,
+        "snippet": "print(\"Checking pyvips/libvips...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 34,
+        "snippet": "print(f\" OK (libvips version {st.version})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 36,
+        "snippet": "print(f\" FAILED ({st.detail})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 41,
+        "snippet": "print(f\"Checking Sharp daemon (port {port})...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 44,
+        "snippet": "print(\" OK (connected)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 48,
+        "snippet": "print(f\" WARNING (could not connect: {err_msg})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 53,
+        "snippet": "print(\"Checking Sharp installation...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 56,
+        "snippet": "print(f\" OK ({st.detail})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 58,
+        "snippet": "print(f\" WARNING ({st.detail})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 66,
+        "snippet": "print(f\"Checking source directory '{source}'...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 69,
+        "snippet": "print(\" FAILED (directory does not exist)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 72,
+        "snippet": "print(\" FAILED (path is not a directory)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 78,
+        "snippet": "print(\" OK (readable)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 80,
+        "snippet": "print(f\" FAILED (not readable: {e})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 84,
+        "snippet": "print(f\"Checking target directory '{target}'...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 92,
+        "snippet": "print(\" OK (creatable/writable)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 94,
+        "snippet": "print(f\" FAILED (not writable: {e})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 132,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 133,
+        "snippet": "print(\"      PixelPivot Environment Validation CLI       \")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 134,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 165,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 167,
+        "snippet": "print(\" Validation Result: PASSED\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 170,
+        "snippet": "print(\" Validation Result: FAILED\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 180,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 181,
+        "snippet": "print(\"      PixelPivot System Doctor / Validation       \")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 182,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 209,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 211,
+        "snippet": "print(\" Doctor Result: PASSED\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 214,
+        "snippet": "print(\" Doctor Result: FAILED\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\code_to_md.py",
+        "line": 57,
+        "snippet": "print(f\"Error: {target_path} is not a valid directory.\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\code_to_md.py",
+        "line": 108,
+        "snippet": "print(f\"Success! Markdown file created: {output_filename}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\scripts\\sharp_daemon.js",
+        "line": 78,
+        "snippet": "console.log(`Sharp daemon listening on port ${port}`);"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\launcher.py",
+        "line": 37,
+        "snippet": "print(f\"API did not become ready; recent logs:\\n{sup_logs}\", file=sys.stderr)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\render.py",
+        "line": 21,
+        "snippet": "Console(file=buf, force_terminal=True, color_system=\"standard\", width=100).print(renderable)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 13,
+        "snippet": "print(f\"Checking {name}...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 15,
+        "snippet": "print(f\" OK (found at {path_str})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 21,
+        "snippet": "print(f\" OK (found on PATH at {which_path})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 24,
+        "snippet": "print(\" FAILED (not found)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 29,
+        "snippet": "print(\"Checking pyvips/libvips...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 34,
+        "snippet": "print(f\" OK (libvips version {pyvips.version(0)}.{pyvips.version(1)}.{pyvips.version(2)})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 37,
+        "snippet": "print(f\" FAILED ({e})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 42,
+        "snippet": "print(f\"Checking Sharp daemon (port {port})...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 45,
+        "snippet": "print(\" OK (connected)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 48,
+        "snippet": "print(f\" WARNING (could not connect: {e})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 56,
+        "snippet": "print(f\"Checking source directory '{source}'...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 59,
+        "snippet": "print(\" FAILED (directory does not exist)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 62,
+        "snippet": "print(\" FAILED (path is not a directory)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 68,
+        "snippet": "print(\" OK (readable)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 70,
+        "snippet": "print(f\" FAILED (not readable: {e})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 74,
+        "snippet": "print(f\"Checking target directory '{target}'...\", end=\"\", flush=True)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 82,
+        "snippet": "print(\" OK (creatable/writable)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 84,
+        "snippet": "print(f\" FAILED (not writable: {e})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 111,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 112,
+        "snippet": "print(\"      PixelPivot Environment Validation CLI       \")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 113,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 144,
+        "snippet": "print(\"==================================================\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 146,
+        "snippet": "print(\" Validation Result: PASSED\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\cli.py",
+        "line": 149,
+        "snippet": "print(\" Validation Result: FAILED\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\code_to_md.py",
+        "line": 57,
+        "snippet": "print(f\"Error: {target_path} is not a valid directory.\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\code_to_md.py",
+        "line": 108,
+        "snippet": "print(f\"Success! Markdown file created: {output_filename}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\scripts\\sharp_daemon.js",
+        "line": 78,
+        "snippet": "console.log(`Sharp daemon listening on port ${port}`);"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\code_to_md.py",
+        "line": 40,
+        "snippet": "print(f\"Error: {target_path} is not a valid directory.\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\code_to_md.py",
+        "line": 91,
+        "snippet": "print(f\"Success! Markdown file created: {output_filename}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\scripts\\sharp_daemon.js",
+        "line": 78,
+        "snippet": "console.log(`Sharp daemon listening on port ${port}`);"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tools\\generate_heuristic_data.py",
+        "line": 31,
+        "snippet": "print(\"Usage: python generate_heuristic_data.py <db_path> <output_json>\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tools\\generate_heuristic_data.py",
+        "line": 35,
+        "snippet": "print(f\"Generated heuristic table saved to {sys.argv[2]}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\dump_runs.py",
+        "line": 8,
+        "snippet": "print(f\"Connecting to database at: {db_path.absolute()}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\dump_runs.py",
+        "line": 16,
+        "snippet": "print(\"\\n--- RECENT BATCH RUNS ---\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\dump_runs.py",
+        "line": 18,
+        "snippet": "print(f\"ID: {r['id']} | Tool: {r['tool']} | Format: {r['target_format']} | Status: {r['status']} | Created: {r['created_at']}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\dump_runs.py",
+        "line": 22,
+        "snippet": "print(\"\\n--- RECENT SUMMARIES ---\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\dump_runs.py",
+        "line": 24,
+        "snippet": "print(f\"Run ID: {s['run_id']} | Savings %: {s['savings_pct']:.2f}% | Success: {s['success_count']} | Failures: {s['failure_count']} | Errors: {s['errors']}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\dump_runs.py",
+        "line": 26,
+        "snippet": "print(f\"Error querying SQLite: {e}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 102,
+        "snippet": "print("
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 146,
+        "snippet": "print(\"\\n=== Probe 1: concurrency-guard gap (pure, no processes) ===\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 170,
+        "snippet": "print(f\"  [note] real import unavailable ({e});\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 171,
+        "snippet": "print(\"         mirroring calibration.py:303-307 verbatim instead.\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 188,
+        "snippet": "print(f\"  source under test        : {source}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 193,
+        "snippet": "print(f\"  CPU cores                : {cpu}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 194,
+        "snippet": "print(f\"  MASSIVE_IMAGE_THRESHOLD  : {MASSIVE_IMAGE_THRESHOLD:,} px\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 195,
+        "snippet": "print(f\"  56MP image area          : {huge_px:,} px \""
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 197,
+        "snippet": "print(f\"  workers (dims MISSING)   : {workers_unprobed}   <-- air-gap reality\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 198,
+        "snippet": "print(f\"  workers (dims present)   : {workers_probed}   <-- guard's assumption\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 202,
+        "snippet": "print(f\"  [BUG CONFIRMED] guard did NOT throttle: {workers_unprobed} \""
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 205,
+        "snippet": "print(\"  [OK] guard throttled even without dims -- bug appears fixed.\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 211,
+        "snippet": "print(\"\\n=== Probe 2: spawn-pool memory under hard watchdog ===\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 215,
+        "snippet": "print(f\"  image           : {width}x{height} (~{actual_mp:.1f} MP)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 216,
+        "snippet": "print(f\"  workers         : {workers}  (buggy default = cpu_count//2 = {(os.cpu_count() or 4)//2})\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 217,
+        "snippet": "print(f\"  watchdog cap    : {cap_mb} MB (tree killed above this)\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 235,
+        "snippet": "print(f\"  worker {idx}: peak {peak:.0f} MB in {dt:.2f}s\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 237,
+        "snippet": "print(f\"  worker raised: {e}\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 243,
+        "snippet": "print(f\"\\n  tree peak RSS   : {watchdog.peak_mb:.0f} MB\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 247,
+        "snippet": "print(f\"  per-worker avg  : {avg:.0f} MB\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 248,
+        "snippet": "print(f\"  projected @ cpu_count//2 ({full_cpu} workers): \""
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 250,
+        "snippet": "print(f\"  elapsed         : {elapsed:.2f}s\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 252,
+        "snippet": "print(f\"  [REPRODUCED] tree crossed {cap_mb} MB -- this is the OOM path. \""
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 255,
+        "snippet": "print(\"  [SAFE] stayed under cap at this worker count.\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 267,
+        "snippet": "print(\"PixelPivot OOM steel thread\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 268,
+        "snippet": "print(\"=\" * 60)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 272,
+        "snippet": "print(\"\\n\" + \"=\" * 60)"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 273,
+        "snippet": "print(\"VERDICT\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 275,
+        "snippet": "print(\"  Root cause active: _determine_concurrency does not throttle\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 276,
+        "snippet": "print(\"  unprobed huge images. Fix: probe dims before concurrency is\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 277,
+        "snippet": "print(\"  chosen, OR have _determine_concurrency probe/treat missing\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 278,
+        "snippet": "print(\"  dims as potentially-massive (fail safe -> throttle to <=2).\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 280,
+        "snippet": "print(\"  Guard already throttles; OOM likely from another path.\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tools\\generate_heuristic_data.py",
+        "line": 46,
+        "snippet": "print(\"Usage: python generate_heuristic_data.py <db_path> <output_json>\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tools\\generate_heuristic_data.py",
+        "line": 50,
+        "snippet": "print(f\"Generated heuristic table saved to {sys.argv[2]}\")"
+      }
+    ],
+    "generic_error_messages": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\base.py",
+        "line": 473,
+        "snippet": "errors.append({\"path\": in_path, \"error\": res.get(\"error\") or \"Unknown error\"})"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\ffmpeg_converter.py",
+        "line": 565,
+        "snippet": "errors.append({\"path\": in_path, \"error\": res.get(\"error\") or \"Unknown error\"})"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\base.py",
+        "line": 473,
+        "snippet": "errors.append({\"path\": in_path, \"error\": res.get(\"error\") or \"Unknown error\"})"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\ffmpeg_converter.py",
+        "line": 565,
+        "snippet": "errors.append({\"path\": in_path, \"error\": res.get(\"error\") or \"Unknown error\"})"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\base.py",
+        "line": 293,
+        "snippet": "errors.append(res.get(\"error\") or \"Unknown error\")"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\ffmpeg_converter.py",
+        "line": 462,
+        "snippet": "errors.append({\"path\": in_path, \"error\": res.get(\"error\") or \"Unknown error\"})"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\engine\\phases\\calibration.py",
+        "line": 380,
+        "snippet": "final_result = {\"success\": False, \"error\": \"Unknown error\"}"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 151,
+        "snippet": "current[\"error\"] = status.get(\"summary\", {}).get(\"errors\", \"Unknown error\")"
+      }
+    ],
+    "central_logging_found": true,
+    "logging_configs_found": [
+      "F:\\dev\\pixelpivot_batch\\app\\core\\logger.py",
+      "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\logger.py",
+      "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\logger.py"
+    ]
+  },
+  "unhappy_paths": {
+    "missing_timeouts": [],
+    "db_resilience_risks": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\db\\export.py",
+        "line": 86,
+        "snippet": "sl_conn = sqlite3.connect(output_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\db\\export.py",
+        "line": 135,
+        "snippet": "sl_conn = sqlite3.connect(sqlite_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\db\\export.py",
+        "line": 86,
+        "snippet": "sl_conn = sqlite3.connect(output_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\db\\export.py",
+        "line": 135,
+        "snippet": "sl_conn = sqlite3.connect(sqlite_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\export.py",
+        "line": 68,
+        "snippet": "sl_conn = sqlite3.connect(output_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\export.py",
+        "line": 107,
+        "snippet": "sl_conn = sqlite3.connect(sqlite_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_batch_repo_sqlite.py",
+        "line": 13,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_schema_sqlite.py",
+        "line": 9,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_schema_sqlite.py",
+        "line": 19,
+        "snippet": "conn = sqlite3.connect(path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_008.py",
+        "line": 25,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_010.py",
+        "line": 20,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_015.py",
+        "line": 17,
+        "snippet": "c = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_016.py",
+        "line": 40,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_017.py",
+        "line": 20,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_018.py",
+        "line": 19,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_019.py",
+        "line": 22,
+        "snippet": "conn = sqlite3.connect(str(path))",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "line": 67,
+        "snippet": "with sqlite3.connect(str(db_path)) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "line": 81,
+        "snippet": "with sqlite3.connect(os.environ[\"PIXELPIVOT_DB_PATH\"]) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "line": 93,
+        "snippet": "with sqlite3.connect(os.environ[\"PIXELPIVOT_DB_PATH\"]) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "line": 183,
+        "snippet": "with sqlite3.connect(os.environ[\"PIXELPIVOT_DB_PATH\"]) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_03_real_world.py",
+        "line": 131,
+        "snippet": "with sqlite3.connect(os.environ[\"PIXELPIVOT_DB_PATH\"]) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_calibration_export.py",
+        "line": 12,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_db_connection_churn.py",
+        "line": 25,
+        "snippet": "conn = sqlite3.connect(str(db_path))",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_heuristic_versioning.py",
+        "line": 28,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_heuristic_versioning.py",
+        "line": 71,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_telemetry_flush.py",
+        "line": 15,
+        "snippet": "conn = sqlite3.connect(\":memory:\", check_same_thread=False)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tools\\generate_heuristic_data.py",
+        "line": 19,
+        "snippet": "conn = sqlite3.connect(db_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\dump_runs.py",
+        "line": 9,
+        "snippet": "conn = sqlite3.connect(db_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_batch_repo_sqlite.py",
+        "line": 13,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_schema_sqlite.py",
+        "line": 9,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_schema_sqlite.py",
+        "line": 19,
+        "snippet": "conn = sqlite3.connect(path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_008.py",
+        "line": 25,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_010.py",
+        "line": 20,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_015.py",
+        "line": 17,
+        "snippet": "c = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_016.py",
+        "line": 40,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_017.py",
+        "line": 20,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_018.py",
+        "line": 19,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_019.py",
+        "line": 22,
+        "snippet": "conn = sqlite3.connect(str(path))",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_truncated_image_corruption.py",
+        "line": 11,
+        "snippet": "conn = sqlite3.connect(str(db_path))",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "line": 67,
+        "snippet": "with sqlite3.connect(str(db_path)) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "line": 81,
+        "snippet": "with sqlite3.connect(os.environ[\"PIXELPIVOT_DB_PATH\"]) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "line": 93,
+        "snippet": "with sqlite3.connect(os.environ[\"PIXELPIVOT_DB_PATH\"]) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "line": 183,
+        "snippet": "with sqlite3.connect(os.environ[\"PIXELPIVOT_DB_PATH\"]) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_03_real_world.py",
+        "line": 131,
+        "snippet": "with sqlite3.connect(os.environ[\"PIXELPIVOT_DB_PATH\"]) as raw:",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_calibration_disabled.py",
+        "line": 35,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_calibration_disabled.py",
+        "line": 51,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_calibration_export.py",
+        "line": 17,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_db_connection_churn.py",
+        "line": 25,
+        "snippet": "conn = sqlite3.connect(str(db_path))",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_heuristic_versioning.py",
+        "line": 28,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_heuristic_versioning.py",
+        "line": 71,
+        "snippet": "conn = sqlite3.connect(\":memory:\")",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_telemetry_flush.py",
+        "line": 15,
+        "snippet": "conn = sqlite3.connect(\":memory:\", check_same_thread=False)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tools\\generate_heuristic_data.py",
+        "line": 34,
+        "snippet": "conn = sqlite3.connect(db_path)",
+        "reason": "Database connection initialized without explicit timeout, pool limit, or retry configuration."
+      }
+    ],
+    "input_validation_risks": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\main.py"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\main.py"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\main.py"
+      }
+    ],
+    "coupling_risks": [],
+    "magic_literals": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 116,
+        "snippet": "if args.command == \"serve\":",
+        "reason": "Comparison with magic string `'serve'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 118,
+        "snippet": "elif args.command == \"convert\":",
+        "reason": "Comparison with magic string `'convert'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 120,
+        "snippet": "elif args.command == \"tui\":",
+        "reason": "Comparison with magic string `'tui'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\cli.py",
+        "line": 122,
+        "snippet": "elif args.command == \"doctor\":",
+        "reason": "Comparison with magic string `'doctor'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\main.py",
+        "line": 33,
+        "snippet": "if sys.platform == \"win32\":",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 81,
+        "snippet": "if run[\"status\"] == \"completed\":",
+        "reason": "Comparison with magic string `'completed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 191,
+        "snippet": "if req.action == \"pause\":",
+        "reason": "Comparison with magic string `'pause'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\batch_api\\routes.py",
+        "line": 194,
+        "snippet": "elif req.action == \"resume\":",
+        "reason": "Comparison with magic string `'resume'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\constraints.py",
+        "line": 47,
+        "snippet": "if fmt in (\"jxl\", \"avif\") and (width < 16 or height < 16):",
+        "reason": "Comparison with magic number `16`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\filename_parser.py",
+        "line": 16,
+        "snippet": "is_night     (bool) - True when arrival_time hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\filename_parser.py",
+        "line": 38,
+        "snippet": "\"is_night\":     bool,  # True if hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\filename_parser.py",
+        "line": 53,
+        "snippet": "if len(parts) < 3:",
+        "reason": "Comparison with magic number `3`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\filename_parser.py",
+        "line": 64,
+        "snippet": "if len(hhmm_raw) != 4 or not hhmm_raw.isdigit():",
+        "reason": "Comparison with magic number `4`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\filename_parser.py",
+        "line": 70,
+        "snippet": "if hhmm_raw == \"9999\":",
+        "reason": "Comparison with magic string `'9999'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\filename_parser.py",
+        "line": 77,
+        "snippet": "if not (0 <= hour <= 23) or not (0 <= minute <= 59):",
+        "reason": "Comparison with magic number `23`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\filename_parser.py",
+        "line": 84,
+        "snippet": "is_night = hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\heuristic.py",
+        "line": 47,
+        "snippet": "if len(set(xs)) < 2:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\paths.py",
+        "line": 49,
+        "snippet": "if IS_DOCKER and DB_HOST == \"db\":",
+        "reason": "Comparison with magic string `'db'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\runner.py",
+        "line": 43,
+        "snippet": "exe_name = f\"{name}.exe\" if sys.platform == \"win32\" else name",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\runner.py",
+        "line": 60,
+        "snippet": "fallback = os.path.join(str(paths.TOOLS_DIR), \"ImageMagick\", \"magick\" + (\".exe\" if sys.platform == \"win32\" else \"\"))",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\telemetry.py",
+        "line": 172,
+        "snippet": "if len(buffer) > 1000:",
+        "reason": "Comparison with magic number `1000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\telemetry.py",
+        "line": 184,
+        "snippet": "if len(buffer) > 1000:",
+        "reason": "Comparison with magic number `1000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\toolcheck.py",
+        "line": 69,
+        "snippet": "if sys.platform == \"win32\"",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 58,
+        "snippet": "if sys.platform == \"win32\":",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 179,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 214,
+        "snippet": "elif megapixels < 2.0:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 216,
+        "snippet": "elif megapixels <= 8.0:",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\utils.py",
+        "line": 250,
+        "snippet": "if quality >= 100:",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\base.py",
+        "line": 34,
+        "snippet": "if sys.platform != \"win32\":",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\base.py",
+        "line": 118,
+        "snippet": "threshold = 10 if self.get_name() == \"ffmpeg\" else self.failure_threshold",
+        "reason": "Comparison with magic string `'ffmpeg'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\base.py",
+        "line": 210,
+        "snippet": "subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\base.py",
+        "line": 259,
+        "snippet": "if classify_stderr_line(line) == \"fatal\":",
+        "reason": "Comparison with magic string `'fatal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\base.py",
+        "line": 417,
+        "snippet": "reserved = 2 if cpu_count > 4 else (1 if cpu_count > 2 else 0)",
+        "reason": "Comparison with magic number `4`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\ffmpeg_converter.py",
+        "line": 103,
+        "snippet": "if target_format == \"avif\" and is_intermediate:",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\magick_converter.py",
+        "line": 239,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\sharp_converter.py",
+        "line": 171,
+        "snippet": "if sys.platform == \"win32\"",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\sharp_converter.py",
+        "line": 198,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\sharp_converter.py",
+        "line": 289,
+        "snippet": "val_quality = float(quality) if target_format == \"jxl\" else round(quality)",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\sharp_converter.py",
+        "line": 301,
+        "snippet": "while len(response_data) < 10000:  # Reasonable limit",
+        "reason": "Comparison with magic number `10000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\sharp_converter.py",
+        "line": 452,
+        "snippet": "val_quality = float(q) if target_format == \"jxl\" else int(q)",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\vips_converter.py",
+        "line": 66,
+        "snippet": "if target_format == \"webp\":",
+        "reason": "Comparison with magic string `'webp'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\vips_converter.py",
+        "line": 71,
+        "snippet": "elif target_format == \"avif\":",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\vips_converter.py",
+        "line": 76,
+        "snippet": "elif target_format == \"jxl\":",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\converters\\vips_converter.py",
+        "line": 79,
+        "snippet": "if quality >= 100:",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\db\\export.py",
+        "line": 51,
+        "snippet": "if len(existing_exports) > 2:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\db\\schema.py",
+        "line": 224,
+        "snippet": "if not res or res[0].lower() != \"ok\":",
+        "reason": "Comparison with magic string `'ok'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\db\\repositories\\images.py",
+        "line": 42,
+        "snippet": "if arrival_time and len(str(arrival_time)) == 5 and \":\" in arrival_time:",
+        "reason": "Comparison with magic number `5`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\process.py",
+        "line": 139,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\process.py",
+        "line": 194,
+        "snippet": "stall_timed_out = self._cancel_reason == \"stall_timeout\"",
+        "reason": "Comparison with magic string `'stall_timeout'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\process.py",
+        "line": 357,
+        "snippet": "if classify_stderr_line(line) == \"fatal\":",
+        "reason": "Comparison with magic string `'fatal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\progress.py",
+        "line": 65,
+        "snippet": "if not raw or raw == \"N/A\":",
+        "reason": "Comparison with magic string `'N/A'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\progress.py",
+        "line": 89,
+        "snippet": "if not raw or raw == \"N/A\":",
+        "reason": "Comparison with magic string `'N/A'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\progress.py",
+        "line": 132,
+        "snippet": "if key != \"progress\":",
+        "reason": "Comparison with magic string `'progress'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\core\\ffmpeg\\progress.py",
+        "line": 136,
+        "snippet": "sample = self._emit(done=(value == \"end\"))",
+        "reason": "Comparison with magic string `'end'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\scripts\\sharp_daemon.js",
+        "line": 39,
+        "snippet": "if (format === 'webp') {",
+        "reason": "Comparison with magic string `'webp'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\scripts\\sharp_daemon.js",
+        "line": 41,
+        "snippet": "} else if (format === 'avif') {",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\scripts\\sharp_daemon.js",
+        "line": 43,
+        "snippet": "} else if (format === 'jxl') {",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\scripts\\sharp_daemon.js",
+        "line": 47,
+        "snippet": "lossless: parseFloat(quality) >= 100",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\scripts\\sharp_daemon.js",
+        "line": 49,
+        "snippet": "} else if (format === 'jpeg' || format === 'jpg') {",
+        "reason": "Comparison with magic string `'jpeg'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\scripts\\sharp_daemon.js",
+        "line": 51,
+        "snippet": "} else if (format === 'png') {",
+        "reason": "Comparison with magic string `'png'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\actions.py",
+        "line": 54,
+        "snippet": "if action == \"restart\":",
+        "reason": "Comparison with magic string `'restart'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\actions.py",
+        "line": 71,
+        "snippet": "if sys.platform == \"win32\"",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\actions.py",
+        "line": 92,
+        "snippet": "if action == \"stop\":",
+        "reason": "Comparison with magic string `'stop'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\actions.py",
+        "line": 97,
+        "snippet": "if action == \"restart\":",
+        "reason": "Comparison with magic string `'restart'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\actions.py",
+        "line": 128,
+        "snippet": "if classify(section, key) == \"restart\":",
+        "reason": "Comparison with magic string `'restart'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\tui\\supervisor.py",
+        "line": 82,
+        "snippet": "if httpx.get(url, timeout=interval).status_code == 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\api_client.py",
+        "line": 48,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\api_client.py",
+        "line": 66,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\api_client.py",
+        "line": 84,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\api_client.py",
+        "line": 99,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\api_client.py",
+        "line": 135,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\api_client.py",
+        "line": 150,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\api_client.py",
+        "line": 168,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\style_utils.py",
+        "line": 25,
+        "snippet": "if color != \"inherit\":",
+        "reason": "Comparison with magic string `'inherit'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\style_utils.py",
+        "line": 139,
+        "snippet": "<div class=\"metric-value\" style=\"color: {'#009688' if color == 'teal' else '#E65100' if color == 'orange' else '#0288D1'};\">",
+        "reason": "Comparison with magic string `'teal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 98,
+        "snippet": "if status[\"status\"] == \"completed\":",
+        "reason": "Comparison with magic string `'completed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 126,
+        "snippet": "elif status[\"status\"] == \"failed\":",
+        "reason": "Comparison with magic string `'failed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\main.py",
+        "line": 22,
+        "snippet": "if sys.platform == \"win32\":",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\batch_api\\routes.py",
+        "line": 77,
+        "snippet": "if run[\"status\"] == \"completed\":",
+        "reason": "Comparison with magic string `'completed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\constraints.py",
+        "line": 47,
+        "snippet": "if fmt in (\"jxl\", \"avif\") and (width < 16 or height < 16):",
+        "reason": "Comparison with magic number `16`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\decode_speed.py",
+        "line": 60,
+        "snippet": "if suffix == \".jxl\" and vips_has_loader(\"jxlload\"):",
+        "reason": "Comparison with magic string `'.jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\decode_speed.py",
+        "line": 62,
+        "snippet": "elif suffix == \".avif\" and vips_has_loader(\"heifload\"):",
+        "reason": "Comparison with magic string `'.avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\filename_parser.py",
+        "line": 16,
+        "snippet": "is_night     (bool) - True when arrival_time hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\filename_parser.py",
+        "line": 38,
+        "snippet": "\"is_night\":     bool,  # True if hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\filename_parser.py",
+        "line": 53,
+        "snippet": "if len(parts) < 3:",
+        "reason": "Comparison with magic number `3`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\filename_parser.py",
+        "line": 64,
+        "snippet": "if len(hhmm_raw) != 4 or not hhmm_raw.isdigit():",
+        "reason": "Comparison with magic number `4`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\filename_parser.py",
+        "line": 70,
+        "snippet": "if hhmm_raw == \"9999\":",
+        "reason": "Comparison with magic string `'9999'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\filename_parser.py",
+        "line": 77,
+        "snippet": "if not (0 <= hour <= 23) or not (0 <= minute <= 59):",
+        "reason": "Comparison with magic number `23`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\filename_parser.py",
+        "line": 84,
+        "snippet": "is_night = hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\gpu_utils.py",
+        "line": 94,
+        "snippet": "1. The GPU is Ada Lovelace (RTX 4000+) or newer \u2014 compute capability >= 8.9",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\gpu_utils.py",
+        "line": 153,
+        "snippet": "log.debug(\"av1_nvenc: GPU compute capability < 8.9 \u2014 skipping\")",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\gpu_utils.py",
+        "line": 161,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\heuristic.py",
+        "line": 47,
+        "snippet": "if len(set(xs)) < 2:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\paths.py",
+        "line": 25,
+        "snippet": "if IS_DOCKER and DB_HOST == \"db\":",
+        "reason": "Comparison with magic string `'db'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\runner.py",
+        "line": 43,
+        "snippet": "exe_name = f\"{name}.exe\" if sys.platform == \"win32\" else name",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\runner.py",
+        "line": 60,
+        "snippet": "fallback = os.path.join(str(paths.TOOLS_DIR), \"ImageMagick\", \"magick\" + (\".exe\" if sys.platform == \"win32\" else \"\"))",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\telemetry.py",
+        "line": 172,
+        "snippet": "if len(buffer) > 1000:",
+        "reason": "Comparison with magic number `1000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\telemetry.py",
+        "line": 184,
+        "snippet": "if len(buffer) > 1000:",
+        "reason": "Comparison with magic number `1000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 58,
+        "snippet": "if sys.platform == \"win32\":",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 179,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 214,
+        "snippet": "elif megapixels < 2.0:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 216,
+        "snippet": "elif megapixels <= 8.0:",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\utils.py",
+        "line": 250,
+        "snippet": "if quality >= 100:",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\base.py",
+        "line": 34,
+        "snippet": "if sys.platform != \"win32\":",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\base.py",
+        "line": 118,
+        "snippet": "threshold = 10 if self.get_name() == \"ffmpeg\" else self.failure_threshold",
+        "reason": "Comparison with magic string `'ffmpeg'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\base.py",
+        "line": 210,
+        "snippet": "subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\base.py",
+        "line": 259,
+        "snippet": "if classify_stderr_line(line) == \"fatal\":",
+        "reason": "Comparison with magic string `'fatal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\base.py",
+        "line": 417,
+        "snippet": "reserved = 2 if cpu_count > 4 else (1 if cpu_count > 2 else 0)",
+        "reason": "Comparison with magic number `4`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\ffmpeg_converter.py",
+        "line": 103,
+        "snippet": "if target_format == \"avif\" and is_intermediate:",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\ffmpeg_nvenc_converter.py",
+        "line": 5,
+        "snippet": "- NVIDIA GPU with Ada Lovelace architecture or newer (RTX 4000+, compute >= 8.9)",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\magick_converter.py",
+        "line": 239,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\sharp_converter.py",
+        "line": 158,
+        "snippet": "if sys.platform == \"win32\"",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\sharp_converter.py",
+        "line": 185,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\sharp_converter.py",
+        "line": 275,
+        "snippet": "val_quality = float(quality) if target_format == \"jxl\" else int(quality)",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\sharp_converter.py",
+        "line": 287,
+        "snippet": "while len(response_data) < 10000:  # Reasonable limit",
+        "reason": "Comparison with magic number `10000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\sharp_converter.py",
+        "line": 436,
+        "snippet": "val_quality = float(q) if target_format == \"jxl\" else int(q)",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\vips_converter.py",
+        "line": 66,
+        "snippet": "if target_format == \"webp\":",
+        "reason": "Comparison with magic string `'webp'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\vips_converter.py",
+        "line": 70,
+        "snippet": "elif target_format == \"avif\":",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\vips_converter.py",
+        "line": 75,
+        "snippet": "elif target_format == \"jxl\":",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\converters\\vips_converter.py",
+        "line": 78,
+        "snippet": "if quality >= 100:",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\db\\export.py",
+        "line": 51,
+        "snippet": "if len(existing_exports) > 2:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\db\\schema.py",
+        "line": 224,
+        "snippet": "if not res or res[0].lower() != \"ok\":",
+        "reason": "Comparison with magic string `'ok'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\db\\repositories\\images.py",
+        "line": 42,
+        "snippet": "if arrival_time and len(str(arrival_time)) == 5 and \":\" in arrival_time:",
+        "reason": "Comparison with magic number `5`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\process.py",
+        "line": 139,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\process.py",
+        "line": 194,
+        "snippet": "stall_timed_out = self._cancel_reason == \"stall_timeout\"",
+        "reason": "Comparison with magic string `'stall_timeout'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\process.py",
+        "line": 357,
+        "snippet": "if classify_stderr_line(line) == \"fatal\":",
+        "reason": "Comparison with magic string `'fatal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\progress.py",
+        "line": 65,
+        "snippet": "if not raw or raw == \"N/A\":",
+        "reason": "Comparison with magic string `'N/A'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\progress.py",
+        "line": 89,
+        "snippet": "if not raw or raw == \"N/A\":",
+        "reason": "Comparison with magic string `'N/A'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\progress.py",
+        "line": 132,
+        "snippet": "if key != \"progress\":",
+        "reason": "Comparison with magic string `'progress'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\core\\ffmpeg\\progress.py",
+        "line": 136,
+        "snippet": "sample = self._emit(done=(value == \"end\"))",
+        "reason": "Comparison with magic string `'end'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\scripts\\sharp_daemon.js",
+        "line": 39,
+        "snippet": "if (format === 'webp') {",
+        "reason": "Comparison with magic string `'webp'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\scripts\\sharp_daemon.js",
+        "line": 41,
+        "snippet": "} else if (format === 'avif') {",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\scripts\\sharp_daemon.js",
+        "line": 43,
+        "snippet": "} else if (format === 'jxl') {",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\scripts\\sharp_daemon.js",
+        "line": 47,
+        "snippet": "lossless: parseFloat(quality) >= 100",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\scripts\\sharp_daemon.js",
+        "line": 49,
+        "snippet": "} else if (format === 'jpeg' || format === 'jpg') {",
+        "reason": "Comparison with magic string `'jpeg'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\scripts\\sharp_daemon.js",
+        "line": 51,
+        "snippet": "} else if (format === 'png') {",
+        "reason": "Comparison with magic string `'png'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\api_client.py",
+        "line": 51,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\api_client.py",
+        "line": 70,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\api_client.py",
+        "line": 89,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\api_client.py",
+        "line": 105,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\api_client.py",
+        "line": 142,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\api_client.py",
+        "line": 158,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\api_client.py",
+        "line": 177,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\style_utils.py",
+        "line": 25,
+        "snippet": "if color != \"inherit\":",
+        "reason": "Comparison with magic string `'inherit'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\style_utils.py",
+        "line": 139,
+        "snippet": "<div class=\"metric-value\" style=\"color: {'#009688' if color == 'teal' else '#E65100' if color == 'orange' else '#0288D1'};\">",
+        "reason": "Comparison with magic string `'teal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 98,
+        "snippet": "if status[\"status\"] == \"completed\":",
+        "reason": "Comparison with magic string `'completed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\deploy\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 126,
+        "snippet": "elif status[\"status\"] == \"failed\":",
+        "reason": "Comparison with magic string `'failed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\batch_api\\routes.py",
+        "line": 48,
+        "snippet": "if run[\"status\"] == \"completed\":",
+        "reason": "Comparison with magic string `'completed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\constraints.py",
+        "line": 39,
+        "snippet": "if fmt in (\"jxl\", \"avif\") and (width < 16 or height < 16):",
+        "reason": "Comparison with magic number `16`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\decode_speed.py",
+        "line": 59,
+        "snippet": "if suffix == \".jxl\" and vips_has_loader(\"jxlload\"):",
+        "reason": "Comparison with magic string `'.jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\decode_speed.py",
+        "line": 61,
+        "snippet": "elif suffix == \".avif\" and vips_has_loader(\"heifload\"):",
+        "reason": "Comparison with magic string `'.avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\filename_parser.py",
+        "line": 16,
+        "snippet": "is_night     (bool) - True when arrival_time hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\filename_parser.py",
+        "line": 38,
+        "snippet": "\"is_night\":     bool,  # True if hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\filename_parser.py",
+        "line": 53,
+        "snippet": "if len(parts) < 3:",
+        "reason": "Comparison with magic number `3`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\filename_parser.py",
+        "line": 64,
+        "snippet": "if len(hhmm_raw) != 4 or not hhmm_raw.isdigit():",
+        "reason": "Comparison with magic number `4`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\filename_parser.py",
+        "line": 70,
+        "snippet": "if hhmm_raw == \"9999\":",
+        "reason": "Comparison with magic string `'9999'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\filename_parser.py",
+        "line": 77,
+        "snippet": "if not (0 <= hour <= 23) or not (0 <= minute <= 59):",
+        "reason": "Comparison with magic number `23`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\filename_parser.py",
+        "line": 84,
+        "snippet": "is_night = hour >= 12",
+        "reason": "Comparison with magic number `12`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\gpu_utils.py",
+        "line": 94,
+        "snippet": "1. The GPU is Ada Lovelace (RTX 4000+) or newer \u2014 compute capability >= 8.9",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\gpu_utils.py",
+        "line": 153,
+        "snippet": "log.debug(\"av1_nvenc: GPU compute capability < 8.9 \u2014 skipping\")",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\gpu_utils.py",
+        "line": 161,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\heuristic.py",
+        "line": 30,
+        "snippet": "if len(set(xs)) < 2:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\heuristic_interpolator.py",
+        "line": 56,
+        "snippet": "fallback_val = 1.0 if format == \"jxl\" else 80.0",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\paths.py",
+        "line": 19,
+        "snippet": "if IS_DOCKER and DB_HOST == \"db\":",
+        "reason": "Comparison with magic string `'db'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\runner.py",
+        "line": 32,
+        "snippet": "exe_name = f\"{name}.exe\" if sys.platform == \"win32\" else name",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\runner.py",
+        "line": 49,
+        "snippet": "fallback = os.path.join(str(paths.TOOLS_DIR), \"ImageMagick\", \"magick\" + (\".exe\" if sys.platform == \"win32\" else \"\"))",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\telemetry.py",
+        "line": 186,
+        "snippet": "if len(buffer) > 1000:",
+        "reason": "Comparison with magic number `1000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\telemetry.py",
+        "line": 199,
+        "snippet": "if len(buffer) > 1000:",
+        "reason": "Comparison with magic number `1000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 54,
+        "snippet": "if sys.platform == \"win32\":",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 155,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 182,
+        "snippet": "elif megapixels < 2.0:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 184,
+        "snippet": "elif megapixels <= 8.0:",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\utils.py",
+        "line": 204,
+        "snippet": "if quality >= 100:",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\base.py",
+        "line": 38,
+        "snippet": "threshold = 10 if self.get_name() == \"ffmpeg\" else self.failure_threshold",
+        "reason": "Comparison with magic string `'ffmpeg'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\base.py",
+        "line": 109,
+        "snippet": "subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\base.py",
+        "line": 164,
+        "snippet": "if classify_stderr_line(line) == \"fatal\":",
+        "reason": "Comparison with magic string `'fatal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\ffmpeg_converter.py",
+        "line": 75,
+        "snippet": "if target_format == \"avif\" and is_intermediate:",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\ffmpeg_nvenc_converter.py",
+        "line": 5,
+        "snippet": "- NVIDIA GPU with Ada Lovelace architecture or newer (RTX 4000+, compute >= 8.9)",
+        "reason": "Comparison with magic number `8`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\magick_converter.py",
+        "line": 182,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\sharp_converter.py",
+        "line": 114,
+        "snippet": "if sys.platform == \"win32\"",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\sharp_converter.py",
+        "line": 141,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\sharp_converter.py",
+        "line": 213,
+        "snippet": "val_quality = float(quality) if target_format == \"jxl\" else int(quality)",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\sharp_converter.py",
+        "line": 225,
+        "snippet": "while len(response_data) < 10000:  # Reasonable limit",
+        "reason": "Comparison with magic number `10000`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\sharp_converter.py",
+        "line": 356,
+        "snippet": "val_quality = float(q) if target_format == \"jxl\" else int(q)",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\vips_converter.py",
+        "line": 40,
+        "snippet": "if target_format == \"webp\":",
+        "reason": "Comparison with magic string `'webp'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\vips_converter.py",
+        "line": 44,
+        "snippet": "elif target_format == \"avif\":",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\vips_converter.py",
+        "line": 49,
+        "snippet": "elif target_format == \"jxl\":",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\converters\\vips_converter.py",
+        "line": 52,
+        "snippet": "if quality >= 100:",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\connection.py",
+        "line": 33,
+        "snippet": "if not os.path.isabs(db_path) and db_path != \":memory:\":",
+        "reason": "Comparison with magic string `':memory:'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\export.py",
+        "line": 39,
+        "snippet": "if len(existing_exports) > 2:",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\schema.py",
+        "line": 214,
+        "snippet": "if not res or res[0].lower() != \"ok\":",
+        "reason": "Comparison with magic string `'ok'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\db\\repositories\\images.py",
+        "line": 20,
+        "snippet": "if arrival_time and len(str(arrival_time)) == 5 and \":\" in arrival_time:",
+        "reason": "Comparison with magic number `5`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\engine\\phases\\calibration.py",
+        "line": 257,
+        "snippet": "if result and result[\"status\"] == \"success\":",
+        "reason": "Comparison with magic string `'success'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\engine\\phases\\calibration.py",
+        "line": 436,
+        "snippet": "col = \"ms_ssim\" if calib_method == \"ms-ssim\" else \"ssim\"",
+        "reason": "Comparison with magic string `'ms-ssim'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\engine\\phases\\calibration.py",
+        "line": 557,
+        "snippet": "if task.use_gpu and (img.get(\"width\", 0) < 64 or img.get(\"height\", 0) < 64):",
+        "reason": "Comparison with magic number `64`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\engine\\phases\\calibration.py",
+        "line": 558,
+        "snippet": "if tool_name == \"ffmpeg_nvenc\":",
+        "reason": "Comparison with magic string `'ffmpeg_nvenc'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\process.py",
+        "line": 97,
+        "snippet": "creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == \"win32\" else 0",
+        "reason": "Comparison with magic string `'win32'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\process.py",
+        "line": 144,
+        "snippet": "stall_timed_out = self._cancel_reason == \"stall_timeout\"",
+        "reason": "Comparison with magic string `'stall_timeout'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\process.py",
+        "line": 282,
+        "snippet": "if classify_stderr_line(line) == \"fatal\":",
+        "reason": "Comparison with magic string `'fatal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\progress.py",
+        "line": 41,
+        "snippet": "if not raw or raw == \"N/A\":",
+        "reason": "Comparison with magic string `'N/A'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\progress.py",
+        "line": 55,
+        "snippet": "if not raw or raw == \"N/A\":",
+        "reason": "Comparison with magic string `'N/A'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\progress.py",
+        "line": 91,
+        "snippet": "if key != \"progress\":",
+        "reason": "Comparison with magic string `'progress'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\core\\ffmpeg\\progress.py",
+        "line": 95,
+        "snippet": "sample = self._emit(done=(value == \"end\"))",
+        "reason": "Comparison with magic string `'end'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\scripts\\sharp_daemon.js",
+        "line": 39,
+        "snippet": "if (format === 'webp') {",
+        "reason": "Comparison with magic string `'webp'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\scripts\\sharp_daemon.js",
+        "line": 41,
+        "snippet": "} else if (format === 'avif') {",
+        "reason": "Comparison with magic string `'avif'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\scripts\\sharp_daemon.js",
+        "line": 43,
+        "snippet": "} else if (format === 'jxl') {",
+        "reason": "Comparison with magic string `'jxl'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\scripts\\sharp_daemon.js",
+        "line": 47,
+        "snippet": "lossless: parseFloat(quality) >= 100",
+        "reason": "Comparison with magic number `100`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\scripts\\sharp_daemon.js",
+        "line": 49,
+        "snippet": "} else if (format === 'jpeg' || format === 'jpg') {",
+        "reason": "Comparison with magic string `'jpeg'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\scripts\\sharp_daemon.js",
+        "line": 51,
+        "snippet": "} else if (format === 'png') {",
+        "reason": "Comparison with magic string `'png'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\api_client.py",
+        "line": 27,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\api_client.py",
+        "line": 35,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\api_client.py",
+        "line": 43,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\api_client.py",
+        "line": 65,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\api_client.py",
+        "line": 73,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\api_client.py",
+        "line": 81,
+        "snippet": "if response.status_code != 200:",
+        "reason": "Comparison with magic number `200`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\style_utils.py",
+        "line": 16,
+        "snippet": "if color != \"inherit\":",
+        "reason": "Comparison with magic string `'inherit'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\style_utils.py",
+        "line": 125,
+        "snippet": "<div class=\"metric-value\" style=\"color: {'#009688' if color == 'teal' else '#E65100' if color == 'orange' else '#0288D1'};\">",
+        "reason": "Comparison with magic string `'teal'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 74,
+        "snippet": "elif comb[\"status\"] == \"failed\":",
+        "reason": "Comparison with magic string `'failed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 89,
+        "snippet": "if comb[\"status\"] == \"completed\" and comb[\"summary\"]:",
+        "reason": "Comparison with magic string `'completed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 141,
+        "snippet": "if status[\"status\"] == \"completed\":",
+        "reason": "Comparison with magic string `'completed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\app\\web\\batch_gui\\panels\\run_panel.py",
+        "line": 149,
+        "snippet": "elif status[\"status\"] == \"failed\":",
+        "reason": "Comparison with magic string `'failed'`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tools\\generate_heuristic_data.py",
+        "line": 30,
+        "snippet": "if len(sys.argv) < 3:",
+        "reason": "Comparison with magic number `3`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 200,
+        "snippet": "bug = workers_unprobed > 2",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scripts\\steelthread_oom.py",
+        "line": 278,
+        "snippet": "print(\"  dims as potentially-massive (fail safe -> throttle to <=2).\")",
+        "reason": "Comparison with magic number `2`. Extract to a named constant or Enum."
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tools\\generate_heuristic_data.py",
+        "line": 45,
+        "snippet": "if len(sys.argv) < 3:",
+        "reason": "Comparison with magic number `3`. Extract to a named constant or Enum."
+      }
+    ]
+  },
+  "concurrency": {
+    "concurrency_issues": []
+  },
+  "test_suite": {
+    "test_dirs": [
+      "out\\airgap_bundle\\tests",
+      "out\\airgap_bundle\\tests\\api",
+      "out\\airgap_bundle\\tests\\audit_threads",
+      "out\\airgap_bundle\\tests\\core",
+      "out\\airgap_bundle\\tests\\fixtures",
+      "out\\airgap_bundle\\tests\\fixtures\\fake_ffmpeg",
+      "out\\airgap_bundle\\tests\\gui",
+      "out\\airgap_bundle\\tests\\test_tui",
+      "tests",
+      "tests\\api",
+      "tests\\audit_threads",
+      "tests\\core",
+      "tests\\fixtures",
+      "tests\\fixtures\\fake_ffmpeg",
+      "tests\\gui",
+      "tests\\test_tui",
+      "tests\\tui"
+    ],
+    "test_files_count": 215,
+    "e2e_tests": [],
+    "integration_tests": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\test_import.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_db_batch.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_ffmpeg_batch_helpers.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_hardened_converters.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_integration_real_assets.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_magick_batch.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_magick_converter_chunking.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_orchestrator.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_orchestrator_multi_tool.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_orchestrator_summary_survives_failures.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_phase1_hardening.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_phase2_hardening.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_phase3_hardening.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_phase4_hardening.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_preflight_checks.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_qa_hotfixes.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_real_assets_end_to_end.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_001.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_003.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_006.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_008.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_012.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_telemetry_children_cache.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_telemetry_resilience.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\api\\test_hot_folder.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\api\\test_hot_folder_api.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\api\\test_hot_folder_polling.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\api\\test_hot_folder_readiness.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\api\\test_probing_heif.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\api\\test_routes.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_03_real_world.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_adaptive_pool.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_db_connection_churn.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_db_integrity.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_heuristic_versioning.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_jxl_lossless.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_jxl_mapping.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_lightweight_probing.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_magick_grouping.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_nvenc_support.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_sharp_resilience.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_subprocess_lifecycle.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_telemetry_flush.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_vips_telemetry.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\gui\\test_api_client.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tools\\stress_test.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_circuit_breaker_isolation.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_cli.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_cli_dispatch.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_db_batch.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_ffmpeg_batch_helpers.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_hardened_converters.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_integration_real_assets.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_magick_batch.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_magick_converter_chunking.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_massive_image_rejection.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_orchestrator.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_orchestrator_cancel.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_orchestrator_multi_tool.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_orchestrator_progress.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_orchestrator_summary_survives_failures.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_phase1_hardening.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_phase2_hardening.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_phase3_hardening.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_phase4_hardening.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_preflight_checks.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_qa_hotfixes.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_real_assets_end_to_end.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_001.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_003.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_006.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_008.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_012.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_telemetry_children_cache.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_telemetry_resilience.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_control_endpoints.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_hot_folder.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_hot_folder_api.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_hot_folder_polling.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_hot_folder_readiness.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_probing_heif.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_progress_endpoint.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_routes.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_01_api_orch_db.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_03_real_world.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_adaptive_pool.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_db_connection_churn.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_db_integrity.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_heuristic_versioning.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_jxl_lossless.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_jxl_mapping.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_lightweight_probing.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_magick_grouping.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_orchestrator.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_sharp_resilience.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_subprocess_lifecycle.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_telemetry_flush.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_vips_telemetry.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_worker_cpu_reservation.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\gui\\test_api_client.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_actions.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_api_client.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_app_smoke.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_launcher.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_telemetry_screen.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_tools_screen.py",
+        "type": "integration"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tools\\stress_test.py",
+        "type": "integration"
+      }
+    ],
+    "unit_tests": [
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\test_150_matrix.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\test_matrix.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\bench_ffmpeg_batch.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_avif_real_images.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_base_converter.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_batch_db_import.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_batch_repo_sqlite.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_config_ffmpeg_batch_constants.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_ffmpeg_converter_batch.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_ffmpeg_process.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_ffmpeg_progress.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_heuristic_table.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_interpolator.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_schema_sqlite.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_smoke_real_conversion.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_002.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_004.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_005.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_007.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_009.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_010.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_011.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_013.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_014.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_015.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_016.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_017.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_018.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_019.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_020.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_021.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_022.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_023.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_024.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_025.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_026.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_task_027.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\test_utils.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\__init__.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\audit_threads\\harness_02_converters_heuristic.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\core\\test_calibration_export.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\fixtures\\fake_ffmpeg\\__init__.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\out\\airgap_bundle\\tests\\fixtures\\fake_ffmpeg\\__main__.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\fix_tests.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\scratch\\fix_tests2.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\bench_ffmpeg_batch.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_airgap_streamlit_telemetry.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_avif_real_images.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_base_converter.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_batch_db_import.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_batch_repo_sqlite.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_config_ffmpeg_batch_constants.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_exif_policy.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_ffmpeg_converter_batch.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_ffmpeg_process.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_ffmpeg_progress.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_heuristic_table.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_interpolator.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_long_path_fix.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_no_streamlit_runtime.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_runtime_surface.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_schema_sqlite.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_smoke_real_conversion.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_steel_thread.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_002.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_004.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_005.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_007.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_009.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_010.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_011.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_013.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_014.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_015.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_016.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_017.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_018.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_019.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_020.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_021.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_022.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_023.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_024.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_025.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_026.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_task_027.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_truncated_image_corruption.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_utils.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_windows_service.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\test_worker_memory_cap.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\__init__.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\api\\test_run_control.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\audit_threads\\harness_02_converters_heuristic.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_calibration_disabled.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_calibration_export.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_frozen_paths.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\core\\test_toolcheck.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\fixtures\\fake_ffmpeg\\__init__.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\fixtures\\fake_ffmpeg\\__main__.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_render.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_settings.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_settings_screen.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_state.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_submit_screen.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_supervisor.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\test_widgets.py",
+        "type": "unit"
+      },
+      {
+        "file": "F:\\dev\\pixelpivot_batch\\tests\\tui\\__init__.py",
+        "type": "unit"
+      }
+    ],
+    "has_test_suite": true
+  }
+}

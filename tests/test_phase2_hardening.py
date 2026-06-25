@@ -26,8 +26,7 @@ def test_ffmpeg_convert_batch_signature(monkeypatch):
                 
                 # Check how group_by_dimensions was called
                 args, kwargs = mock_group.call_args
-                # We removed dimensions kwarg
-                assert "dimensions" not in kwargs
+                assert "dimensions" in kwargs
 
 def test_image2_gated_off_for_avif_by_default(monkeypatch):
     """With IMAGE2_ALLOW_LOSSY_FORMATS False, AVIF skips image2 and routes to multimap."""

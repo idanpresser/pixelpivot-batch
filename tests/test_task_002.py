@@ -13,8 +13,13 @@ def test_sqlite_busy_retry_with_real_lock(tmp_path, monkeypatch):
     """
     Regression test for Task 002: Orchestrator retries save_summary on SQLITE_BUSY.
     """
-    db_path = tmp_path / "test_busy.db"
+    # Force clean thread-local connection to prevent leakage from prior tests
     import app.core.db.connection as connection
+    if hasattr(connection, "_local"):
+        connection._local.conn = None
+        connection._local.depth = 0
+
+    db_path = tmp_path / "test_busy.db"
     monkeypatch.setattr(connection, "SQLITE_DB_PATH", db_path)
     monkeypatch.setenv("PIXELPIVOT_DB_PATH", str(db_path))
 
@@ -35,6 +40,7 @@ def test_sqlite_busy_retry_with_real_lock(tmp_path, monkeypatch):
     # main file before the orchestrator's raw connection reads it.
     from app.core.db.schema import init_db
     with connection.get_connection() as _c:
+        print(f"DEBUG: _c database list at init_db: {[tuple(r) for r in _c.execute('PRAGMA database_list').fetchall()]}")
         init_db(_c)
         _c.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
@@ -50,6 +56,8 @@ def test_sqlite_busy_retry_with_real_lock(tmp_path, monkeypatch):
     # Put a fake image so orchestrator has something to process
     (tmp_path / "test.jpg").write_bytes(b"fake image data")
 
+    monkeypatch.setattr("app.core.utils.probe_image_dimensions", lambda path: (100, 100))
+
     orchestrator = BatchOrchestrator()
     # Mock converter to succeed instantly
     class DummyConverter:
@@ -61,8 +69,8 @@ def test_sqlite_busy_retry_with_real_lock(tmp_path, monkeypatch):
     
     # We must also mock config to speed up retries in tests, else it might take long.
     import app.core.config as config
-    monkeypatch.setattr(config, "SQLITE_BUSY_ATTEMPTS", 5, raising=False)
-    monkeypatch.setattr(config, "SQLITE_BUSY_BASE_DELAY_S", 0.05, raising=False)
+    monkeypatch.setattr(config, "SQLITE_BUSY_ATTEMPTS", 8, raising=False)
+    monkeypatch.setattr(config, "SQLITE_BUSY_BASE_DELAY_S", 0.1, raising=False)
     
     # Create a run record first
     with get_connection() as conn:
@@ -101,13 +109,33 @@ def test_sqlite_busy_retry_with_real_lock(tmp_path, monkeypatch):
     def fast_fail_get_connection():
         # override timeout to 0.1s so it raises SQLITE_BUSY quickly
         conn = sqlite3.connect(str(db_path), timeout=0.1, isolation_level=None)
+        conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
     monkeypatch.setattr("app.batch_api.orchestrator.get_connection", fast_fail_get_connection)
     
+    # Debug update_status
+    original_update_status = orchestrator.repo.update_status
+    def mock_update_status(conn, r_id, status, *args, **kwargs):
+        print(f"DEBUG: update_status called for r_id={r_id} with status={status}")
+        try:
+            res = original_update_status(conn, r_id, status, *args, **kwargs)
+            print(f"DEBUG: update_status succeeded for r_id={r_id} status={status}")
+            return res
+        except Exception as e:
+            print(f"DEBUG: update_status FAILED for r_id={r_id} status={status}: {e}")
+            raise
+    monkeypatch.setattr(orchestrator.repo, "update_status", mock_update_status)
+
     # Execute batch
-    orchestrator.execute_batch(run_id, request)
+    print("DEBUG: Starting execute_batch")
+    try:
+        orchestrator.execute_batch(run_id, request)
+        print("DEBUG: execute_batch finished successfully")
+    except Exception as e:
+        print(f"DEBUG: execute_batch raised exception: {e}")
+        raise
 
     t.join()
 

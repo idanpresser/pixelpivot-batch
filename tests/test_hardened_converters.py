@@ -63,7 +63,7 @@ def test_ffmpeg_convert_batch_signature():
                     qualities=[80.0]
                 )
                 args, kwargs = mock_group.call_args
-                assert "dimensions" not in kwargs
+                assert "dimensions" in kwargs
 
 def test_subprocess_creation_flags():
     """Verify that all relevant subprocess calls use CREATE_NO_WINDOW on Windows."""

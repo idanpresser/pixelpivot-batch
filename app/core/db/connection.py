@@ -86,9 +86,25 @@ def _configure(conn: sqlite3.Connection) -> None:
         cur.close()
 
 
+def get_db_path() -> Path:
+    """Dynamically resolve the database path, checking environment variables.
+
+    This prevents test isolation issues where reloaded modules or thread pools
+    access stale DB paths.
+    """
+    import os
+    env_path = os.getenv("PIXELPIVOT_DB_PATH")
+    if env_path:
+        return Path(env_path)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url and db_url.startswith("sqlite:///"):
+        return Path(db_url.replace("sqlite:///", ""))
+    return SQLITE_DB_PATH
+
+
 def _open(db_path: Path | None = None) -> sqlite3.Connection:
     """Open a fresh SQLite connection with pragmas applied."""
-    target = db_path if db_path is not None else SQLITE_DB_PATH
+    target = db_path if db_path is not None else get_db_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(
         str(target),
@@ -126,9 +142,20 @@ def get_connection() -> Iterator[sqlite3.Connection]:
     get_connection() block, reducing open/close churn. Unit of transaction
     is the outer-most block.
     """
-    if not hasattr(_local, "conn") or _local.conn is None:
+    current_path = get_db_path()
+    if (
+        not hasattr(_local, "conn")
+        or _local.conn is None
+        or getattr(_local, "conn_path", None) != current_path
+    ):
+        if getattr(_local, "conn", None) is not None:
+            try:
+                _local.conn.close()
+            except Exception:
+                pass
         conn = _open()
         _local.conn = conn
+        _local.conn_path = current_path
         _local.depth = 1
         try:
             yield conn
@@ -147,6 +174,7 @@ def get_connection() -> Iterator[sqlite3.Connection]:
                 except Exception as e:
                     log.debug("close suppressed: %s", e)
                 _local.conn = None
+                _local.conn_path = None
                 _local.depth = 0
     else:
         _local.depth += 1

@@ -76,6 +76,21 @@ async def lifespan(app: FastAPI):
 
     loop = asyncio.get_running_loop()
     app.state.orchestrator = BatchOrchestrator()
+
+    # Eagerly start Sharp daemon on startup
+    sharp_conv = app.state.orchestrator.converters.get("sharp")
+    if sharp_conv:
+        try:
+            from ..core.toolcheck import check_sharp_install
+            install_status = check_sharp_install()
+            if install_status.ok:
+                log.info("Eagerly starting Sharp Node daemon on startup...")
+                sharp_conv._ensure_daemon_running()
+            else:
+                log.warning("Sharp Node daemon not started eagerly: %s", install_status.detail)
+        except Exception as e:
+            log.warning("Failed to start Sharp Node daemon eagerly on startup: %s", e)
+
     manager = init_hot_folder_manager(app.state.orchestrator, loop)
     manager.start()
     app.state.hot_folder_manager = manager
@@ -83,6 +98,14 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         manager.stop()
+        # Eagerly stop Sharp daemon on shutdown
+        sharp_conv = getattr(app.state, "orchestrator", None) and app.state.orchestrator.converters.get("sharp")
+        if sharp_conv:
+            try:
+                log.info("Eagerly stopping Sharp Node daemon on shutdown...")
+                sharp_conv._stop_daemon()
+            except Exception as e:
+                log.warning("Failed to stop Sharp Node daemon on shutdown: %s", e)
 
 app = FastAPI(title="PixelPivot Batch Engine", lifespan=lifespan)
 

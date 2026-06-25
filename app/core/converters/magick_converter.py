@@ -123,6 +123,7 @@ class MagickConverter(BaseConverter):
             and error details.
         """
 
+        self._set_active_run_id(run_id)
         param_builder = self.FORMAT_PARAMS.get(target_format)
         if not param_builder:
             return {"success": False, "error": f"Unsupported format: {target_format}"}

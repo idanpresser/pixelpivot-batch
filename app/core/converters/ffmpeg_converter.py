@@ -92,6 +92,7 @@ class FFmpegConverter(BaseConverter):
             Dict with conversion result including success status, duration, telemetry,
             and error details.
         """
+        self._set_active_run_id(run_id)
         if self.is_broken and not getattr(self, "_bypass_breaker", False):
             return {"success": False, "error": f"{self.get_name()} is broken"}
 
@@ -285,7 +286,7 @@ class FFmpegConverter(BaseConverter):
                 # Outer group by quality (encoder params depend on quality).
                 batch_params = params + ["-threads", "1"]
 
-                size_groups = group_by_dimensions(group_paths)
+                size_groups = group_by_dimensions(group_paths, dimensions=dimensions)
 
                 for wh, sub_paths in size_groups.items():
                     if wh is None:

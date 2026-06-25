@@ -110,6 +110,7 @@ class VipsConverter(BaseConverter):
             Dict with conversion result including success status, duration, telemetry,
             and error details.
         """
+        self._set_active_run_id(run_id)
         return self._run_library(
             self._convert_via_pyvips,
             "pyvips",
