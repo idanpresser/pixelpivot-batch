@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 import pyvips
 
+from . import config
 from .logger import get_logger
 
 log = get_logger(__name__)
@@ -47,6 +48,25 @@ def compute_ssim(a: np.ndarray, b: np.ndarray) -> float:
     return float(ssim_map.mean())
 
 
+def _maybe_downscale(original: np.ndarray, candidate: np.ndarray):
+    """Downscale both arrays equally when over HUGE_IMAGE_THRESHOLD, to bound
+    cv2 SSIM memory (float32 x3 buffers). Single source for SSIM memory safety.
+
+    Reads config.HUGE_IMAGE_THRESHOLD at call time so the limit stays a single
+    source of truth (and is overridable in tests).
+    """
+    h, w = original.shape[:2]
+    if h * w <= config.HUGE_IMAGE_THRESHOLD:
+        return original, candidate
+    scale = (config.HUGE_IMAGE_THRESHOLD / float(h * w)) ** 0.5
+    new_w = max(11, int(w * scale))
+    new_h = max(11, int(h * scale))
+    log.info("SSIM rescale %dx%d -> %dx%d (over HUGE threshold)", w, h, new_w, new_h)
+    o = cv2.resize(original, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    c = cv2.resize(candidate, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    return o, c
+
+
 def score_ssim(orig_path: str, conv_path: str, *, orig_rgb: np.ndarray = None) -> float:
     """Decode original (or reuse orig_rgb) and candidate, return SSIM.
 
@@ -61,6 +81,7 @@ def score_ssim(orig_path: str, conv_path: str, *, orig_rgb: np.ndarray = None) -
                 "SSIM shape mismatch %s vs %s for %s", original.shape, candidate.shape, conv_path
             )
             return -1.0
+        original, candidate = _maybe_downscale(original, candidate)
         return compute_ssim(original, candidate)
     except Exception as e:
         log.warning("SSIM scoring failed for %s: %s", conv_path, e)

@@ -27,11 +27,8 @@ from ..core.config import (
     MAGICK_MOGRIFY_CHUNK,
     SQLITE_BUSY_ATTEMPTS,
     SQLITE_BUSY_BASE_DELAY_S,
-    MIN_AVAILABLE_RAM_BYTES,
-    MIN_FREE_DISK_BYTES,
     DISK_RECHECK_EVERY_CELLS,
     default_quality_for,
-    MASSIVE_IMAGE_THRESHOLD,
 )
 from ..core.paths import APP_ROOT, PROJ_ROOT
 
@@ -161,37 +158,25 @@ class BatchOrchestrator:
     def _preflight_resources(self, target_dir: str) -> None:
         """Validate available memory and disk space before batch execution.
 
-        Args:
-            target_dir: Directory where output will be written.
+        Delegates to the shared image_guards module (single source of truth for
+        the preflight thresholds shared with the calibration runner).
 
         Raises:
             ValueError: If insufficient memory or disk space.
         """
-        import psutil
-        import shutil
-        vm = psutil.virtual_memory()
-        if vm.available < MIN_AVAILABLE_RAM_BYTES:
-            raise ValueError(f"Critically low memory: {vm.available / (1024*1024):.1f} MB available.")
-        
-        target_path = Path(target_dir)
-        target_path.mkdir(parents=True, exist_ok=True)
-        _, _, free = shutil.disk_usage(str(target_path))
-        if free < MIN_FREE_DISK_BYTES:
-            raise ValueError("Insufficient disk space on target directory.")
+        from .image_guards import preflight_resources
+        preflight_resources(target_dir)
 
     def _check_free_disk(self, target_dir: str) -> None:
         """Check available disk space during batch execution.
 
-        Args:
-            target_dir: Directory to check.
+        Delegates to the shared image_guards module.
 
         Raises:
             ValueError: If disk space is critically low.
         """
-        import shutil
-        _, _, free = shutil.disk_usage(target_dir)
-        if free < MIN_FREE_DISK_BYTES:
-            raise ValueError("Insufficient disk space on target directory mid-run.")
+        from .image_guards import check_free_disk
+        check_free_disk(target_dir)
 
     def _probe_quality(self, path: str, category: str, tool: str, target_format: str, cached_dim: tuple[int, int] | None = None) -> float:
         """Probes a single image and returns its target quality."""
@@ -326,28 +311,15 @@ class BatchOrchestrator:
             
             dim_cache = self._probe_all_dimensions(input_paths)
 
-            # Filter unreadable and massive images upfront
-            filtered_input_paths = []
-            for path in input_paths:
-                w, h = dim_cache.get(path, (0, 0))
-                if w == 0 and h == 0:
-                    err_msg = f"Image {Path(path).name} could not be probed (unreadable or corrupt) — skipped."
-                    log.error(err_msg)
-                    all_failure_count += len(plan)
-                    for cell in plan:
-                        all_errors.append({"path": path, "error": err_msg})
-                elif w * h > MASSIVE_IMAGE_THRESHOLD:
-                    err_msg = (
-                        f"Image {Path(path).name} exceeds MASSIVE_IMAGE_THRESHOLD "
-                        f"({w}x{h} = {w*h} px > {MASSIVE_IMAGE_THRESHOLD} px) and was rejected."
-                    )
-                    log.error(err_msg)
-                    all_failure_count += len(plan)
-                    for cell in plan:
-                        all_errors.append({"path": path, "error": err_msg})
-                else:
-                    filtered_input_paths.append(path)
-            input_paths = filtered_input_paths
+            # Filter unreadable and massive images upfront via the shared guard
+            # (single source of truth, also used by the calibration runner).
+            from .image_guards import partition_images
+            input_paths, rejected = partition_images(input_paths, dim_cache)
+            for rej in rejected:
+                log.error(rej["error"])
+                all_failure_count += len(plan)
+                for _ in plan:
+                    all_errors.append(rej)
 
             from concurrent.futures import ThreadPoolExecutor
             probe_workers = min(32, (os.cpu_count() or 4) * 4)
