@@ -81,9 +81,11 @@ def test_mid_run_disk_check(tmp_path, monkeypatch):
     with get_connection() as conn:
         run_id = orchestrator.repo.create_run(conn, str(tmp_path), str(tmp_path), "['webp']", "['magick', 'ffmpeg']", "api")
 
+    # Disk/RAM thresholds now live in the shared image_guards module (DRY); the
+    # orchestrator delegates its preflight + mid-run disk check there.
     monkeypatch.setattr("app.batch_api.orchestrator.DISK_RECHECK_EVERY_CELLS", 1)
-    monkeypatch.setattr("app.batch_api.orchestrator.MIN_FREE_DISK_BYTES", 50*1024*1024)
-    monkeypatch.setattr("app.batch_api.orchestrator.MIN_AVAILABLE_RAM_BYTES", 50*1024*1024)
+    monkeypatch.setattr("app.batch_api.image_guards.MIN_FREE_DISK_BYTES", 50*1024*1024)
+    monkeypatch.setattr("app.batch_api.image_guards.MIN_AVAILABLE_RAM_BYTES", 50*1024*1024)
 
     call_count = 0
     def mock_disk_usage(*args):
