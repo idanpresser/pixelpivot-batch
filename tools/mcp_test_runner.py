@@ -37,20 +37,17 @@ def get_venv_pytest(git_root):
             
     return ["pytest"]
 
-def compact_pytest_output(stdout, stderr, exit_code):
-    if exit_code == 0:
-        lines = [line.strip() for line in stdout.splitlines() if line.strip()]
-        summary = ""
-        for line in reversed(lines):
-            if "passed" in line and ("in " in line or line.startswith("==")):
-                summary = line.strip(" =")
-                break
-        if not summary and lines:
-            summary = lines[-1].strip(" =")
-        return f"ALL GREEN: {summary}"
+def strip_ansi_codes(text):
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
 
+def compact_pytest_output(stdout, stderr, exit_code):
+    stdout = strip_ansi_codes(stdout)
+    stderr = strip_ansi_codes(stderr)
+    
     lines = stdout.splitlines()
     
+    # 1. Extract summary line
     summary = ""
     for line in reversed(lines):
         trimmed = line.strip()
@@ -64,6 +61,32 @@ def compact_pytest_output(stdout, stderr, exit_code):
                 summary = trimmed
                 break
 
+    if exit_code == 0:
+        output_parts = [
+            "=== TEST RUN SUMMARY ===",
+            "Status: PASSED",
+            f"Summary: {summary or 'All tests passed'}",
+            "========================"
+        ]
+        return "\n".join(output_parts)
+
+    # 2. Extract failed/errored tests from the short test summary info section
+    failed_tests = []
+    in_summary_info = False
+    for line in lines:
+        trimmed = line.strip()
+        if re.match(r'^={3,}\s+short test summary info\s+={3,}$', trimmed):
+            in_summary_info = True
+            continue
+        if in_summary_info and re.match(r'^={3,}.*?={3,}$', trimmed):
+            in_summary_info = False
+            continue
+        if in_summary_info and (trimmed.startswith("FAILED ") or trimmed.startswith("ERROR ")):
+            parts = trimmed.split()
+            if len(parts) > 1:
+                failed_tests.append(parts[1])
+
+    # 3. Extract failure details
     in_failures_section = False
     failure_blocks = []
     current_block = []
@@ -120,7 +143,15 @@ def compact_pytest_output(stdout, stderr, exit_code):
         compacted_failures.append(f"{header}\n{body_str}")
 
     output_parts = []
-    output_parts.append(f"TESTS FAILED: {summary}")
+    output_parts.append("=== TEST RUN SUMMARY ===")
+    output_parts.append("Status: FAILED")
+    output_parts.append(f"Summary: {summary}")
+    if failed_tests:
+        output_parts.append("Failed/Errored Tests:")
+        for t in failed_tests:
+            output_parts.append(f"  - {t}")
+    output_parts.append("========================\n")
+
     if compacted_failures:
         output_parts.append("\n" + "\n\n".join(compacted_failures))
     else:
