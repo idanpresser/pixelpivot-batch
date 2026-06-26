@@ -77,11 +77,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.error("Startup reaper failed: %s", e)
 
-    # Enable the calibration write gate in the API process so the /calibrate
-    # endpoint's save_calibration_result writes fire.
-    from app.core import config
-    config.CALIBRATION_ENABLED = True
-
     loop = asyncio.get_running_loop()
     app.state.orchestrator = BatchOrchestrator()
     from .queue_manager import init_queue_manager

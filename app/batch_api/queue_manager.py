@@ -154,6 +154,11 @@ class BatchQueueManager:
                     if isinstance(request, CalibrationRequest):
                         from .run_control import RunControl
                         from .calibration_runner import run_calibration
+                        # Enable the calibration write gate on the execution path
+                        # (not at app startup) so save_calibration_result fires for
+                        # this run without polluting the default-off global elsewhere.
+                        from app.core import config
+                        config.CALIBRATION_ENABLED = True
                         ctrl = self.orchestrator.run_controls.setdefault(run_id, RunControl())
                         log.info(f"Starting calibration run_id={run_id}")
                         run_calibration(
