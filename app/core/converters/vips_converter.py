@@ -2,7 +2,7 @@
 
 import time
 from typing import Dict, Any, List, Optional, Union
-from .base import BaseConverter
+from .base import BaseConverter, ConvertResult
 from ..telemetry import TelemetryMonitor
 from ..logger import get_logger
 from ..utils import get_pyvips, quality_to_jxl_distance
@@ -95,7 +95,7 @@ class VipsConverter(BaseConverter):
         quality: Union[int, float],
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConvertResult:
         """Convert a single image via in-process pyvips.
 
         Args:

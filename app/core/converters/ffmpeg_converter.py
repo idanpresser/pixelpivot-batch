@@ -27,7 +27,7 @@ from ..ffmpeg import FFmpegProcess
 from ..logger import get_logger
 from ..telemetry import TelemetryMonitor, aggregate_telemetry
 from ..utils import quality_to_jxl_distance
-from .base import BaseConverter, _win32_safe_path
+from .base import BaseConverter, _win32_safe_path, ConvertResult, BatchResult
 from .ffmpeg_batch_helpers import (
     all_same_resolution,
     build_image2_args,
@@ -77,7 +77,7 @@ class FFmpegConverter(BaseConverter):
         quality: Union[int, float],
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConvertResult:
         """Convert a single image file via ffmpeg subprocess.
 
         Args:
@@ -89,16 +89,15 @@ class FFmpegConverter(BaseConverter):
             run_id: Optional batch run ID for telemetry.
 
         Returns:
-            Dict with conversion result including success status, duration, telemetry,
-            and error details.
+            ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
         self._set_active_run_id(run_id)
         if self.is_broken and not getattr(self, "_bypass_breaker", False):
-            return {"success": False, "error": f"{self.get_name()} is broken"}
+            return ConvertResult(success=False, error=f"{self.get_name()} is broken")
 
         params = encoder_params_for(target_format, quality)
         if params is None:
-            return {"success": False, "error": f"Unsupported format: {target_format}"}
+            return ConvertResult(success=False, error=f"Unsupported format: {target_format}")
 
         # Faster cpu-used for intermediate calibration encodes (AVIF only).
         if target_format == "avif" and is_intermediate:
@@ -139,7 +138,7 @@ class FFmpegConverter(BaseConverter):
         target_format: str,
         output_path: str,
         run_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConvertResult:
         """Run ffmpeg via FFmpegProcess with progress tracking and timeout supervision.
 
         Args:
@@ -151,7 +150,7 @@ class FFmpegConverter(BaseConverter):
             run_id: Optional batch run ID for telemetry.
 
         Returns:
-            Dict with success status, duration, telemetry, parameters used, and error details.
+            ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
         proc = FFmpegProcess(
             self.ffmpeg_path,
@@ -163,14 +162,14 @@ class FFmpegConverter(BaseConverter):
             pid = proc.spawn()
         except FileNotFoundError as e:
             self._mark_failure()
-            return {
-                "success": False,
-                "duration_ms": 0.0,
-                "telemetry": {},
-                "parameters_used": {"cli_args": params, "quality_value": quality, "method": "subprocess"},
-                "error": f"ffmpeg binary not found: {e}",
-                "fatal_error": True,
-            }
+            return ConvertResult(
+                success=False,
+                duration_ms=0.0,
+                telemetry={},
+                parameters_used={"cli_args": params, "quality_value": quality, "method": "subprocess"},
+                error=f"ffmpeg binary not found: {e}",
+                fatal_error=True,
+            )
 
         monitor = TelemetryMonitor(pid=pid, interval_ms=int(TELEMETRY_INTERVAL * 1000), run_id=run_id)
         monitor.start()
@@ -206,20 +205,20 @@ class FFmpegConverter(BaseConverter):
                     (error or "").splitlines()[0] if error else "(no detail)",
                 )
 
-        return {
-            "success": success,
-            "duration_ms": result.duration_ms,
-            "telemetry": telemetry,
-            "parameters_used": {
+        return ConvertResult(
+            success=success,
+            duration_ms=result.duration_ms,
+            telemetry=telemetry,
+            parameters_used={
                 "cli_args": params,
                 "quality_value": quality,
                 "method": "subprocess",
                 "progress_samples": len(result.progress_samples),
             },
-            "error": error,
-            "fatal_error": result.fatal,
-            "bytes_written": bytes_written,
-        }
+            error=error,
+            fatal_error=result.fatal,
+            bytes_written=bytes_written,
+        )
 
     def convert_batch(
         self,
@@ -230,7 +229,7 @@ class FFmpegConverter(BaseConverter):
         run_id: Optional[int] = None,
         suffix: str = "",
         dimensions: Optional[Dict[str, tuple[int, int]]] = None,
-    ) -> Dict[str, Any]:
+    ) -> BatchResult:
         """Convert a batch of images via hybrid native-batch routing.
 
         Groups by (format, quality), sub-groups by (width, height), and routes:
@@ -251,8 +250,7 @@ class FFmpegConverter(BaseConverter):
             dimensions: Optional pre-computed (width, height) dict (unused in this implementation).
 
         Returns:
-            Dict with 'success_count', 'failure_count', 'duration_ms', 'telemetry',
-            and 'errors' keys. Note: does NOT return per-image results.
+            BatchResult containing conversion metrics, aggregated telemetry, errors, and bytes written.
         """
         self._set_active_run_id(run_id)
         self._bypass_breaker = True
@@ -261,14 +259,14 @@ class FFmpegConverter(BaseConverter):
             os.makedirs(output_dir, exist_ok=True)
 
             if not input_paths:
-                return {
-                    "success_count": 0,
-                    "failure_count": 0,
-                    "duration_ms": 0.0,
-                    "telemetry": {},
-                    "errors": [],
-                    "bytes_written": 0,
-                }
+                return BatchResult(
+                    success_count=0,
+                    failure_count=0,
+                    duration_ms=0.0,
+                    telemetry={},
+                    errors=[],
+                    bytes_written=0,
+                )
 
             success_count = 0
             failure_count = 0
@@ -286,12 +284,12 @@ class FFmpegConverter(BaseConverter):
                 if params is None:
                     # Unsupported format — surface the error per item.
                     res = self._fallback_per_file(group_paths, output_dir, target_format, [q] * len(group_paths), run_id, suffix=suffix)
-                    success_count += res["success_count"]
-                    failure_count += res["failure_count"]
-                    bytes_written += res.get("bytes_written", 0)
-                    errors.extend(res["errors"])
-                    if res["telemetry"]:
-                        telemetry_samples.append(res["telemetry"])
+                    success_count += res.success_count
+                    failure_count += res.failure_count
+                    bytes_written += res.bytes_written
+                    errors.extend(res.errors)
+                    if res.telemetry:
+                        telemetry_samples.append(res.telemetry)
                     continue
 
                 # Outer group by quality (encoder params depend on quality).
@@ -302,12 +300,12 @@ class FFmpegConverter(BaseConverter):
                 for wh, sub_paths in size_groups.items():
                     if wh is None:
                         res = self._fallback_per_file(sub_paths, output_dir, target_format, [q] * len(sub_paths), run_id, suffix=suffix)
-                        success_count += res["success_count"]
-                        failure_count += res["failure_count"]
-                        bytes_written += res.get("bytes_written", 0)
-                        errors.extend(res["errors"])
-                        if res["telemetry"]:
-                            telemetry_samples.append(res["telemetry"])
+                        success_count += res.success_count
+                        failure_count += res.failure_count
+                        bytes_written += res.bytes_written
+                        errors.extend(res.errors)
+                        if res.telemetry:
+                            telemetry_samples.append(res.telemetry)
                         continue
 
                     # image2 path is unreliable for AVIF/JXL on some libaom/heif builds; gated
@@ -348,14 +346,14 @@ class FFmpegConverter(BaseConverter):
                         if tele:
                             telemetry_samples.append(tele)
 
-            return {
-                "success_count": success_count,
-                "failure_count": failure_count,
-                "duration_ms": (time.time() - start) * 1000,
-                "telemetry": aggregate_telemetry(telemetry_samples),
-                "errors": errors,
-                "bytes_written": bytes_written,
-            }
+            return BatchResult(
+                success_count=success_count,
+                failure_count=failure_count,
+                duration_ms=(time.time() - start) * 1000,
+                telemetry=aggregate_telemetry(telemetry_samples),
+                errors=errors,
+                bytes_written=bytes_written,
+            )
         finally:
             self._bypass_breaker = False
 
@@ -547,10 +545,10 @@ class FFmpegConverter(BaseConverter):
                                 len(missing))
                 fb = self._fallback_per_file(missing, output_dir, target_format,
                                               [quality] * len(missing), run_id, suffix=suffix)
-                success_count += fb["success_count"]
-                failure_count += fb["failure_count"]
-                bytes_written += fb.get("bytes_written", 0)
-                errors.extend(fb["errors"])
+                success_count += fb.success_count
+                failure_count += fb.failure_count
+                bytes_written += fb.bytes_written
+                errors.extend(fb.errors)
 
         return success_count, failure_count, errors, aggregate_telemetry(telemetry_samples), bytes_written
 
@@ -562,7 +560,7 @@ class FFmpegConverter(BaseConverter):
         qualities: List[float],
         run_id: Optional[int],
         suffix: str = "",
-    ) -> Dict[str, Any]:
+    ) -> BatchResult:
         """Invoke per-file convert() as final fallback for unsupported or failed batches.
 
         Args:
@@ -574,7 +572,7 @@ class FFmpegConverter(BaseConverter):
             suffix: Optional filename suffix.
 
         Returns:
-            Dict with 'success_count', 'failure_count', 'telemetry', 'errors', and 'bytes_written' keys.
+            BatchResult containing conversion metrics, aggregated telemetry, errors, and bytes written.
         """
         success_count = 0
         failure_count = 0
@@ -585,18 +583,19 @@ class FFmpegConverter(BaseConverter):
         for in_path, q in zip(paths, qualities):
             out_path = os.path.join(output_dir, f"{Path(in_path).stem}{suffix}.{target_format}")
             res = self.convert(in_path, out_path, target_format, q, run_id=run_id)
-            if res.get("success"):
+            if res.success:
                 success_count += 1
-                bytes_written += res.get("bytes_written", 0)
+                bytes_written += res.bytes_written
             else:
                 failure_count += 1
-                errors.append({"path": in_path, "error": res.get("error") or "Unknown error"})
-            telemetry_samples.append(res.get("telemetry") or {})
+                errors.append({"path": in_path, "error": res.error or "Unknown error"})
+            telemetry_samples.append(res.telemetry or {})
 
-        return {
-            "success_count": success_count,
-            "failure_count": failure_count,
-            "telemetry": aggregate_telemetry(telemetry_samples),
-            "errors": errors,
-            "bytes_written": bytes_written,
-        }
+        return BatchResult(
+            success_count=success_count,
+            failure_count=failure_count,
+            telemetry=aggregate_telemetry(telemetry_samples),
+            errors=errors,
+            bytes_written=bytes_written,
+            duration_ms=0.0,  # fallback duration is tracked in caller
+        )

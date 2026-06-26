@@ -7,7 +7,7 @@ import subprocess
 import time
 import os
 import sys
-from .base import BaseConverter, _win32_safe_path
+from .base import BaseConverter, _win32_safe_path, ConvertResult, BatchResult
 from ..logger import get_logger
 from ..telemetry import TelemetryMonitor, aggregate_telemetry
 from ..utils import kill_process_tree, quality_to_jxl_distance, get_resolution_bucket_from_path
@@ -104,7 +104,7 @@ class MagickConverter(BaseConverter):
         quality: Union[int, float],
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConvertResult:
         """Convert a single image via magick subprocess, with Wand fallback.
 
         Subprocess is preferred in multi-process environments to avoid OpenMP
@@ -119,14 +119,13 @@ class MagickConverter(BaseConverter):
             run_id: Optional batch run ID for telemetry.
 
         Returns:
-            Dict with conversion result including success status, duration, telemetry,
-            and error details.
+            ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
 
         self._set_active_run_id(run_id)
         param_builder = self.FORMAT_PARAMS.get(target_format)
         if not param_builder:
-            return {"success": False, "error": f"Unsupported format: {target_format}"}
+            return ConvertResult(success=False, error=f"Unsupported format: {target_format}")
 
         params = param_builder(quality)
         cmd = [self.magick_path, _win32_safe_path(input_path)] + params + [_win32_safe_path(output_path)]
@@ -162,7 +161,7 @@ class MagickConverter(BaseConverter):
         run_id: Optional[int] = None,
         suffix: str = "",
         dimensions: Optional[Dict[str, tuple[int, int]]] = None,
-    ) -> Dict[str, Any]:
+    ) -> BatchResult:
         """Convert a batch of images via mogrify with Windows safety chunking.
 
         Groups by (quality, resolution_bucket), runs mogrify on each group with
@@ -341,14 +340,14 @@ class MagickConverter(BaseConverter):
                     if tripped:
                         self.is_broken = True
 
-        return {
-            "success_count": success_count,
-            "failure_count": failure_count,
-            "duration_ms": (time.time() - start) * 1000,
-            "telemetry": aggregate_telemetry(summaries),
-            "errors": errors,
-            "bytes_written": bytes_written,
-        }
+        return BatchResult(
+            success_count=success_count,
+            failure_count=failure_count,
+            duration_ms=(time.time() - start) * 1000,
+            telemetry=aggregate_telemetry(summaries),
+            errors=errors,
+            bytes_written=bytes_written,
+        )
 
     def _recover_chunk_per_file(self, chunk, output_dir, target_format, q, suffix, run_id):
         """Recover a failed mogrify chunk by invoking convert() per file.

@@ -395,29 +395,39 @@ class BatchOrchestrator:
                     suffix=suffix,
                     dimensions=dim_cache
                 )
+                if isinstance(result, dict):
+                    from app.core.converters.base import BatchResult
+                    result = BatchResult(
+                        success_count=result.get("success_count", 0),
+                        failure_count=result.get("failure_count", 0),
+                        duration_ms=result.get("duration_ms", 0.0),
+                        telemetry=result.get("telemetry", {}),
+                        errors=result.get("errors", []),
+                        bytes_written=result.get("bytes_written", 0),
+                    )
                 
-                all_success_count += result["success_count"]
-                all_failure_count += result["failure_count"]
-                total_bytes_written += result.get("bytes_written", 0)
-                all_errors.extend(result.get("errors", []))
-                if result.get("telemetry"):
-                    all_telemetry_summaries.append(result["telemetry"])
+                all_success_count += result.success_count
+                all_failure_count += result.failure_count
+                total_bytes_written += result.bytes_written
+                all_errors.extend(result.errors)
+                if result.telemetry:
+                    all_telemetry_summaries.append(result.telemetry)
                     
                 cells_processed += 1
-                p = self.progress[run_id]
-                p["cells_done"] = cells_processed
-                p["ok"] = all_success_count
-                p["fail"] = all_failure_count
+                progress_dict = self.progress[run_id]
+                progress_dict["cells_done"] = cells_processed
+                progress_dict["ok"] = all_success_count
+                progress_dict["fail"] = all_failure_count
                 
                 executed_cells.append(cell)
 
                 # Per-conversion analytics for the heuristic feedback loop. A path
                 # succeeded if it is not among this cell's error paths.
-                error_paths = {e.get("path") for e in result.get("errors", []) if e.get("path")}
-                for p, q in zip(input_paths, qualities):
+                error_paths = {e.get("path") for e in result.errors if e.get("path")}
+                for img_path, q in zip(input_paths, qualities):
                     analytics_records.append({
-                        "path": p, "category": cat, "format": fmt, "tool": t_name,
-                        "quality": q, "success": p not in error_paths,
+                        "path": img_path, "category": cat, "format": fmt, "tool": t_name,
+                        "quality": q, "success": img_path not in error_paths,
                     })
 
             # Nothing ran at all (every tool unregistered, all images unreadable)

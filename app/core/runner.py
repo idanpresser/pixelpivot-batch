@@ -8,7 +8,7 @@ import os
 import sys
 import shutil
 from typing import Dict, Any, List, Optional, Union
-from .converters.base import BaseConverter
+from .converters.base import BaseConverter, ConvertResult
 from .converters.ffmpeg_converter import FFmpegConverter
 from .converters.magick_converter import MagickConverter
 from .converters.vips_converter import VipsConverter
@@ -113,10 +113,10 @@ class Runner:
         input_path: str,
         output_path: str,
         target_format: str,
-        quality: Union[int, float],
-        is_intermediate: bool = True
-    ) -> Dict[str, Any]:
-        """Delegate a conversion to the specified tool adapter.
+        quality: float,
+        is_intermediate: bool = False,
+    ) -> ConvertResult:
+        """Convert a single image using the specified tool.
 
         Args:
             tool_name: Converter name (must be in list_converters()).
@@ -127,13 +127,13 @@ class Runner:
             is_intermediate: Whether this is a temporary intermediate file.
 
         Returns:
-            Dict with conversion result (success, error, etc.).
+            ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
         converter = self.get_converter(tool_name)
         if not converter:
             error_msg = f"Converter '{tool_name}' not found. Available: {self.list_converters()}"
             log.error(error_msg)
-            return {"success": False, "error": error_msg}
+            return ConvertResult(success=False, error=error_msg)
 
         log.debug(
             f"Delegating conversion to {tool_name}: {input_path} -> {output_path} (format={target_format}, quality={quality})"

@@ -11,7 +11,7 @@ import atexit
 import shutil
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional
-from .base import BaseConverter
+from .base import BaseConverter, ConvertResult, BatchResult
 from ..telemetry import TelemetryMonitor
 from ..logger import get_logger
 
@@ -262,7 +262,7 @@ class SharpConverter(BaseConverter):
         quality: Union[int, float],
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
-    ) -> dict:
+    ) -> ConvertResult:
         """Convert a single image via Sharp daemon socket.
 
         Sends a JSON request to the daemon, with socket retry logic on transient
@@ -278,8 +278,7 @@ class SharpConverter(BaseConverter):
             run_id: Optional batch run ID for telemetry.
 
         Returns:
-            Dict with conversion result including success status, duration, telemetry,
-            and error details.
+            ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
         self._set_active_run_id(run_id)
         self._ensure_daemon_running()
@@ -325,7 +324,7 @@ class SharpConverter(BaseConverter):
                     if monitor:
                         monitor.stop()
                     self._mark_failure()
-                    return {"success": False, "error": "Sharp daemon timed out"}
+                    return ConvertResult(success=False, error="Sharp daemon timed out")
 
                 # If we got a response, parse it
                 if response_data.strip():
@@ -358,24 +357,23 @@ class SharpConverter(BaseConverter):
                     except OSError:
                         pass
                     log.debug(f"Sharp success: Q={quality}, format={target_format}")
-                    return {
-                        "success": True,
-                        "duration_ms": result.get("duration_ms", 1000),
-                        "total_overhead_ms": duration_total
-                        - result.get("duration_ms", 1000),
-                        "parameters_used": {
+                    return ConvertResult(
+                        success=True,
+                        duration_ms=result.get("duration_ms", 1000),
+                        total_overhead_ms=duration_total - result.get("duration_ms", 1000),
+                        parameters_used={
                             "quality": val_quality,
                             "format": target_format,
                         },
-                        "telemetry": telemetry,
-                        "error": None,
-                        "bytes_written": bytes_written,
-                    }
+                        telemetry=telemetry,
+                        error=None,
+                        bytes_written=bytes_written,
+                    )
                 else:
                     self._mark_failure()
                     error_msg = result.get("error") or "Unknown Sharp daemon error"
                     log.error(f"Sharp daemon error: {error_msg}")
-                    return {"success": False, "error": error_msg, "bytes_written": 0}
+                    return ConvertResult(success=False, error=error_msg, bytes_written=0)
 
             except OSError as e:
                 # OSError covers socket.timeout, all ConnectionError subclasses
@@ -414,10 +412,10 @@ class SharpConverter(BaseConverter):
         if monitor:
             monitor.stop()
         self._mark_failure()
-        return {
-            "success": False,
-            "error": f"Sharp conversion failed after {max_retries + 1} attempts: {last_error}",
-        }
+        return ConvertResult(
+            success=False,
+            error=f"Sharp conversion failed after {max_retries + 1} attempts: {last_error}",
+        )
 
     def convert_batch(
         self,
@@ -428,7 +426,7 @@ class SharpConverter(BaseConverter):
         run_id: Optional[int] = None,
         suffix: str = "",
         dimensions: Optional[Dict[str, tuple[int, int]]] = None,
-    ) -> Dict[str, Any]:
+    ) -> BatchResult:
         """Convert a batch of images via pipelined Sharp daemon socket.
 
         Sends all JSON requests in a pipeline, then reads all responses sequentially.
@@ -532,11 +530,11 @@ class SharpConverter(BaseConverter):
 
         telemetry = monitor.stop() if monitor else {}
 
-        return {
-            "success_count": success_count,
-            "failure_count": failure_count,
-            "duration_ms": (time.time() - start) * 1000,
-            "telemetry": telemetry,
-            "errors": errors,
-            "bytes_written": bytes_written,
-        }
+        return BatchResult(
+            success_count=success_count,
+            failure_count=failure_count,
+            duration_ms=(time.time() - start) * 1000,
+            telemetry=telemetry,
+            errors=errors,
+            bytes_written=bytes_written,
+        )

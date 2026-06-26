@@ -101,10 +101,22 @@ def find_optimal_quality(
 
         out_path = os.path.join(output_dir, f"{stem}_{tool}_{iterations}.{target_format}")
         result = converter.convert(input_path, out_path, target_format, q, is_intermediate=True)
+        if isinstance(result, dict):
+            from app.core.converters.base import ConvertResult
+            result = ConvertResult(
+                success=result.get("success", False),
+                error=result.get("error"),
+                duration_ms=result.get("duration_ms", 0.0),
+                telemetry=result.get("telemetry", {}),
+                parameters_used=result.get("parameters_used", {}),
+                fatal_error=result.get("fatal_error", False),
+                bytes_written=result.get("bytes_written", 0),
+                total_overhead_ms=result.get("total_overhead_ms"),
+            )
 
-        if not result.get("success"):
-            last_error = result.get("error", "converter error")
-            if result.get("fatal_error"):
+        if not result.success:
+            last_error = result.error or "converter error"
+            if result.fatal_error:
                 log.error("Calibration aborted (fatal) for %s via %s", input_path, tool)
                 break
             # Shrink the range away from the failing end and retry.
