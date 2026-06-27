@@ -10,8 +10,56 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, Any, List, Union, Optional
+from dataclasses import dataclass, field
 from ..telemetry import TelemetryMonitor, aggregate_telemetry
 from ..logger import get_logger
+
+@dataclass
+class ConvertResult:
+    """Standardized return structure for a single file conversion."""
+    success: bool
+    error: Optional[str] = None
+    duration_ms: float = 0.0
+    telemetry: Dict[str, Any] = field(default_factory=dict)
+    parameters_used: Dict[str, Any] = field(default_factory=dict)
+    fatal_error: bool = False
+    bytes_written: int = 0
+    total_overhead_ms: Optional[float] = None
+
+    def __getitem__(self, key: str) -> Any:
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
+
+
+@dataclass
+class BatchResult:
+    """Standardized return structure for a batch of conversions."""
+    success_count: int
+    failure_count: int
+    duration_ms: float
+    telemetry: Dict[str, Any]
+    errors: List[Dict[str, Any]]
+    bytes_written: int = 0
+
+    def __getitem__(self, key: str) -> Any:
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
 from ..utils import kill_process_tree
 from ..config import (
     FFMPEG_TIMEOUT,
@@ -236,7 +284,7 @@ class BaseConverter(ABC):
         quality: Union[int, float],
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConvertResult:
         """Convert a single image file.
 
         Args:
@@ -248,8 +296,7 @@ class BaseConverter(ABC):
             run_id: Optional batch run ID for telemetry tracking.
 
         Returns:
-            Dict with 'success' (bool), 'error' (str or None), 'duration_ms', 'telemetry',
-            'parameters_used', and 'fatal_error' keys.
+            ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
         pass
 
@@ -261,7 +308,7 @@ class BaseConverter(ABC):
         quality: Union[int, float],
         run_id: Optional[int] = None,
         output_path: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConvertResult:
         """Execute a subprocess command with telemetry capture and circuit-breaker logic.
 
         Handles process lifecycle (timeout, cleanup), captures telemetry and stderr,
@@ -275,8 +322,7 @@ class BaseConverter(ABC):
             run_id: Optional batch run ID for telemetry association.
 
         Returns:
-            Dict with 'success', 'duration_ms', 'telemetry', 'parameters_used', 'error',
-            and 'fatal_error' keys.
+            ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
         self._set_active_run_id(run_id)
         # Circuit Breaker with 30s self-healing cooldown bypass
@@ -285,7 +331,7 @@ class BaseConverter(ABC):
                 log.warning(f"Cooldown period elapsed. Retrying broken converter: {self.get_name()}")
                 self._reset_failures()
             else:
-                return {"success": False, "error": f"{tool_name} is marked as broken (too many failures)."}
+                return ConvertResult(success=False, error=f"{tool_name} is marked as broken (too many failures).")
 
         start = time.time()
         monitor = None
@@ -358,15 +404,15 @@ class BaseConverter(ABC):
             except OSError:
                 pass
 
-        return {
-            "success": success,
-            "duration_ms": duration_ms,
-            "telemetry": telemetry,
-            "parameters_used": {"cli_args": params, "quality_value": quality, "method": "subprocess"},
-            "error": error,
-            "fatal_error": fatal_error,
-            "bytes_written": bytes_written,
-        }
+        return ConvertResult(
+            success=success,
+            duration_ms=duration_ms,
+            telemetry=telemetry,
+            parameters_used={"cli_args": params, "quality_value": quality, "method": "subprocess"},
+            error=error,
+            fatal_error=fatal_error,
+            bytes_written=bytes_written,
+        )
 
     def _run_library(
         self,
@@ -377,7 +423,7 @@ class BaseConverter(ABC):
         run_id: Optional[int] = None,
         output_path: Optional[str] = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> ConvertResult:
         """Execute an in-process library call with telemetry capture and circuit-breaker logic.
 
         Wraps library functions (pyvips, Wand, etc.) with telemetry monitoring and
@@ -392,7 +438,7 @@ class BaseConverter(ABC):
             **kwargs: Keyword arguments to pass to func.
 
         Returns:
-            Dict with 'success', 'duration_ms', 'telemetry', 'parameters_used', and 'error' keys.
+            ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
         self._set_active_run_id(run_id)
         if self.is_broken and not getattr(self, "_bypass_breaker", False):
@@ -400,7 +446,7 @@ class BaseConverter(ABC):
                 log.warning(f"Cooldown period elapsed. Retrying broken library converter: {self.get_name()}")
                 self._reset_failures()
             else:
-                return {"success": False, "error": f"{tool_name} (library) is marked as broken."}
+                return ConvertResult(success=False, error=f"{tool_name} (library) is marked as broken.")
 
         start = time.time()
         monitor = TelemetryMonitor(interval_ms=int(TELEMETRY_INTERVAL * 1000), run_id=run_id)
@@ -431,14 +477,14 @@ class BaseConverter(ABC):
             except OSError:
                 pass
 
-        return {
-            "success": success,
-            "duration_ms": duration_ms,
-            "telemetry": telemetry,
-            "parameters_used": params,
-            "error": error,
-            "bytes_written": bytes_written,
-        }
+        return ConvertResult(
+            success=success,
+            duration_ms=duration_ms,
+            telemetry=telemetry,
+            parameters_used=params,
+            error=error,
+            bytes_written=bytes_written,
+        )
 
     def convert_batch(
         self,
@@ -449,7 +495,7 @@ class BaseConverter(ABC):
         run_id: Optional[int] = None,
         suffix: str = "",
         dimensions: Optional[Dict[str, tuple[int, int]]] = None,
-    ) -> Dict[str, Any]:
+    ) -> BatchResult:
         """Convert a batch of images efficiently.
 
         Default implementation delegates to _default_batch_convert(). Subclasses
@@ -465,8 +511,7 @@ class BaseConverter(ABC):
             dimensions: Optional dict mapping input paths to (width, height) tuples.
 
         Returns:
-            Dict with 'success_count', 'failure_count', 'duration_ms', 'telemetry',
-            and 'errors' keys.
+            BatchResult containing conversion metrics, aggregated telemetry, errors, and bytes written.
         """
         return self._default_batch_convert(input_paths, output_dir, target_format, qualities, run_id=run_id, suffix=suffix, dimensions=dimensions)
 
@@ -479,7 +524,7 @@ class BaseConverter(ABC):
         run_id: Optional[int] = None,
         suffix: str = "",
         dimensions: Optional[Dict[str, tuple[int, int]]] = None,
-    ) -> Dict[str, Any]:
+    ) -> BatchResult:
         """Generic batch conversion using adaptive ThreadPoolExecutor.
 
         Dispatches each image to convert() in parallel, with thread pool size
@@ -495,8 +540,7 @@ class BaseConverter(ABC):
             dimensions: Optional pre-computed dimensions (unused in base implementation).
 
         Returns:
-            Dict with 'success_count', 'failure_count', 'duration_ms', 'telemetry',
-            and 'errors' keys.
+            BatchResult containing conversion metrics, aggregated telemetry, errors, and bytes written.
         """
         self._set_active_run_id(run_id)
         start = time.time()
@@ -580,11 +624,11 @@ class BaseConverter(ABC):
 
             summaries.append(res.get("telemetry", {}))
 
-        return {
-            "success_count": success_count,
-            "failure_count": failure_count,
-            "duration_ms": (time.time() - start) * 1000,
-            "telemetry": aggregate_telemetry(summaries),
-            "errors": errors,
-            "bytes_written": bytes_written,
-        }
+        return BatchResult(
+            success_count=success_count,
+            failure_count=failure_count,
+            duration_ms=(time.time() - start) * 1000,
+            telemetry=aggregate_telemetry(summaries),
+            errors=errors,
+            bytes_written=bytes_written,
+        )

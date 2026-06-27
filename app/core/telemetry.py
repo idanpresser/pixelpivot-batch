@@ -68,6 +68,7 @@ class TelemetryMonitor:
         self._children_refresh_s = TELEMETRY_CHILDREN_REFRESH_S
         self._last_children_walk_ts = 0.0
         self._cached_pids: set[int] = set()
+        self.start_time = 0.0
 
     def _refresh_pid_tree(self, pid: int) -> None:
         """Re-walk the process tree and update the cached PID set."""
@@ -132,7 +133,8 @@ class TelemetryMonitor:
         try:
             while self.is_running:
                 time.sleep(self.interval)
-                self._sample()
+                if self.is_running:
+                    self._sample()
         except Exception as e:
             log.error(f"Telemetry monitor producer thread crashed: {e}")
             self.is_running = False
@@ -189,6 +191,13 @@ class TelemetryMonitor:
     def _sample(self):
         """Take a single resource sample and queue for DB write."""
         root_pid = self.target_pid or os.getpid()
+
+        # Optimize CPU overhead by skipping sub-process checks for fast-running conversions
+        # during the first 200ms, relying on the final sample in stop() to capture metrics.
+        now = time.monotonic()
+        if self.is_running and (now - self.start_time < 0.2):
+            return
+
         cpu, ram = self._get_recursive_resources(root_pid)
 
         with self._data_lock:
@@ -212,6 +221,7 @@ class TelemetryMonitor:
         self._proc_cache = {}
         self._cached_pids = set()
         self._last_children_walk_ts = 0.0
+        self.start_time = time.monotonic()
         self.is_running = True
 
         self.thread = threading.Thread(target=self._monitor, daemon=True)

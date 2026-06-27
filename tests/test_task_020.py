@@ -15,11 +15,12 @@ from pathlib import Path
 
 import pytest
 
-# DB path env var must be set before importing the DB layer so SQLITE_DB_PATH
-# captures the temp file.
 _TMP_DIR = tempfile.mkdtemp(prefix="pp_t020_")
 _DB_PATH = Path(_TMP_DIR) / "audit.db"
-os.environ["PIXELPIVOT_DB_PATH"] = str(_DB_PATH)
+
+@pytest.fixture(autouse=True)
+def setup_env(monkeypatch):
+    monkeypatch.setenv("PIXELPIVOT_DB_PATH", str(_DB_PATH))
 
 
 @pytest.fixture

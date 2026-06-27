@@ -3,7 +3,9 @@
 [CmdletBinding()]
 param(
     [int]   $Port = 8000,
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [switch]$Gui,
+    [int]   $GuiPort = 8503
 )
 $root = $PSScriptRoot
 
@@ -52,11 +54,25 @@ if (-not $ready) {
     throw "API did not start within 30s"
 }
 Write-Host "API ready: http://localhost:$Port/docs" -ForegroundColor Green
+
+$guiProc = $null
+if ($Gui) {
+    $guiMain = Join-Path $root 'app\web\batch_gui\main.py'
+    if (-not (Test-Path $guiMain)) { throw "GUI entry not found: $guiMain" }
+    $env:BATCH_API_URL = "http://127.0.0.1:$Port/api/v1"
+    $guiProc = Start-Process -FilePath $py `
+        -ArgumentList "-m streamlit run `"$guiMain`" --server.port $GuiPort" `
+        -WorkingDirectory $root -PassThru -WindowStyle Normal
+    Write-Host "  GUI PID  : $($guiProc.Id)"
+    Write-Host "GUI: http://localhost:$GuiPort" -ForegroundColor Green
+}
+
 Write-Host "Press Ctrl+C to stop." -ForegroundColor Yellow
 
 try   { while ($true) { Start-Sleep -Seconds 5 } }
 finally {
     Write-Host "Shutting down..."
+    if ($guiProc) { $guiProc | Stop-Process -Force -EA SilentlyContinue }
     $apiProc   | Stop-Process -Force -EA SilentlyContinue
     $sharpProc | Stop-Process -Force -EA SilentlyContinue
 }

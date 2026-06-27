@@ -81,6 +81,21 @@ $wheels = Join-Path $DeployDir 'vendor\wheels'
     2>&1 | Write-Host
 if ($LASTEXITCODE -ne 0) { throw "pip install failed (exit $LASTEXITCODE)" }
 
+# ---- 8b. Install Streamlit GUI (with deps) from the wheel mirror ----
+# The project install above uses --no-deps; Streamlit is an optional extra, so
+# install it explicitly WITH its transitive closure (offline, from the mirror).
+Step "Install Streamlit GUI -> vendor\site-packages\"
+& $py -m pip install `
+    --no-index `
+    --find-links $wheels `
+    --target $sitePackages `
+    --upgrade `
+    streamlit `
+    2>&1 | Write-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "Streamlit install failed (exit $LASTEXITCODE) -- run download_wheels.ps1 to mirror streamlit + deps"
+}
+
 # ---- 9. Wire up embedded Python package discovery ----
 Step "Configure embedded Python (.pth)"
 # Uncomment 'import site' so .pth files are processed

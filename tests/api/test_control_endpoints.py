@@ -34,9 +34,11 @@ def test_control_unknown_run_404():
 def test_restart_clones_config_and_queues():
     orch = MagicMock(); orch.run_controls = {}
     app.dependency_overrides[get_orchestrator] = lambda: orch
+    fake_qm = MagicMock()
     try:
         with patch("app.batch_api.routes.get_connection") as gc, \
-             patch("app.batch_api.routes.repo") as repo:
+             patch("app.batch_api.routes.repo") as repo, \
+             patch("app.batch_api.queue_manager.get_queue_manager", lambda: fake_qm):
             gc.return_value.__enter__.return_value = MagicMock()
             repo.get_run.return_value = {
                 "id": 5, "source_dir": "/src", "target_dir": "/dst",
@@ -46,6 +48,7 @@ def test_restart_clones_config_and_queues():
             r = client.post("/api/v1/batch/5/restart")
             assert r.status_code == 200
             assert r.json()["run_id"] == 6
-            orch.execute_batch.assert_called_once()
+            # Restart submits the cloned run to the bounded queue (no inline exec).
+            fake_qm.submit_batch.assert_called_once()
     finally:
         app.dependency_overrides.clear()

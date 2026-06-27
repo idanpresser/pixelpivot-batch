@@ -29,6 +29,11 @@ nvidia-ml-py
 prompt-toolkit
 rich
 
+# --- Optional Streamlit GUI (app/web/batch_gui) ---
+# Mirrors pyproject.toml [project.optional-dependencies].gui. Pulls streamlit +
+# its transitive closure so the embedded-Python deploy can serve the dashboard.
+streamlit
+
 
 # --- Dev / smoke-test deps (mirror pyproject.toml [project.optional-dependencies].dev) ---
 # Included so the air-gapped target can run `pytest` and scripts/smoke_test.ps1.

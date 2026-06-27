@@ -18,22 +18,26 @@ def test_start_batch():
     mock_orchestrator = MagicMock()
     app.dependency_overrides[get_orchestrator] = lambda: mock_orchestrator
     
-    # Mock the repository and DB connection
+    # Mock the repository, DB connection, and queue manager. The route submits
+    # the run to the bounded BatchQueueManager (it no longer executes inline), so
+    # the queue manager must be mocked or it raises "not initialized".
+    fake_qm = MagicMock()
     try:
-        with patch("app.batch_api.routes.get_connection") as mock_get_conn:
+        with patch("app.batch_api.routes.get_connection") as mock_get_conn, \
+             patch("app.batch_api.queue_manager.get_queue_manager", lambda: fake_qm):
             mock_get_conn.return_value.__enter__.return_value = MagicMock()
-            
+
             with patch("app.batch_api.routes.repo") as mock_repo:
                 mock_repo.create_run.return_value = 123
-                
+
                 response = client.post("/api/v1/batch/start", json=payload)
-                
+
                 assert response.status_code == 200
                 assert response.json()["run_id"] == 123
                 assert response.json()["status"] == "queued"
-                
+
                 mock_repo.create_run.assert_called_once()
-                mock_orchestrator.execute_batch.assert_called_once()
+                fake_qm.submit_batch.assert_called_once()
     finally:
         app.dependency_overrides.clear()
 

@@ -32,11 +32,6 @@ class HotFolderHandler(FileSystemEventHandler):
     Uses debouncing to group multiple file events into a single batch,
     and readiness checks to ensure files are fully written before conversion.
     """
-    """
-    Listens for new images in a hot folder.
-    Uses a debouncer to group files into a single batch.
-    Includes readiness checks and double-trigger protection.
-    """
     def __init__(self, orchestrator, loop: asyncio.AbstractEventLoop,
                  config: Dict[str, Any], debounce_seconds: float = 5.0):
         """Initialize hot folder handler.

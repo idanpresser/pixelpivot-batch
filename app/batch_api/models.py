@@ -70,6 +70,22 @@ class BatchRequest(BaseModel):
         return _resolve_path(v)
 
 
+class CalibrationRequest(BaseModel):
+    """Request schema for an offline serial calibration run."""
+    source_dir: str
+    target_format: Annotated[List[TargetFormat], Field(min_length=1)]
+    tool: Annotated[List[Tool], Field(min_length=1)]
+    category: Annotated[List[str], Field(min_length=1)] = ["general"]
+    sample: int = 30
+    target_ssim: float = 0.98
+    regenerate_table: bool = True
+
+    @field_validator("source_dir")
+    @classmethod
+    def resolve_path(cls, v: str) -> str:
+        return _resolve_path(v)
+
+
 class HotFolderRequest(BaseModel):
     """Request schema for registering a hot folder watcher.
 

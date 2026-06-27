@@ -178,36 +178,53 @@ def get_connection() -> Iterator[sqlite3.Connection]:
                 _local.depth = 0
     else:
         _local.depth += 1
+        sp_name = f"sp_{_local.depth}"
+        _local.conn.execute(f"SAVEPOINT {sp_name}")
         try:
             yield _local.conn
+            _local.conn.execute(f"RELEASE SAVEPOINT {sp_name}")
+        except Exception:
+            try:
+                _local.conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
+                _local.conn.execute(f"RELEASE SAVEPOINT {sp_name}")
+            except Exception as e:
+                log.debug("nested rollback/release suppressed: %s", e)
+            raise
         finally:
             _local.depth -= 1
 
-def with_db_retry(max_retries: int = 3, initial_delay: float = 0.5):
+def with_db_retry(
+    func: Callable[..., T] | None = None,
+    *,
+    max_retries: int = 5,
+    initial_delay: float = 0.1,
+) -> Any:
     """
-    Exponential backoff retry decorator for SQLite operations.
-    Handles transient lock contention (database is locked).
+    Retry a database operation/function with exponential backoff on SQLite lock/busy errors.
+    Can be used as a decorator or called directly with a callable.
     """
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+    def decorator(fn: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> T:
             delay = initial_delay
             for attempt in range(max_retries + 1):
                 try:
-                    return func(*args, **kwargs)
+                    return fn(*args, **kwargs)
                 except sqlite3.OperationalError as e:
-                    # SQLite raises OperationalError when the database is locked
-                    if "locked" in str(e).lower() or "busy" in str(e).lower():
-                        if attempt == max_retries:
-                            log.error(f"SQLite operation failed after {max_retries} retries due to lock: {e}")
-                            raise e
-                        log.warning(f"SQLite database locked, retrying in {delay}s... (Attempt {attempt+1}/{max_retries}): {e}")
-                        time.sleep(delay)
-                        delay *= 2
-                        continue
-                    raise e
+                    if "locked" not in str(e).lower() and "busy" not in str(e).lower():
+                        raise
+                    if attempt == max_retries:
+                        log.error(f"SQLite operation failed after {max_retries} retries due to lock: {e}")
+                        raise e
+                    log.warning(f"SQLite database locked/busy, retrying in {delay}s... (Attempt {attempt+1}/{max_retries}): {e}")
+                    time.sleep(delay)
+                    delay *= 2
                 except Exception as e:
-                    log.error(f"Non-retryable DB error in {func.__name__}: {e}")
-                    raise e
+                    log.error(f"Non-retryable DB error: {e}")
+                    raise
+            raise sqlite3.OperationalError("Database busy retry limit reached")
         return wrapper
+
+    if func is not None:
+        return decorator(func)()
     return decorator

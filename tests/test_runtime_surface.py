@@ -1,8 +1,10 @@
-"""Guard tests for bd-34p: runtime surface is batch-conversion + telemetry + hotfolder.
+"""Guard tests for bd-34p: runtime surface is batch + telemetry + hotfolder + calibration.
 
-The deployable backend must not couple to calibration or streamlit at runtime.
-Importing the API entrypoint is done in a subprocess so GUI/calibration imports
-triggered elsewhere in the test session can't mask a real coupling regression.
+The deployable backend exposes a calibration trigger (POST /api/v1/calibrate), but
+must still not eagerly import the heavyweight calibration engine (cv2/pyvips/the
+calibration_runner) at API startup — those imports stay lazy inside the queue
+worker. Importing the API entrypoint is done in a subprocess so GUI/calibration
+imports triggered elsewhere in the test session can't mask a real coupling regression.
 """
 import subprocess
 import sys
@@ -12,10 +14,13 @@ _PROBE = r"""
 import sys
 import app.batch_api.main as m
 
-# 1. No GUI / calibration engine pulled in by importing the API.
+# 1. No GUI / heavyweight calibration engine pulled in by importing the API.
+#    The calibration_runner (and its cv2/pyvips deps) must stay lazy — imported
+#    only inside the queue worker when a calibration job actually executes.
 banned = [name for name in sys.modules
           if name == "streamlit" or name.startswith("streamlit.")
-          or "calibration" in name.lower()]
+          or "calibration_runner" in name
+          or name in ("cv2", "app.core.similarity", "app.core.calibrator")]
 assert not banned, f"banned runtime imports: {banned}"
 
 # 2. Routes are limited to batch / telemetry / hotfolder.
@@ -33,8 +38,9 @@ for r in m.app.routes:
 
 assert paths, "no /api routes registered"
 for p in sorted(paths):
-    assert "calibrat" not in p.lower(), f"calibration endpoint exposed: {p}"
-    assert p.startswith("/api/v1/batch") or p.startswith("/api/v1/hotfolder"), p
+    assert (p.startswith("/api/v1/batch")
+            or p.startswith("/api/v1/hotfolder")
+            or p.startswith("/api/v1/calibrate")), p
 
 print("OK", paths)
 """

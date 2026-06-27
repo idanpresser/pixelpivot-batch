@@ -6,7 +6,7 @@ Exposes /api/v1 routes for:
 """
 import psutil
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from .models import BatchRequest, BatchStatusResponse, HotFolderRequest, ControlRequest
+from .models import BatchRequest, BatchStatusResponse, HotFolderRequest, ControlRequest, CalibrationRequest
 from ..core.db.repositories.batch import BatchRepository
 from .orchestrator import BatchOrchestrator
 from ..core.db.connection import get_connection
@@ -20,7 +20,7 @@ def get_orchestrator(request: Request) -> BatchOrchestrator:
     return request.app.state.orchestrator
 
 @router.post("/batch/start")
-async def start_batch(
+def start_batch(
     req: BatchRequest,
     bg_tasks: BackgroundTasks,
     orchestrator: BatchOrchestrator = Depends(get_orchestrator)
@@ -50,14 +50,38 @@ async def start_batch(
                 heuristic_version=orchestrator.interpolator.version
             )
 
-        bg_tasks.add_task(orchestrator.execute_batch, run_id, req)
+        from .queue_manager import get_queue_manager
+        get_queue_manager().submit_batch(run_id, req)
         
         return {"run_id": run_id, "status": "queued"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/calibrate")
+def start_calibration(
+    req: CalibrationRequest,
+    orchestrator: BatchOrchestrator = Depends(get_orchestrator),
+):
+    """Queue an offline serial SSIM calibration run; regenerates priors on completion."""
+    try:
+        with get_connection() as conn:
+            run_id = repo.create_run(
+                conn,
+                source_dir=req.source_dir,
+                target_dir=req.source_dir,
+                target_format=",".join(req.target_format),
+                tool=",".join([t.value for t in req.tool]),
+                trigger_type="calibration",
+                heuristic_version=orchestrator.interpolator.version,
+            )
+        from .queue_manager import get_queue_manager
+        get_queue_manager().submit_calibration(run_id, req)
+        return {"run_id": run_id, "status": "queued"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/batch/status/{run_id}")
-async def get_batch_status(
+def get_batch_status(
     run_id: int,
     orchestrator: BatchOrchestrator = Depends(get_orchestrator)
 ):
@@ -101,7 +125,7 @@ async def get_batch_status(
         return res
 
 @router.get("/batch/{run_id}/errors")
-async def get_batch_errors(run_id: int):
+def get_batch_errors(run_id: int):
     """Retrieve error records for a batch run.
 
     Args:
@@ -114,7 +138,7 @@ async def get_batch_errors(run_id: int):
         return repo.get_errors(conn, run_id)
 
 @router.get("/batch/history")
-async def get_batch_history():
+def get_batch_history():
     """Retrieve all completed and running batch runs.
 
     Returns:
@@ -125,7 +149,7 @@ async def get_batch_history():
         return runs
 
 @router.post("/hotfolder/register")
-async def register_hot_folder(req: HotFolderRequest):
+def register_hot_folder(req: HotFolderRequest):
     """Register a directory to be monitored for automatic batch processing.
 
     Args:
@@ -147,7 +171,7 @@ async def register_hot_folder(req: HotFolderRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/hotfolder/list")
-async def list_hot_folders():
+def list_hot_folders():
     """Retrieve all active hot folder watchers.
 
     Returns:
@@ -160,7 +184,7 @@ async def list_hot_folders():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/hotfolder/{watcher_id}")
-async def unregister_hot_folder(watcher_id: str):
+def unregister_hot_folder(watcher_id: str):
     """Stop and unregister a hot folder watcher.
 
     Args:
@@ -179,7 +203,7 @@ async def unregister_hot_folder(watcher_id: str):
 
 
 @router.post("/batch/{run_id}/control")
-async def control_batch(
+def control_batch(
     run_id: int,
     req: ControlRequest,
     orchestrator: BatchOrchestrator = Depends(get_orchestrator),
@@ -204,7 +228,7 @@ async def control_batch(
 
 
 @router.post("/batch/{run_id}/restart")
-async def restart_batch(
+def restart_batch(
     run_id: int,
     bg_tasks: BackgroundTasks,
     orchestrator: BatchOrchestrator = Depends(get_orchestrator),
@@ -236,12 +260,13 @@ async def restart_batch(
             trigger_type="restart",
             heuristic_version=orchestrator.interpolator.version,
         )
-    bg_tasks.add_task(orchestrator.execute_batch, new_id, new_req)
+    from .queue_manager import get_queue_manager
+    get_queue_manager().submit_batch(new_id, new_req)
     return {"run_id": new_id, "status": "queued"}
 
 
 @router.get("/batch/{run_id}/progress")
-async def get_batch_progress(
+def get_batch_progress(
     run_id: int,
     orchestrator: BatchOrchestrator = Depends(get_orchestrator),
 ):
