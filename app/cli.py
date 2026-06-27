@@ -111,6 +111,11 @@ def main(argv=None):
     p_conv.add_argument("--dry-run", action="store_true")
 
     sub.add_parser("tui", help="Launch the terminal UI (supervises the API).")
+
+    p_gui = sub.add_parser("gui", help="Launch the Streamlit dashboard GUI.")
+    p_gui.add_argument("--port", type=int, default=8503)
+    p_gui.add_argument("--api-url", default=None, help="BATCH_API_URL the GUI should target.")
+
     sub.add_parser("doctor", help="Check system environment and dependencies.")
 
     p_cal = sub.add_parser("calibrate", help="Serial SSIM calibration; regenerates the heuristic table.")
@@ -131,6 +136,8 @@ def main(argv=None):
         _run_convert(args.source, args.target, args.dry_run)
     elif args.command == "tui":
         _run_tui()
+    elif args.command == "gui":
+        _run_gui(args.port, args.api_url)
     elif args.command == "doctor":
         _run_doctor()
     elif args.command == "calibrate":
@@ -189,6 +196,32 @@ def _run_convert(source: str, target: str, dry_run: bool) -> None:
 def _run_tui() -> None:
     from app.tui.launcher import run_tui
     run_tui()
+
+
+def _run_gui(port: int = 8503, api_url: str | None = None) -> None:
+    # Streamlit ships only with the [gui] extra / embedded-Python deploy; it is
+    # excluded from the frozen exe. Fail loudly with install guidance otherwise.
+    try:
+        import streamlit  # noqa: F401
+    except ImportError:
+        print(
+            "Streamlit not installed. Install the GUI extra:\n"
+            "    pip install pixelpivot-batch[gui]",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if api_url:
+        os.environ["BATCH_API_URL"] = api_url
+
+    import subprocess
+
+    main_py = str(PROJ_ROOT / "app" / "web" / "batch_gui" / "main.py")
+    cmd = [
+        sys.executable, "-m", "streamlit", "run", main_py,
+        "--server.port", str(port),
+    ]
+    sys.exit(subprocess.call(cmd, cwd=str(PROJ_ROOT)))
 
 
 def _run_calibrate(args) -> None:
