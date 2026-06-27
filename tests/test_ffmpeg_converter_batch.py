@@ -238,3 +238,54 @@ def test_batch_against_real_test_examples(tmp_path):
         stem = Path(in_path).stem
         assert (out_dir / f"{stem}.webp").exists()
         assert (out_dir / f"{stem}.webp").stat().st_size > 0
+
+
+def test_batch_cross_volume_bypasses_image2(tmp_path, monkeypatch):
+    """
+    Verify that if the source and target directories are on different drive volumes,
+    the image2 demuxer path is immediately bypassed and multimap path is used instead.
+    """
+    import os
+    from unittest.mock import MagicMock
+    out_dir = tmp_path / "out"
+    inputs = [_make_png(tmp_path / f"img_{i}.png", 320, 240) for i in range(5)]
+
+    conv = FFmpegConverter(ffmpeg_path=shutil.which("ffmpeg"))
+    
+    # Mock _run_image2_path and _run_multimap_path to monitor routing
+    mock_image2 = MagicMock(return_value=(5, 0, [], {}, [], 100))
+    mock_multimap = MagicMock(return_value=(5, 0, [], {}, 100))
+    
+    monkeypatch.setattr(conv, "_run_image2_path", mock_image2)
+    monkeypatch.setattr(conv, "_run_multimap_path", mock_multimap)
+
+    # Mock os.stat to return a different st_dev for out_dir
+    orig_stat = os.stat
+    def mock_stat(path):
+        stat_res = orig_stat(path)
+        # If the path matches our output directory, return a mock stat result with a different st_dev
+        if str(out_dir) in str(Path(path).absolute()):
+            class MockStatResult:
+                st_dev = 999999
+                st_mode = stat_res.st_mode
+                st_ino = stat_res.st_ino
+                st_nlink = stat_res.st_nlink
+                st_uid = stat_res.st_uid
+                st_gid = stat_res.st_gid
+                st_size = stat_res.st_size
+                st_atime = stat_res.st_atime
+                st_mtime = stat_res.st_mtime
+                st_ctime = stat_res.st_ctime
+            return MockStatResult()
+        return stat_res
+    monkeypatch.setattr(os, "stat", mock_stat)
+
+    result = conv.convert_batch(
+        input_paths=inputs,
+        output_dir=str(out_dir),
+        target_format="webp",
+        qualities=[80.0] * 5,
+    )
+
+    assert mock_image2.call_count == 0
+    assert mock_multimap.call_count == 1

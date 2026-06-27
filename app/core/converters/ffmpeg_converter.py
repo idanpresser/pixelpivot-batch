@@ -274,6 +274,24 @@ class FFmpegConverter(BaseConverter):
             errors: List[Dict[str, Any]] = []
             telemetry_samples: List[Dict[str, Any]] = []
 
+            # Check if source and target directories share the same volume.
+            # If not, we immediately bypass the image2 path.
+            same_volume = True
+            if input_paths:
+                try:
+                    src_dir = os.path.dirname(os.path.abspath(input_paths[0]))
+                    dst_dir = os.path.abspath(output_dir)
+                    # Resolve parent paths until they exist to avoid FileNotFoundError
+                    while not os.path.exists(src_dir) and src_dir != os.path.dirname(src_dir):
+                        src_dir = os.path.dirname(src_dir)
+                    while not os.path.exists(dst_dir) and dst_dir != os.path.dirname(dst_dir):
+                        dst_dir = os.path.dirname(dst_dir)
+                    if os.stat(src_dir).st_dev != os.stat(dst_dir).st_dev:
+                        same_volume = False
+                except Exception as e:
+                    log.warning("Volume check failed; assuming different volumes: %s", e)
+                    same_volume = False
+
             # Outer group by quality (encoder params depend on quality).
             quality_groups: Dict[float, List[str]] = defaultdict(list)
             for path, q in zip(input_paths, qualities):
@@ -312,7 +330,8 @@ class FFmpegConverter(BaseConverter):
                     # by IMAGE2_ALLOW_LOSSY_FORMATS (env: PIXELPIVOT_IMAGE2_ALLOW_LOSSY). When
                     # the flag is on, multimap remains the per-chunk safety net on failure.
                     can_use_image2 = (
-                        target_format not in ("avif", "jxl") or IMAGE2_ALLOW_LOSSY_FORMATS
+                        (target_format not in ("avif", "jxl") or IMAGE2_ALLOW_LOSSY_FORMATS)
+                        and same_volume
                     )
 
                     if can_use_image2 and len(sub_paths) >= IMAGE2_THRESHOLD and all_same_resolution(sub_paths):
