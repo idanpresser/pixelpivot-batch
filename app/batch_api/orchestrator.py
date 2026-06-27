@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Callable, TypeVar, Tuple
 from .models import BatchRequest, Tool
 from .run_control import RunControl, RunControlRegistry
 from ..core.db.repositories.batch import BatchRepository
-from ..core.db.connection import get_connection
+from ..core.db.connection import get_connection, with_db_retry
 from ..core.heuristic_interpolator import HeuristicInterpolator
 from ..core.converters.magick_converter import MagickConverter
 from ..core.converters.ffmpeg_converter import FFmpegConverter
@@ -36,30 +36,7 @@ log = get_logger(__name__)
 
 T = TypeVar("T")
 
-def with_busy_retry(fn: Callable[[], T], *, attempts: int = 5, base_delay_s: float = 0.1) -> T:
-    """Retry a callable with exponential backoff on SQLite lock/busy errors.
 
-    Args:
-        fn: Callable to retry.
-        attempts: Number of retry attempts (default 5).
-        base_delay_s: Initial delay in seconds; doubled on each retry.
-
-    Returns:
-        Return value of fn.
-
-    Raises:
-        sqlite3.OperationalError: On non-lock errors or final timeout.
-    """
-    for i in range(attempts):
-        try:
-            return fn()
-        except sqlite3.OperationalError as e:
-            if "lock" not in str(e).lower() and "busy" not in str(e).lower():
-                raise
-            if i == attempts - 1:
-                raise
-            time.sleep(base_delay_s * (2 ** i))
-    raise RuntimeError("unreachable")
 
 @dataclass(frozen=True)
 class MatrixCell:
@@ -444,8 +421,8 @@ class BatchOrchestrator:
                     with get_connection() as conn:
                         self.repo.update_status(conn, run_id, "cancelled",
                                                 total_images=total_conversions)
-                with_busy_retry(_mark_cancelled, attempts=SQLITE_BUSY_ATTEMPTS,
-                                base_delay_s=SQLITE_BUSY_BASE_DELAY_S)
+                with_db_retry(_mark_cancelled, max_retries=SQLITE_BUSY_ATTEMPTS,
+                              initial_delay=SQLITE_BUSY_BASE_DELAY_S)
                 if all_failure_count > 0:
                     try:
                         with get_connection() as conn:
@@ -494,7 +471,7 @@ class BatchOrchestrator:
                     )
                     self.repo.update_status(conn, run_id, final_status, total_images=total_conversions)
             
-            with_busy_retry(_save_summary, attempts=SQLITE_BUSY_ATTEMPTS, base_delay_s=SQLITE_BUSY_BASE_DELAY_S)
+            with_db_retry(_save_summary, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)
 
             if all_failure_count > 0:
                 try:
@@ -518,7 +495,7 @@ class BatchOrchestrator:
             def _fail():
                 with get_connection() as conn:
                     self.repo.update_status(conn, run_id, "failed")
-            with_busy_retry(_fail, attempts=SQLITE_BUSY_ATTEMPTS, base_delay_s=SQLITE_BUSY_BASE_DELAY_S)
+            with_db_retry(_fail, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)
         finally:
             self.run_controls.pop(run_id, None)
             self.progress.pop(run_id, None)
