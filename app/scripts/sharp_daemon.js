@@ -3,7 +3,7 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-const port = process.argv[2] || 8765;
+const port = process.argv[2] !== undefined ? parseInt(process.argv[2], 10) : 0;
 
 const server = net.createServer((socket) => {
     let buffer = '';
@@ -81,7 +81,9 @@ const server = net.createServer((socket) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-    console.log(`Sharp daemon listening on port ${port}`);
+    const actualPort = server.address().port;
+    console.log(`PORT:${actualPort}`);
+    console.log(`Sharp daemon listening on port ${actualPort}`);
 });
 
 // Auto-exit if stdin is closed (parent process died)

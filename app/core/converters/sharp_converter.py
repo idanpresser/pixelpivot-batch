@@ -131,11 +131,11 @@ class SharpConverter(BaseConverter):
         except Exception:
             return False
 
-    def _stop_daemon(self):
+    def _stop_daemon(self, via_atexit: bool = True):
         """Stop the Node.js sharp daemon and close its socket."""
         self._close_socket()
         if self.daemon_process and self.daemon_process.poll() is None:
-            if not sys.is_finalizing():
+            if not via_atexit:
                 try:
                     log.info("Stopping Sharp daemon...")
                 except Exception:
@@ -187,29 +187,14 @@ class SharpConverter(BaseConverter):
                 "Install Node.js in the container or run scripts/setup_sharp_portable.ps1 to install portable Node.js."
             )
 
-        # Find a free port dynamically to avoid TIME_WAIT / EADDRINUSE issues on restart
-        # Hardened with retry loop to minimize TOCTOU race
         max_spawn_retries = 3
-        configured_port = self.port
         for spawn_attempt in range(max_spawn_retries):
-            target_port = configured_port if spawn_attempt == 0 else 0
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    s.bind(("", target_port))
-                    self.port = s.getsockname()[1]
-            except OSError as bind_err:
-                log.debug(f"Could not bind to port {target_port}: {bind_err}")
-                if target_port == 0:
-                    raise
-                continue
-
             # Run daemon with cwd=project root so require('sharp') resolves to ./node_modules
-            log.info(f"Starting Sharp daemon on port {self.port} (attempt {spawn_attempt+1})...")
+            log.info(f"Starting Sharp daemon on atomic port 0 (attempt {spawn_attempt+1})...")
             # Use CREATE_NO_WINDOW on Windows to prevent console flash
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             self.daemon_process = subprocess.Popen(
-                [node_cmd, daemon_path, str(self.port)],
+                [node_cmd, daemon_path, "0"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 stdin=subprocess.PIPE,  # Keep pipe open so Node dies when Python dies
@@ -221,32 +206,60 @@ class SharpConverter(BaseConverter):
             # Fix #9: register shutdown hook via atexit (reliable vs. __del__)
             atexit.register(self._stop_daemon)
 
-            # Fix #10: Poll the port AND test readiness instead of fixed sleep
-            deadline = time.monotonic() + 10.0  # Increased timeout to 10 seconds
-            success = False
+            # Read stdout to get the allocated port
+            allocated_port = None
+            deadline = time.monotonic() + 5.0
             while time.monotonic() < deadline:
                 if self.daemon_process.poll() is not None:
-                    # Process exited; capture stderr for diagnostics
+                    break
+                line = self.daemon_process.stdout.readline()
+                if not line:
+                    break
+                line_str = line.strip()
+                if line_str.startswith("PORT:"):
+                    try:
+                        allocated_port = int(line_str.split(":")[1])
+                        break
+                    except ValueError:
+                        pass
+
+            if allocated_port is not None:
+                self.port = allocated_port
+                
+                # Consume stdout and stderr in background threads to prevent stream buffer blocking
+                def consume_stream(stream, prefix):
+                    try:
+                        for l in stream:
+                            log.debug(f"{prefix}: {l.strip()}")
+                    except Exception:
+                        pass
+                threading.Thread(target=consume_stream, args=(self.daemon_process.stdout, "sharp-stdout"), daemon=True).start()
+                threading.Thread(target=consume_stream, args=(self.daemon_process.stderr, "sharp-stderr"), daemon=True).start()
+
+                # Test both port AND readiness
+                deadline = time.monotonic() + 5.0
+                while time.monotonic() < deadline:
+                    if self.daemon_process.poll() is not None:
+                        break
+                    if self._is_port_open(timeout=0.3) and self._test_daemon_ready():
+                        log.info(f"Sharp daemon ready on port {self.port}")
+                        return
+                    time.sleep(0.1)
+
+            # If we reached here, startup failed or timed out
+            if self.daemon_process:
+                # Process exited or timed out; capture any remaining stderr
+                if self.daemon_process.poll() is None:
+                    log.warning(f"Sharp daemon attempt {spawn_attempt+1} timed out.")
+                    self._stop_daemon(via_atexit=False)
+                else:
                     try:
                         _, stderr_out = self.daemon_process.communicate(timeout=1)
                     except Exception:
                         stderr_out = "(no stderr)"
                     err_msg = (stderr_out or "").strip() or "(no stderr)"
                     log.warning(f"Sharp daemon attempt {spawn_attempt+1} failed to start. stderr: {err_msg}")
-                    break # Try next port
-
-                # Test both port AND readiness
-                if self._is_port_open(timeout=0.3) and self._test_daemon_ready():
-                    log.info(f"Sharp daemon ready on port {self.port}")
-                    return
-                time.sleep(0.2)
-
-            # If we broke out of while but daemon is still alive, it's a timeout
-            if self.daemon_process.poll() is None:
-                log.warning(f"Sharp daemon attempt {spawn_attempt+1} timed out.")
-                self._stop_daemon()
-            else:
-                self.daemon_process = None
+                    self.daemon_process = None
 
         # If all retries exhausted
         raise RuntimeError(
@@ -392,7 +405,7 @@ class SharpConverter(BaseConverter):
 
                 if attempt < max_retries:
                     # Stop daemon and restart fresh
-                    self._stop_daemon()
+                    self._stop_daemon(via_atexit=False)
                     self._ensure_daemon_running()
                     if self.daemon_process:
                         monitor = TelemetryMonitor(
