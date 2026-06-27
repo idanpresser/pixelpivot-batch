@@ -35,6 +35,7 @@ class BatchRepository:
         tool: str,
         trigger_type: str,
         heuristic_version: Optional[str] = None,
+        status: str = "running",
     ) -> int:
         """Insert a new batch run row and return its id.
 
@@ -46,6 +47,7 @@ class BatchRepository:
             tool: Converter tool name (e.g. 'magick', 'ffmpeg').
             trigger_type: How the batch was triggered (e.g. 'api', 'hot_folder').
             heuristic_version: Optional version of heuristic table used.
+            status: Initial status of the batch run.
 
         Returns:
             int: The id of the newly created batch_runs row.
@@ -60,7 +62,7 @@ class BatchRepository:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
-                (source_dir, target_dir, target_format, tool, trigger_type, "running", heuristic_version),
+                (source_dir, target_dir, target_format, tool, trigger_type, status, heuristic_version),
             )
             row = cur.fetchone()
             return int(row["id"]) if row else 0

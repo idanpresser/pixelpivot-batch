@@ -178,8 +178,18 @@ def get_connection() -> Iterator[sqlite3.Connection]:
                 _local.depth = 0
     else:
         _local.depth += 1
+        sp_name = f"sp_{_local.depth}"
+        _local.conn.execute(f"SAVEPOINT {sp_name}")
         try:
             yield _local.conn
+            _local.conn.execute(f"RELEASE SAVEPOINT {sp_name}")
+        except Exception:
+            try:
+                _local.conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
+                _local.conn.execute(f"RELEASE SAVEPOINT {sp_name}")
+            except Exception as e:
+                log.debug("nested rollback/release suppressed: %s", e)
+            raise
         finally:
             _local.depth -= 1
 
