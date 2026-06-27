@@ -94,6 +94,73 @@ def output_name(stem: str, cell: MatrixCell, *, multi_category: bool) -> str:
     """
     return f"{stem}{suffix_for(cell, multi_category=multi_category)}.{cell.target_format}"
 
+
+class DirectoryScanner:
+    """Helper for scanning input directories for supported images."""
+    @staticmethod
+    def scan(source_dir: str, input_files: Optional[List[str]] = None) -> List[str]:
+        source_path = Path(source_dir)
+        if not source_path.exists():
+            raise ValueError(f"Source directory {source_dir} does not exist.")
+        
+        valid_exts = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".heic", ".heif", ".avif"}
+        
+        input_paths = []
+        if input_files is not None:
+            for p in input_files:
+                path_obj = Path(p)
+                if path_obj.is_file() and path_obj.suffix.lower() in valid_exts:
+                    input_paths.append(str(path_obj))
+        else:
+            max_attempts = 3
+            for attempt in range(1, max_attempts + 1):
+                input_paths = [
+                    str(p) for p in source_path.iterdir() 
+                    if p.is_file() and p.suffix.lower() in valid_exts
+                ]
+                if input_paths:
+                    break
+                if attempt < max_attempts:
+                    log.info(f"Empty scan for source_dir {source_dir}, retrying in 0.5s (attempt {attempt}/{max_attempts})...")
+                    time.sleep(0.5)
+        return input_paths
+
+
+class MetricsCollector:
+    """Helper for collecting resource and savings metrics on completion."""
+    @staticmethod
+    def collect(
+        input_paths: List[str],
+        executed_cells: List[MatrixCell],
+        total_bytes_written: int,
+        all_telemetry_summaries: List[Dict[str, Any]],
+        duration_ms: float
+    ) -> Dict[str, Any]:
+        from ..core.telemetry import aggregate_telemetry
+        telemetry = aggregate_telemetry(all_telemetry_summaries) if all_telemetry_summaries else {}
+        
+        per_image_input_bytes = 0
+        for p in input_paths:
+            try:
+                per_image_input_bytes += os.path.getsize(p)
+            except OSError:
+                pass
+        input_bytes = per_image_input_bytes * len(executed_cells)
+        output_bytes = total_bytes_written
+
+        duration_s = max(duration_ms / 1000.0, 1e-3)
+        yield_mb_sec = (output_bytes / (1024 * 1024)) / duration_s
+        savings_pct = (1.0 - output_bytes / input_bytes) * 100.0 if input_bytes else 0.0
+
+        return {
+            "cpu_avg": telemetry.get("cpu_avg", 0.0),
+            "cpu_peak": telemetry.get("cpu_peak", 0.0),
+            "ram_peak": telemetry.get("ram_peak", 0.0),
+            "yield_mb_sec": yield_mb_sec,
+            "savings_pct": savings_pct
+        }
+
+
 class BatchOrchestrator:
     """Coordinates batch conversion across multiple tools and format combinations.
 
@@ -204,47 +271,34 @@ class BatchOrchestrator:
         """
         start_time = time.time()
         ctrl = self.run_controls.setdefault(run_id, RunControl())
+        
+        # State variables shared across execution and finalization phases
+        all_success_count = 0
+        all_failure_count = 0
+        total_bytes_written = 0
+        all_errors = []
+        all_telemetry_summaries = []
+        analytics_records: List[dict] = []
+        input_paths = []
+        executed_cells: List[MatrixCell] = []
+        total_conversions = 0
         cancelled = False
+        failed_during_run = False
+        failure_reason = None
+
         try:
-            # 1. Scan source_dir
-            source_path = Path(request.source_dir)
-            if not source_path.exists():
-                raise ValueError(f"Source directory {request.source_dir} does not exist.")
+            # 1. Scan source_dir using DirectoryScanner
+            input_paths = DirectoryScanner.scan(request.source_dir, request.input_files)
             
             # Pre-flight resource validation check
             self._preflight_resources(request.target_dir)
-            
-            valid_exts = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".heic", ".heif", ".avif"}
-            
-            input_paths = []
-            if request.input_files is not None:
-                for p in request.input_files:
-                    path_obj = Path(p)
-                    if path_obj.is_file() and path_obj.suffix.lower() in valid_exts:
-                        input_paths.append(str(path_obj))
-            else:
-                max_attempts = 3
-                for attempt in range(1, max_attempts + 1):
-                    input_paths = [
-                        str(p) for p in source_path.iterdir() 
-                        if p.is_file() and p.suffix.lower() in valid_exts
-                    ]
-                    if input_paths:
-                        break
-                    if attempt < max_attempts:
-                        log.info(f"Empty scan for source_dir {request.source_dir}, retrying in 0.5s (attempt {attempt}/{max_attempts})...")
-                        time.sleep(0.5)
             
             if not input_paths:
                 if request.input_files is not None:
                     err_msg = f"No images found in {request.source_dir} after filtering specific files."
                 else:
-                    err_msg = f"No images found in {request.source_dir} after {max_attempts} scan attempts — check the path is reachable and contains supported files."
-                log.error(err_msg)
-                with get_connection() as conn:
-                    self.repo.update_status(conn, run_id, "failed", total_images=0)
-                    self.repo.save_errors(conn, run_id, [{"path": None, "error": err_msg}])
-                return
+                    err_msg = f"No images found in {request.source_dir} after 3 scan attempts — check the path is reachable and contains supported files."
+                raise ValueError(err_msg)
 
             # Per-batch circuit-breaker isolation (issue 49x): converters are
             # long-lived singletons shared across batches. Reset every breaker at
@@ -279,12 +333,6 @@ class BatchOrchestrator:
             }
             
             log.info(f"Starting Matrix Batch: {len(input_paths)} images * {len(plan)} cells = {total_conversions} conversions")
-
-            all_success_count = 0
-            all_failure_count = 0
-            total_bytes_written = 0
-            all_errors = []
-            all_telemetry_summaries = []
             
             dim_cache = self._probe_all_dimensions(input_paths)
 
@@ -303,12 +351,6 @@ class BatchOrchestrator:
 
             cells_processed = 0
             abort_matrix = False
-            executed_cells: List[MatrixCell] = []
-            analytics_records: List[dict] = []
-
-            # Resolve target directory path. The pre-run mtime snapshot loop is deleted
-            # to prevent a pre-loop stat storm over network paths.
-            target_dir_path = Path(request.target_dir)
 
             for cell in plan:
                 if abort_matrix:
@@ -416,39 +458,55 @@ class BatchOrchestrator:
                 if not any(e.get("quarantined") for e in all_errors):
                     raise ValueError("Batch produced no executed cells (all tools unsupported or all images unreadable).")
 
+        except Exception as e:
+            log.error(f"Batch execution failed for run {run_id}: {e}")
+            failed_during_run = True
+            failure_reason = str(e)
+
+        # 4. Finalize stage (OUTSIDE the execution try/except!)
+        # Any error during metrics collection or summary logging must be handled
+        # gracefully without marking a successful batch as failed.
+        try:
             if cancelled:
                 def _mark_cancelled():
                     with get_connection() as conn:
                         self.repo.update_status(conn, run_id, "cancelled",
                                                 total_images=total_conversions)
                 with_db_retry(_mark_cancelled, max_retries=SQLITE_BUSY_ATTEMPTS,
-                              initial_delay=SQLITE_BUSY_BASE_DELAY_S)
+                               initial_delay=SQLITE_BUSY_BASE_DELAY_S)
                 if all_failure_count > 0:
                     try:
                         with get_connection() as conn:
                             self.repo.save_errors(conn, run_id, all_errors)
-                    except Exception as e:
-                        log.warning(f"save_errors dropped {len(all_errors)} rows: {e}")
+                    except Exception as err:
+                        log.warning(f"save_errors dropped {len(all_errors)} rows: {err}")
                 return
 
-            # 4. Save Summary & Finalize Status
+            if failed_during_run:
+                # Mark as failed if we failed during scanning, preflight or converter execution
+                def _fail():
+                    with get_connection() as conn:
+                        self.repo.update_status(conn, run_id, "failed")
+                with_db_retry(_fail, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)
+                
+                if all_failure_count > 0 or failure_reason:
+                    errs_to_save = all_errors if all_errors else [{"path": None, "error": failure_reason}]
+                    try:
+                        with get_connection() as conn:
+                            self.repo.save_errors(conn, run_id, errs_to_save)
+                    except Exception as err:
+                        log.warning(f"save_errors dropped {len(errs_to_save)} rows: {err}")
+                return
+
+            # Compute and save metrics summary using MetricsCollector
             duration_ms = (time.time() - start_time) * 1000
-            from ..core.telemetry import aggregate_telemetry
-            telemetry = aggregate_telemetry(all_telemetry_summaries) if all_telemetry_summaries else {}
-            
-            # Savings are computed only over cells that actually executed and
-            # outputs actually produced (new or modified) during THIS run.
-            per_image_input_bytes = 0
-            for p in input_paths:
-                try: per_image_input_bytes += os.path.getsize(p)
-                except OSError: pass
-            input_bytes = per_image_input_bytes * len(executed_cells)
-
-            output_bytes = total_bytes_written
-
-            duration_s = max(duration_ms / 1000.0, 1e-3)
-            yield_mb_sec = (output_bytes / (1024 * 1024)) / duration_s
-            savings_pct = (1.0 - output_bytes / input_bytes) * 100.0 if input_bytes else 0.0
+            metrics = MetricsCollector.collect(
+                input_paths=input_paths,
+                executed_cells=executed_cells,
+                total_bytes_written=total_bytes_written,
+                all_telemetry_summaries=all_telemetry_summaries,
+                duration_ms=duration_ms
+            )
 
             # A batch that produced zero successful conversions while accruing
             # failures (e.g. every tool unregistered, all images unreadable) is a
@@ -461,11 +519,11 @@ class BatchOrchestrator:
                         conn,
                         batch_id=run_id,
                         duration_ms=duration_ms,
-                        cpu_avg_pct=telemetry.get("cpu_avg", 0.0),
-                        cpu_peak_pct=telemetry.get("cpu_peak", 0.0),
-                        ram_peak_mb=telemetry.get("ram_peak", 0.0),
-                        yield_mb_sec=yield_mb_sec,
-                        savings_pct=savings_pct,
+                        cpu_avg_pct=metrics.get("cpu_avg", 0.0),
+                        cpu_peak_pct=metrics.get("cpu_peak", 0.0),
+                        ram_peak_mb=metrics.get("ram_peak", 0.0),
+                        yield_mb_sec=metrics.get("yield_mb_sec", 0.0),
+                        savings_pct=metrics.get("savings_pct", 0.0),
                         success_count=all_success_count,
                         failure_count=all_failure_count,
                     )
@@ -477,8 +535,8 @@ class BatchOrchestrator:
                 try:
                     with get_connection() as conn:
                         self.repo.save_errors(conn, run_id, all_errors)
-                except Exception as e:
-                    log.warning(f"save_errors dropped {len(all_errors)} rows: {e}")
+                except Exception as err:
+                    log.warning(f"save_errors dropped {len(all_errors)} rows: {err}")
 
             # Best-effort: persist per-conversion analytics so the heuristic
             # generators can learn from real batch runs. Never fails the batch.
@@ -487,15 +545,11 @@ class BatchOrchestrator:
                     from ..core.db.repositories.conversions import record_conversions
                     with get_connection() as conn:
                         record_conversions(conn, analytics_records)
-                except Exception as e:
-                    log.warning(f"Analytics recording failed (best-effort): {e}")
+                except Exception as err:
+                    log.warning(f"Analytics recording failed (best-effort): {err}")
 
         except Exception as e:
-            log.error(f"Batch execution failed for run {run_id}: {e}")
-            def _fail():
-                with get_connection() as conn:
-                    self.repo.update_status(conn, run_id, "failed")
-            with_db_retry(_fail, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)
+            log.error(f"Error during finalization for run {run_id}: {e}")
         finally:
             self.run_controls.pop(run_id, None)
             self.progress.pop(run_id, None)
