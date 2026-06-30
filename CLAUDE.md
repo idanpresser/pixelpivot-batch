@@ -13,6 +13,11 @@ PixelPivot Batch Engine — a decoupled microservice system for high-throughput 
 pytest                            # All tests (verbose, short tracebacks per pytest.ini)
 pytest tests/test_base_converter.py  # Single file
 pytest -k "test_interpolator"    # Run by keyword
+
+# Run tests with Postgres (requires docker service test-postgres running):
+docker compose up -d test-postgres
+$env:PIXELPIVOT_DB_URL="postgresql+psycopg://pixelpivot:pixelpivot@localhost:5433/pixelpivot_test"
+pytest
 ```
 
 ### Starting Services (Docker)
