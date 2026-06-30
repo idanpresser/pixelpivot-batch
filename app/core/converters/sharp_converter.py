@@ -51,6 +51,7 @@ class SharpConverter(BaseConverter):
         # sharing one across threads interleaves requests/responses and corrupts
         # the framing. Each worker thread gets its own connection.
         self._local = threading.local()
+        self.fallback_enabled = True
 
     @property
     def _socket(self):
@@ -286,6 +287,42 @@ class SharpConverter(BaseConverter):
         is_intermediate: bool = False,
         run_id: Optional[int] = None,
     ) -> ConvertResult:
+        try:
+            return self._convert_via_daemon(
+                input_path, output_path, target_format, quality,
+                is_intermediate=is_intermediate, run_id=run_id
+            )
+        except (OSError, socket.timeout) as e:
+            if not getattr(self, "fallback_enabled", True):
+                self._mark_failure()
+                return ConvertResult(
+                    success=False,
+                    error=f"Sharp conversion failed after 3 attempts: {e}",
+                )
+            log.warning("sharp daemon unavailable, falling back to vips",
+                        extra={"subprocess": {"error": str(e), "in_path": input_path}})
+            from .vips_converter import VipsConverter
+            res = VipsConverter().convert(
+                input_path, output_path, target_format, quality,
+                is_intermediate=is_intermediate, run_id=run_id
+            )
+            if isinstance(res, ConvertResult):
+                res.tool = "vips"
+                res.fallback_from = "sharp"
+            elif isinstance(res, dict):
+                res["tool"] = "vips"
+                res["fallback_from"] = "sharp"
+            return res
+
+    def _convert_via_daemon(
+        self,
+        input_path: str,
+        output_path: str,
+        target_format: str,
+        quality: Union[int, float],
+        is_intermediate: bool = False,
+        run_id: Optional[int] = None,
+    ) -> ConvertResult:
         """Convert a single image via Sharp daemon socket.
 
         Sends a JSON request to the daemon, with socket retry logic on transient
@@ -430,9 +467,11 @@ class SharpConverter(BaseConverter):
         if monitor:
             monitor.stop()
         self._mark_failure()
+        if last_error:
+            raise last_error
         return ConvertResult(
             success=False,
-            error=f"Sharp conversion failed after {max_retries + 1} attempts: {last_error}",
+            error=f"Sharp conversion failed after {max_retries + 1} attempts",
         )
 
     def convert_batch(
@@ -448,7 +487,7 @@ class SharpConverter(BaseConverter):
         """Convert a batch of images via pipelined Sharp daemon socket.
 
         Sends all JSON requests in a pipeline, then reads all responses sequentially.
-        Falls back to per-file convert() if pipelining fails.
+        Falls back to VipsConverter.convert_batch() on the remaining/un-converted files if pipelining fails.
 
         Args:
             input_paths: List of input file paths.
@@ -460,14 +499,16 @@ class SharpConverter(BaseConverter):
             dimensions: Optional pre-computed dimensions (unused).
 
         Returns:
-            Dict with 'success_count', 'failure_count', 'duration_ms', 'telemetry',
-            and 'errors' keys.
+            BatchResult with counts, duration, and errors.
         """
         self._ensure_daemon_running()
         start = time.time()
         success_count = 0
         failure_count = 0
         errors = []
+        received_count = 0
+        bytes_written = 0
+        telemetry = {}
 
         os.makedirs(output_dir, exist_ok=True)
 
@@ -493,8 +534,6 @@ class SharpConverter(BaseConverter):
             # 2. Read all responses
             response_buffer = b""
             expected_responses = len(input_paths)
-            received_count = 0
-            bytes_written = 0
 
             # Set a generous timeout for the whole batch
             sock.settimeout(60.0 + (len(input_paths) * 0.5))
@@ -531,15 +570,38 @@ class SharpConverter(BaseConverter):
             self._account_native_batch(failed=failure_count > 0)
 
         except Exception as e:
-            log.error(f"Sharp batch conversion failed: {e}")
+            log.warning(f"Sharp batch conversion failed: {e}. Falling back to vips for remaining files.")
             self._close_socket()
             if monitor:
                 monitor.stop()
                 monitor = None
-            # Fallback to default (individual) if pipelining failed
-            return self._default_batch_convert(
-                input_paths, output_dir, target_format, qualities, run_id=run_id, suffix=suffix, dimensions=dimensions
+
+            # Determine remaining files
+            remaining_inputs = input_paths[received_count:]
+            remaining_qualities = qualities[received_count:]
+
+            # If there are remaining files to convert, run them via vips
+            from .vips_converter import VipsConverter
+            fallback_res = VipsConverter().convert_batch(
+                remaining_inputs, output_dir, target_format, remaining_qualities, run_id=run_id, suffix=suffix, dimensions=dimensions
             )
+
+            # Merge counts
+            merged_success = success_count + fallback_res.success_count
+            merged_failure = failure_count + fallback_res.failure_count
+            merged_bytes = bytes_written + fallback_res.bytes_written
+            merged_errors = errors + fallback_res.errors
+
+            res = BatchResult(
+                success_count=merged_success,
+                failure_count=merged_failure,
+                duration_ms=(time.time() - start) * 1000,
+                telemetry=telemetry,
+                errors=merged_errors,
+                bytes_written=merged_bytes,
+            )
+            res.tool = "vips"
+            return res
 
         telemetry = monitor.stop() if monitor else {}
 

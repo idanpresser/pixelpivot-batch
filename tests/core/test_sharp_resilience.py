@@ -30,6 +30,7 @@ def test_sharp_daemon_restarts_on_connection_reset(mock_daemon):
     Verify that if the socket resets, the daemon is stopped and restarted.
     """
     conv = SharpConverter()
+    conv.fallback_enabled = False
     
     # First connection fails with Reset, second succeeds
     mock_sock1 = MagicMock()
@@ -51,6 +52,7 @@ def test_sharp_daemon_max_retries_and_circuit_break(mock_daemon):
     Verify that after enough failed attempts, it gives up.
     """
     conv = SharpConverter()
+    conv.fallback_enabled = False
     conv.failure_threshold = 1 # Force break on first convert() failure
     
     # All connections fail
@@ -69,6 +71,7 @@ def test_sharp_socket_resilience_types(mock_daemon, error_type):
     Verify it handles various socket errors similarly.
     """
     conv = SharpConverter()
+    conv.fallback_enabled = False
     
     mock_sock = MagicMock()
     mock_sock.sendall.side_effect = error_type("Error")

@@ -431,6 +431,7 @@ class BatchOrchestrator:
                 )
                 if isinstance(result, dict):
                     from app.core.converters.base import BatchResult
+                    tool_val = result.get("tool")
                     result = BatchResult(
                         success_count=result.get("success_count", 0),
                         failure_count=result.get("failure_count", 0),
@@ -439,6 +440,8 @@ class BatchOrchestrator:
                         errors=result.get("errors", []),
                         bytes_written=result.get("bytes_written", 0),
                     )
+                    if tool_val:
+                        result.tool = tool_val
                 
                 # Quarantine failed files to DLQ
                 quarantined_errors = []
@@ -471,10 +474,11 @@ class BatchOrchestrator:
 
                 # Per-conversion analytics for the heuristic feedback loop. A path
                 # succeeded if it is not among this cell's error paths.
+                actual_tool = getattr(result, "tool", None) or t_name
                 error_paths = {e.get("path") for e in result.errors if e.get("path")}
                 for img_path, q in zip(input_paths, qualities):
                     analytics_records.append({
-                        "path": img_path, "category": cat, "format": fmt, "tool": t_name,
+                        "path": img_path, "category": cat, "format": fmt, "tool": actual_tool,
                         "quality": q, "success": img_path not in error_paths,
                     })
 
