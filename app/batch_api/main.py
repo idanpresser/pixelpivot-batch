@@ -147,3 +147,13 @@ app.include_router(router, prefix="/api/v1")
 async def root():
     """Return health check response."""
     return {"message": "PixelPivot Batch Engine API is running"}
+
+
+from .health import LIVE_BODY
+
+
+@app.get("/healthz/live")
+async def healthz_live():
+    """Liveness probe: the process is up. Never depends on external state."""
+    return LIVE_BODY
+
