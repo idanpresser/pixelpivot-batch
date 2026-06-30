@@ -119,6 +119,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="PixelPivot Batch Engine", lifespan=lifespan)
 
+from app.core import tracing
+
+@app.middleware("http")
+async def trace_id_middleware(request, call_next):
+    tracing.new_trace_id("req-")
+    return await call_next(request)
+
 @app.middleware("http")
 async def api_token_auth_middleware(request, call_next):
     import os

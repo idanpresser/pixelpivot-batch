@@ -97,6 +97,8 @@ def check_paths(source: str, target: str) -> bool:
     return ok
 
 def main(argv=None):
+    from app.core import tracing
+    tracing.new_trace_id("cli-")
     parser = argparse.ArgumentParser(description="PixelPivot Batch Engine.")
     sub = parser.add_subparsers(dest="command", required=True)
 

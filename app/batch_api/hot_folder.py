@@ -15,6 +15,7 @@ from typing import Dict, Any, List
 
 from .models import BatchRequest, HotFolderRequest
 from ..core.logger import get_logger
+from ..core import tracing
 from ..core.db.repositories.batch import BatchRepository
 from ..core.db.connection import get_connection
 from ..core.config import (
@@ -89,8 +90,12 @@ class HotFolderHandler(FileSystemEventHandler):
                 self.timer.cancel()
                 self.timer = None
 
+    def _stamp_trace(self):
+        tracing.new_trace_id("hotfolder-")
+
     def _trigger_batch(self):
         """Initiate batch execution after debounce expires; guard against re-entrancy."""
+        self._stamp_trace()
         with self.lock:
             if self._is_triggering:
                 log.debug(f"Batch trigger already in progress for {self.config['source_dir']}. Skipping.")
