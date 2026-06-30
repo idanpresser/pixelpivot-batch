@@ -63,6 +63,51 @@ class DBLogHandler(logging.Handler):
             # Silently fail to avoid crashing the pipeline due to logging issues
             pass
 
+import os
+from datetime import datetime, timezone
+
+
+class EcsJsonFormatter(logging.Formatter):
+    """Single-line Elastic Common Schema JSON formatter."""
+
+    # record attrs that are NOT extra fields
+    _RESERVED = set(logging.LogRecord("", 0, "", 0, "", None, None).__dict__) | {
+        "trace_id", "batch", "subprocess", "performance", "message", "asctime"
+    }
+
+    def __init__(self, service_name: str = "pixelpivot"):
+        super().__init__()
+        self.service_name = service_name
+
+    def format(self, record: logging.LogRecord) -> str:
+        out = {
+            "@timestamp": datetime.fromtimestamp(record.created, timezone.utc)
+            .isoformat().replace("+00:00", "Z"),
+            "log.level": record.levelname,
+            "message": record.getMessage(),
+            "service.name": self.service_name,
+            "trace.id": getattr(record, "trace_id", None),
+            "log.logger": record.name,
+        }
+        for prefix in ("batch", "performance", "subprocess"):
+            payload = getattr(record, prefix, None)
+            if isinstance(payload, dict):
+                for k, v in payload.items():
+                    out[f"{prefix}.{k}"] = v
+        if record.exc_info:
+            out["error.stack_trace"] = self.formatException(record.exc_info)
+        return json.dumps(out, default=str, ensure_ascii=True)
+
+
+def _selected_formatter() -> logging.Formatter:
+    if os.environ.get("PIXELPIVOT_LOG_FORMAT", "text").lower() == "json":
+        return EcsJsonFormatter(
+            service_name=os.environ.get("PIXELPIVOT_SERVICE_NAME", "pixelpivot")
+        )
+    return logging.Formatter(
+        "%(asctime)s - %(levelname)s - [%(filename)s:%(funcName)s] - %(message)s"
+    )
+
 _configured = False
 
 
@@ -78,9 +123,7 @@ def _configure_root_once() -> None:
     if _configured:
         return
 
-    formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - [%(filename)s:%(funcName)s] - %(message)s"
-    )
+    formatter = _selected_formatter()
 
     from .paths import PROJ_ROOT
     log_file = str(PROJ_ROOT / "pixelpivot.log")
@@ -91,10 +134,15 @@ def _configure_root_once() -> None:
         log_file, maxBytes=1_000_000, backupCount=10, delay=True
     )
     file_handler.setLevel(logging.WARNING)
+    
+    from .tracing import TraceIdFilter
+    _trace_filter = TraceIdFilter()
     file_handler.setFormatter(formatter)
+    file_handler.addFilter(_trace_filter)
 
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
+    stream_handler.addFilter(_trace_filter)
 
     db_handler = DBLogHandler()
     db_handler.setLevel(logging.INFO)
