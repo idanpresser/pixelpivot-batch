@@ -100,6 +100,18 @@ def _truncate(s: str | None, limit: int = 2048) -> str | None:
     return s if len(s) <= limit else s[:limit] + f"... ({len(s) - limit} bytes truncated)"
 
 
+def build_subprocess_log_payload(tool_name: str, returncode: int, stderr: str) -> dict:
+    """Structured payload for a finished subprocess; raw text stays nested."""
+    raw = (stderr or "").strip()
+    error = None
+    if returncode != 0 and raw:
+        # pick the most error-like line, else the last non-empty line
+        lines = [ln for ln in raw.splitlines() if ln.strip()]
+        err_lines = [ln for ln in lines if "error" in ln.lower() or "invalid" in ln.lower()]
+        error = (err_lines[-1] if err_lines else lines[-1]).strip()
+    return {"tool": tool_name, "returncode": returncode, "raw_output": raw, "error": error}
+
+
 # Conservative per-pixel working-set estimate for an in-process decode+encode:
 # a decoded RGBA frame is 4 bytes/px; encoders typically hold ~3x that in
 # intermediate buffers. Tunable via env for unusual workloads.
@@ -362,6 +374,11 @@ class BaseConverter(ABC):
                             success = False
                             error = f"{tool_name} claimed success but output file is missing or empty: {target_out}"
                     error = _truncate(stderr) if not success and not error else error
+                    
+                    stderr_text = stderr or ""
+                    payload = build_subprocess_log_payload(tool_name, proc.returncode, stderr_text)
+                    if payload["returncode"] != 0:
+                        log.warning("subprocess failed", extra={"subprocess": payload})
                 except subprocess.TimeoutExpired:
                     log.warning(f"{tool_name} timed out, force cleaning process tree...")
                     kill_process_tree(proc.pid)
