@@ -373,5 +373,5 @@ def with_db_retry(
         return wrapper
 
     if func is not None:
-        return decorator(func)()
+        return decorator(func)
     return decorator

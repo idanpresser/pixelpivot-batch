@@ -15,6 +15,7 @@ from typing import Optional
 
 from ... import config
 from ...logger import get_logger
+from ..connection import with_db_retry
 
 log = get_logger(__name__)
 
@@ -26,6 +27,7 @@ class BatchRepository:
     summaries, storing per-file errors, and retrieving calibration results.
     """
 
+    @with_db_retry
     def create_run(
         self,
         conn: sqlite3.Connection,
@@ -69,6 +71,7 @@ class BatchRepository:
         finally:
             cur.close()
 
+    @with_db_retry
     def reap_stale_running(self, conn: sqlite3.Connection) -> int:
         """Transition all 'running' batches to 'interrupted' state.
 
@@ -94,6 +97,7 @@ class BatchRepository:
         finally:
             cur.close()
 
+    @with_db_retry
     def update_status(
         self,
         conn: sqlite3.Connection,
@@ -211,6 +215,7 @@ class BatchRepository:
         finally:
             cur.close()
 
+    @with_db_retry
     def save_summary(
         self,
         conn: sqlite3.Connection,
@@ -268,6 +273,7 @@ class BatchRepository:
         finally:
             cur.close()
 
+    @with_db_retry
     def save_errors(
         self, conn: sqlite3.Connection, batch_id: int, errors: list[dict]
     ) -> None:
@@ -322,6 +328,7 @@ class BatchRepository:
         finally:
             cur.close()
 
+    @with_db_retry
     def save_calibration_result(
         self,
         conn: sqlite3.Connection,
