@@ -30,6 +30,60 @@ from ..paths import SQLITE_DB_PATH
 
 log = get_logger(__name__)
 
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
+
+_engines: dict[str, "Engine"] = {}
+
+
+def _db_url() -> str:
+    """Resolve the SQLAlchemy URL: explicit PIXELPIVOT_DB_URL wins, else sqlite at get_db_path()."""
+    import os
+    url = os.getenv("PIXELPIVOT_DB_URL")
+    if url:
+        return url
+    return f"sqlite:///{get_db_path()}"
+
+
+def get_engine() -> Engine:
+    """Return a process-cached engine for the current DB URL."""
+    url = _db_url()
+    eng = _engines.get(url)
+    if eng is None:
+        is_sqlite = url.startswith("sqlite")
+        if is_sqlite:
+            get_db_path().parent.mkdir(parents=True, exist_ok=True)
+        eng = create_engine(
+            url,
+            future=True,
+            # one shared in-process connection for file sqlite is fine; pool for pg
+            connect_args={"check_same_thread": False} if is_sqlite else {},
+        )
+        _engines[url] = eng
+    return eng
+
+
+def reset_engine_cache() -> None:
+    """Dispose + drop cached engines (test isolation across DB paths)."""
+    for eng in _engines.values():
+        eng.dispose()
+    _engines.clear()
+
+
+@event.listens_for(Engine, "connect")
+def _apply_sqlite_pragmas(dbapi_connection, connection_record):
+    """WAL + project pragmas on every sqlite connection from any engine in the pool."""
+    if dbapi_connection.__class__.__module__.startswith("sqlite3"):
+        cur = dbapi_connection.cursor()
+        try:
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA synchronous=NORMAL")
+            cur.execute("PRAGMA busy_timeout=5000")
+            cur.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cur.close()
+
+
 _local = threading.local()
 
 
