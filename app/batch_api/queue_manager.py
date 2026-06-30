@@ -45,9 +45,9 @@ class BatchQueueManager:
             t.start()
         log.info(f"Started BatchQueueManager with {self.max_workers} worker thread(s).")
 
-    def stop(self) -> None:
+    def stop(self, grace_s: float = 5.0) -> None:
         """Gracefully stop the queue manager, cancelling in-flight jobs and waiting for workers."""
-        log.info("Stopping BatchQueueManager...")
+        log.info("Stopping BatchQueueManager (grace=%.1fs)...", grace_s)
         self._stopped = True
         
         # Signal all worker threads to stop by putting None sentinels
@@ -64,7 +64,7 @@ class BatchQueueManager:
 
         # Join the threads with a timeout
         for t in self._threads:
-            t.join(timeout=5.0)
+            t.join(timeout=grace_s)
         log.info("BatchQueueManager stopped.")
 
     def submit_batch(self, run_id: int, request: BatchRequest) -> None:
