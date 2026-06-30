@@ -81,3 +81,45 @@ def test_lifespan_shutdown_invokes_graceful_shutdown(monkeypatch):
     assert called["had_hf"] is True
 
 
+import subprocess
+import sys
+from app.batch_api.run_control import RunControl
+from app.batch_api.shutdown import graceful_shutdown
+from app.core import process_registry as reg
+
+
+class _OrchWithRun:
+    def __init__(self, run_id):
+        self.run_controls = {run_id: RunControl()}
+
+
+def test_mid_batch_sigterm_cancels_and_reaps(monkeypatch):
+    reg.clear()
+    run_id = 1
+    orch = _OrchWithRun(run_id)
+
+    # Simulate an in-flight chunk: a real child process registered as live.
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    reg.register_process(child)
+
+    class _QM:
+        def __init__(self, orch):
+            self.orchestrator = orch
+        def stop(self, grace_s):
+            # Cooperative cancel of the in-flight run, mirroring the real stop().
+            self.orchestrator.run_controls[run_id].cancel()
+
+    class _HF:
+        def stop(self):
+            pass
+
+    killed = graceful_shutdown(hot_folder_manager=_HF(), queue_manager=_QM(orch), grace_s=0.5)
+
+    child.wait(timeout=5)
+    assert orch.run_controls[run_id].cancelled is True   # batch was told to stop
+    assert child.poll() is not None                       # no orphan child survives
+    assert killed >= 1
+    assert reg.snapshot() == set()                        # registry drained
+
+
+
