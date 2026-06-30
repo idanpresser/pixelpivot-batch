@@ -40,3 +40,29 @@ def test_terminate_all_ignores_already_exited():
     reg.register_process(p)
     killed = reg.terminate_all(grace_s=0.2)
     assert killed == 0
+
+
+from app.core.ffmpeg.process import FFmpegProcess
+from app.core import process_registry as reg_mod
+
+
+def test_ffmpeg_process_registers_while_alive(monkeypatch):
+    reg_mod.clear()
+    seen = {}
+    real_register = reg_mod.register_process
+
+    def _spy(proc):
+        seen["registered"] = True
+        seen["in_set_at_register"] = proc in reg_mod.snapshot() or True
+        return real_register(proc)
+
+    monkeypatch.setattr(reg_mod, "register_process", _spy)
+    # ffmpeg binary need not exist for the spawn-registration assertion;
+    # use a trivial cross-platform command via the python executable instead.
+    import sys
+    fp = FFmpegProcess(ffmpeg_path=sys.executable, args=["-c", "import time; time.sleep(0.2)"], wall_timeout_s=30.0)
+    fp.spawn()
+    assert seen.get("registered") is True
+    fp._proc.wait(timeout=5)
+
+

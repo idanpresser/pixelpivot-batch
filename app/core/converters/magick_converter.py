@@ -248,20 +248,25 @@ class MagickConverter(BaseConverter):
                          text=True,
                          creationflags=creationflags,
                     ) as proc:
-                        monitor = TelemetryMonitor(pid=proc.pid, interval_ms=int(TELEMETRY_INTERVAL * 1000), run_id=run_id)
-                        monitor.start()
-
+                        from ...process_registry import register_process, unregister_process
+                        register_process(proc)
                         try:
-                            stdout, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT * len(chunk_paths))
-                            success = proc.returncode == 0
-                        except subprocess.TimeoutExpired:
-                            log.warning("Mogrify timed out, force cleaning process tree...")
-                            kill_process_tree(proc.pid)
-                            proc.communicate()
-                            success = False
-                            stderr = f"Mogrify timed out for chunk of size {len(chunk_paths)}"
+                            monitor = TelemetryMonitor(pid=proc.pid, interval_ms=int(TELEMETRY_INTERVAL * 1000), run_id=run_id)
+                            monitor.start()
 
-                        summaries.append(monitor.stop())
+                            try:
+                                stdout, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT * len(chunk_paths))
+                                success = proc.returncode == 0
+                            except subprocess.TimeoutExpired:
+                                log.warning("Mogrify timed out, force cleaning process tree...")
+                                kill_process_tree(proc.pid)
+                                proc.communicate()
+                                success = False
+                                stderr = f"Mogrify timed out for chunk of size {len(chunk_paths)}"
+
+                            summaries.append(monitor.stop())
+                        finally:
+                            unregister_process(proc)
 
                     if success:
                         self._reset_failures()
