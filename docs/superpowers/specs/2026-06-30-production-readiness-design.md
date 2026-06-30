@@ -42,15 +42,16 @@ All toggles default to air-gapped-safe (feature off / local-only):
 - **e1.3 subprocess output wrapping** — ffmpeg/mogrify stderr captured, parsed, nested under `subprocess.raw_output`/`subprocess.error`; no raw multiline dump to stdout. *Accept:* failing convert → one JSON log line, raw text inside payload.
 - **e1.4 propagate trace_id across worker + subprocess boundaries** — workers are `ThreadPoolExecutor` threads, which do **not** auto-copy `contextvars`. Capture trace_id at submit time (`copy_context().run(...)` or explicit injection) so worker-thread log records carry it. Cross *process* boundaries: ffmpeg via log prefix; Sharp daemon via a `trace_id` field in the TCP request frame. *Accept:* worker-thread log line and sharp-daemon log line both carry the originating request's trace_id.
 
-## E2 — DB Abstraction (SQLAlchemy Core)
+## E2 — DB Abstraction (SQLAlchemy engine + facade seam)
 
-- **e2.1 deps + engine factory** — add SQLAlchemy, vendor wheels (cp314 win + linux for air-gap mirror). Engine factory reads `PIXELPIVOT_DB_URL` (default sqlite). *Accept:* engine builds for both sqlite and postgres URLs.
-- **e2.2 port connection.py** → engine/pool; keep `init_db()` contract. SQLite pragmas (`journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout`) applied via a `@event.listens_for(Engine, "connect")` listener gated on the sqlite dialect — **not** one-off execution — so every pooled/recycled connection gets them consistently. *Accept:* existing connection tests green; new connection from pool reports `journal_mode=wal`.
-- **e2.3a port schema.py** to Core / portable `text()`. *Accept:* schema init green both dialects.
-- **e2.3b port analytics.py** to Core expressions. *Accept:* analytics tests green on sqlite; smoke pass on postgres.
-- **e2.3c port analytics_api.py** to Core. *Accept:* analytics_api tests green both dialects.
-- **e2.3d port export.py** to Core. *Accept:* export tests green both dialects.
-- **e2.4 postgres CI lane** — compose service + test matrix runs full suite on both backends. *Accept:* suite green sqlite + postgres.
+**Revised after planning discovery (2026-06-30):** the raw-`sqlite3` surface is **~125 call sites across ~15 files** (incl. the whole `app/core/db/repositories/` dir, `queue_manager`, `calibration_runner`, `heuristic.py`, `core/telemetry.py`, `logger.DBLogHandler`), not the 4 files originally listed. A file-by-file Core port is 3x the work and risk. **Decision: facade seam** — keep `get_connection()` as the single chokepoint, put a SQLAlchemy engine underneath, and yield a thin compat wrapper so the ~15 consumers stay almost unchanged. Postgres portability comes from translating paramstyle + row access in one place.
+
+- **e2.1 deps + engine factory** — add SQLAlchemy, vendor wheels (cp314 win + linux for air-gap mirror). `get_engine()` reads `PIXELPIVOT_DB_URL` (default `sqlite:///<get_db_path()>`), cached per-URL (test isolation). SQLite pragmas (`journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`, `foreign_keys=ON`) applied via `@event.listens_for(Engine, "connect")` gated on the sqlite dialect — never one-off — so every pooled/recycled connection is consistent. *Accept:* engine builds for both sqlite and postgres URLs; a fresh sqlite connection reports `journal_mode=wal`.
+- **e2.2 facade compat wrapper + get_connection swap** — `get_connection()` yields a `_CompatConnection` backed by `engine.raw_connection()`, preserving the legacy API: `.cursor()`, `.commit()/.rollback()/.close()`, thread-local reuse + outermost-block transaction semantics. `_CompatCursor.execute()` translates `?`→dialect paramstyle (no-op on sqlite, `?`→`%s` on postgres) and rows expose `row["col"]` (sqlite `Row`; psycopg `dict_row`). *Accept:* full existing suite green on sqlite with consumers unchanged.
+- **e2.3 dialect-aware schema DDL** — `schema.py` is the one consumer that can't be made portable by the seam alone (DDL differs: `INTEGER PRIMARY KEY AUTOINCREMENT` vs `SERIAL`/`IDENTITY`, `executescript` unsupported on psycopg). Branch DDL on `engine.dialect.name`; sqlite keeps current script, postgres gets an equivalent. `init_db()` contract preserved. *Accept:* schema init green on both dialects; table set identical.
+- **e2.4 postgres CI lane + smoke** — compose Postgres service + test matrix runs the suite on both backends; fix any dialect leaks the facade missed (e.g. `INSERT OR IGNORE`, `strftime`, boolean `0/1`). *Accept:* suite green sqlite + postgres.
+
+> Deferred (not blocking E2): repositories etc. keep raw SQL through the seam. A later optional epic may migrate hot queries to Core expressions, but YAGNI for now.
 
 ## E3 — Error Handling + Resilience
 
