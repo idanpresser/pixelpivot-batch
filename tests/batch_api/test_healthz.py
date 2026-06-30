@@ -41,3 +41,32 @@ def test_readiness_db_failure_named(monkeypatch):
     assert checks["db"].ok is False
     assert "db down" in checks["db"].detail
 
+
+from app.batch_api import health as health_mod
+
+
+def _all_ok(_orch):
+    return [health_mod.Check(n, True, "ok") for n in ("db", "storage", "magick", "ffmpeg", "sharp")]
+
+
+def test_ready_all_ok_returns_200(monkeypatch):
+    monkeypatch.setattr("app.batch_api.main.readiness_checks", _all_ok)
+    with TestClient(app) as client:
+        resp = client.get("/healthz/ready")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ready"
+
+
+def test_ready_broken_dep_returns_503_naming_check(monkeypatch):
+    def _ffmpeg_down(_orch):
+        out = _all_ok(_orch)
+        return [c if c.name != "ffmpeg" else health_mod.Check("ffmpeg", False, "not found") for c in out]
+    monkeypatch.setattr("app.batch_api.main.readiness_checks", _ffmpeg_down)
+    with TestClient(app) as client:
+        resp = client.get("/healthz/ready")
+    assert resp.status_code == 503
+    body = resp.json()
+    assert "ffmpeg" in body["failed"]
+    assert body["checks"]["ffmpeg"]["ok"] is False
+
+

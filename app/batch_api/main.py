@@ -149,11 +149,28 @@ async def root():
     return {"message": "PixelPivot Batch Engine API is running"}
 
 
-from .health import LIVE_BODY
+from .health import LIVE_BODY, readiness_checks
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 
 @app.get("/healthz/live")
 async def healthz_live():
     """Liveness probe: the process is up. Never depends on external state."""
     return LIVE_BODY
+
+
+@app.get("/healthz/ready")
+async def healthz_ready(request: Request):
+    """Readiness probe: 200 when every dependency is reachable, else 503 naming failures."""
+    orchestrator = getattr(request.app.state, "orchestrator", None)
+    checks = readiness_checks(orchestrator)
+    failed = [c.name for c in checks if not c.ok]
+    body = {
+        "status": "ready" if not failed else "not_ready",
+        "failed": failed,
+        "checks": {c.name: {"ok": c.ok, "detail": c.detail} for c in checks},
+    }
+    return JSONResponse(status_code=200 if not failed else 503, content=body)
+
 
