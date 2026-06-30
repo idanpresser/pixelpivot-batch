@@ -61,3 +61,23 @@ def test_graceful_shutdown_tolerates_none_lanes(monkeypatch):
     # Must not raise when a lane was never initialized.
     assert graceful_shutdown(hot_folder_manager=None, queue_manager=None, grace_s=1.0, registry=reg) == 0
 
+
+from fastapi.testclient import TestClient
+
+
+def test_lifespan_shutdown_invokes_graceful_shutdown(monkeypatch):
+    called = {}
+
+    def _spy(hot_folder_manager, queue_manager, grace_s, **kw):
+        called["grace_s"] = grace_s
+        called["had_hf"] = hot_folder_manager is not None
+        return 0
+
+    monkeypatch.setattr("app.batch_api.main.graceful_shutdown", _spy)
+    from app.batch_api.main import app
+    with TestClient(app):
+        pass  # entering+exiting the context triggers startup then shutdown
+    assert "grace_s" in called
+    assert called["had_hf"] is True
+
+

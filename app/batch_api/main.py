@@ -11,7 +11,8 @@ from .routes import router
 from .hot_folder import init_hot_folder_manager, get_hot_folder_manager
 from .orchestrator import BatchOrchestrator
 from ..core.db.schema import init_db
-from ..core.config import MIN_PYTHON_VERSION
+from ..core.config import MIN_PYTHON_VERSION, SHUTDOWN_GRACE_S
+from .shutdown import graceful_shutdown
 from ..core.logger import get_logger
 
 log = get_logger(__name__)
@@ -102,13 +103,12 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        manager.stop()
-        if hasattr(app.state, "queue_manager") and app.state.queue_manager:
-            try:
-                app.state.queue_manager.stop()
-            except Exception as e:
-                log.warning("Failed to stop BatchQueueManager on shutdown: %s", e)
-        # Eagerly stop Sharp daemon on shutdown
+        graceful_shutdown(
+            hot_folder_manager=getattr(app.state, "hot_folder_manager", None),
+            queue_manager=getattr(app.state, "queue_manager", None),
+            grace_s=SHUTDOWN_GRACE_S,
+        )
+        # Sharp daemon is a long-lived helper (not a per-conversion child); stop it last.
         sharp_conv = getattr(app.state, "orchestrator", None) and app.state.orchestrator.converters.get("sharp")
         if sharp_conv:
             try:
