@@ -53,9 +53,14 @@ def get_engine() -> Engine:
         is_sqlite = url.startswith("sqlite")
         if is_sqlite:
             get_db_path().parent.mkdir(parents=True, exist_ok=True)
+            from sqlalchemy.pool import NullPool
+            poolclass = NullPool
+        else:
+            poolclass = None
         eng = create_engine(
             url,
             future=True,
+            poolclass=poolclass,
             # one shared in-process connection for file sqlite is fine; pool for pg
             connect_args={"check_same_thread": False} if is_sqlite else {},
         )
@@ -74,6 +79,7 @@ def reset_engine_cache() -> None:
 def _apply_sqlite_pragmas(dbapi_connection, connection_record):
     """WAL + project pragmas on every sqlite connection from any engine in the pool."""
     if dbapi_connection.__class__.__module__.startswith("sqlite3"):
+        dbapi_connection.row_factory = sqlite3.Row
         cur = dbapi_connection.cursor()
         try:
             cur.execute("PRAGMA journal_mode=WAL")
@@ -172,15 +178,93 @@ def _open(db_path: Path | None = None) -> sqlite3.Connection:
     return conn
 
 
+class _CompatCursor:
+    """Wrap a DBAPI cursor: translate ?-paramstyle to the active dialect; keep row['col']."""
+
+    def __init__(self, dbapi_cursor, paramstyle: str):
+        self._cur = dbapi_cursor
+        self._paramstyle = paramstyle
+
+    def execute(self, sql: str, params=()):
+        if self._paramstyle != "qmark" and "?" in sql:
+            sql = sql.replace("?", "%s")
+        return self._cur.execute(sql, params or ())
+
+    def executemany(self, sql: str, seq):
+        if self._paramstyle != "qmark" and "?" in sql:
+            sql = sql.replace("?", "%s")
+        return self._cur.executemany(sql, seq)
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    @property
+    def lastrowid(self):
+        return self._cur.lastrowid
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    @property
+    def description(self):
+        return self._cur.description
+
+    def close(self):
+        self._cur.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
+class _CompatConnection:
+    """Legacy-shaped wrapper over a SQLAlchemy raw DBAPI connection."""
+
+    def __init__(self, raw, paramstyle: str):
+        self._raw = raw
+        self._paramstyle = paramstyle
+
+    def cursor(self) -> _CompatCursor:
+        return _CompatCursor(self._raw.cursor(), self._paramstyle)
+
+    def execute(self, sql, params=()):
+        cur = self.cursor()
+        cur.execute(sql, params)
+        return cur
+
+    def commit(self):
+        self._raw.commit()
+
+    def rollback(self):
+        self._raw.rollback()
+
+    def close(self):
+        self._raw.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        else:
+            self.commit()
+        self.close()
+
+
 @contextlib.contextmanager
-def transaction(conn: sqlite3.Connection):
-    """Context manager for SQLite transactions.
+def transaction(conn: Any):
+    """Context manager for legacy transactions.
 
     Yields the connection. Commits on success, rolls back on exception.
     """
     try:
-        # sqlite3.Connection itself is a context manager that handles
-        # transactions (commit/rollback) but NOT closing.
         with conn:
             yield conn
     except Exception as e:
@@ -188,14 +272,16 @@ def transaction(conn: sqlite3.Connection):
         raise
 
 @contextlib.contextmanager
-def get_connection() -> Iterator[sqlite3.Connection]:
+def get_connection() -> Iterator[Any]:
     """
-    Yields a SQLite connection bound to ``SQLITE_DB_PATH``.
+    Yields an engine-backed database connection.
 
     Task 19: Reuses a thread-local connection if already inside another
     get_connection() block, reducing open/close churn. Unit of transaction
     is the outer-most block.
     """
+    engine = get_engine()
+    paramstyle = engine.dialect.paramstyle
     current_path = get_db_path()
     if (
         not hasattr(_local, "conn")
@@ -207,16 +293,23 @@ def get_connection() -> Iterator[sqlite3.Connection]:
                 _local.conn.close()
             except Exception:
                 pass
-        conn = _open()
-        _local.conn = conn
+        raw = engine.raw_connection()
+        if paramstyle != "qmark":
+            try:
+                from psycopg.rows import dict_row
+                raw.cursor_factory = dict_row  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        c = _CompatConnection(raw, paramstyle)
+        _local.conn = c
         _local.conn_path = current_path
         _local.depth = 1
         try:
-            yield conn
-            conn.commit()
+            yield c
+            c.commit()
         except Exception:
             try:
-                conn.rollback()
+                c.rollback()
             except Exception as e:
                 log.debug("rollback suppressed: %s", e)
             raise
@@ -224,7 +317,7 @@ def get_connection() -> Iterator[sqlite3.Connection]:
             _local.depth -= 1
             if _local.depth <= 0:
                 try:
-                    conn.close()
+                    c.close()
                 except Exception as e:
                     log.debug("close suppressed: %s", e)
                 _local.conn = None
