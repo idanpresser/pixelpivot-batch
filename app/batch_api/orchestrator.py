@@ -254,8 +254,9 @@ class BatchOrchestrator:
                 return (0, 0)
 
         workers = min(32, (os.cpu_count() or 4) * 4)
+        from ..core.tracing import bind_context
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            dims = list(ex.map(_safe_probe, paths))
+            dims = list(ex.map(bind_context(_safe_probe), paths))
         return dict(zip(paths, dims))
 
     def execute_batch(self, run_id: int, request: BatchRequest) -> None:
@@ -400,8 +401,9 @@ class BatchOrchestrator:
                 log.info(f"Processing Matrix Cell: [{cat}] [{t_name}] [{fmt}]")
                 
                 # Probe qualities for this combination
+                from ..core.tracing import bind_context
                 with ThreadPoolExecutor(max_workers=probe_workers) as ex:
-                    qualities = list(ex.map(lambda p: self._probe_quality(p, cat, t_name, fmt, dim_cache.get(p)), input_paths))
+                    qualities = list(ex.map(bind_context(lambda p: self._probe_quality(p, cat, t_name, fmt, dim_cache.get(p))), input_paths))
 
                 suffix = suffix_for(cell, multi_category=multi_category)
 

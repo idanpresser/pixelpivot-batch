@@ -17,6 +17,8 @@ from ..logger import get_logger
 
 from ..tracing import get_trace_id
 
+log = get_logger(__name__)
+
 def build_sharp_request(in_path, out_path, fmt, quality, **extra) -> dict:
     req = {"inputPath": in_path, "outputPath": out_path, "format": fmt, "quality": quality}
     req.update(extra)

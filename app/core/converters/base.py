@@ -624,8 +624,9 @@ class BaseConverter(ABC):
 
         self._bypass_breaker = True
         try:
+            from ...core.tracing import bind_context
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                results = list(executor.map(worker, zip(input_paths, qualities)))
+                results = list(executor.map(bind_context(worker), zip(input_paths, qualities)))
         finally:
             self._bypass_breaker = False
 

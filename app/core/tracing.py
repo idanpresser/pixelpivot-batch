@@ -41,6 +41,21 @@ def run_in_context(func: Callable[..., T], *args, **kwargs) -> T:
     return ctx.run(func, *args, **kwargs)
 
 
+def bind_context(func: Callable[..., T]) -> Callable[..., T]:
+    """Capture the current context variables and run func with them in the target thread."""
+    ctx = contextvars.copy_context()
+    def wrapper(*args, **kwargs):
+        tokens = []
+        for var, val in ctx.items():
+            tokens.append((var, var.set(val)))
+        try:
+            return func(*args, **kwargs)
+        finally:
+            for var, token in reversed(tokens):
+                var.reset(token)
+    return wrapper
+
+
 class TraceIdFilter(logging.Filter):
     """Attach `trace_id` to every record; fallback-generate when unset."""
 
