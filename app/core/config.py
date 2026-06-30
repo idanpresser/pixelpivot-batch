@@ -47,6 +47,14 @@ FFMPEG_TIMEOUT = 120                # Default wall-clock timeout (s) — used as
 TELEMETRY_INTERVAL = 0.25           # Seconds between resource polling (CPU/RAM/GPU)
 MAX_LOG_BUFFER = 500                # Max lines kept in memory for the live monitor
 
+SHUTDOWN_GRACE_S = float(os.getenv("PIXELPIVOT_SHUTDOWN_GRACE_S", "30"))
+"""Wall-clock seconds to let the active matrix chunk drain on SIGTERM before
+force-terminating surviving child processes."""
+
+SUBPROCESS_TERMINATE_TIMEOUT_S = 5.0
+"""Seconds to wait after terminate() before kill() on a surviving child."""
+
+
 
 # ---------------------------------------------------------------------------
 # FFmpeg subprocess wrapper (app/core/ffmpeg/)
