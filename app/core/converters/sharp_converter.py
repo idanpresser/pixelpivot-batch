@@ -15,7 +15,15 @@ from .base import BaseConverter, ConvertResult, BatchResult
 from ..telemetry import TelemetryMonitor
 from ..logger import get_logger
 
-log = get_logger(__name__)
+from ..tracing import get_trace_id
+
+def build_sharp_request(in_path, out_path, fmt, quality, **extra) -> dict:
+    req = {"inputPath": in_path, "outputPath": out_path, "format": fmt, "quality": quality}
+    req.update(extra)
+    tid = get_trace_id()
+    if tid:
+        req["trace_id"] = tid
+    return req
 
 
 class SharpConverter(BaseConverter):
@@ -312,12 +320,7 @@ class SharpConverter(BaseConverter):
                 # Fix: Preserve float distance values for JXL; otherwise round to the
                 # nearest int (unbiased) at this final encoder boundary, not truncate.
                 val_quality = float(quality) if target_format == "jxl" else round(quality)
-                request = {
-                    "inputPath": input_path,
-                    "outputPath": output_path,
-                    "format": target_format,
-                    "quality": val_quality,
-                }
+                request = build_sharp_request(input_path, output_path, target_format, val_quality)
                 sock.sendall((json.dumps(request) + "\n").encode("utf-8"))
 
                 # Wait for response with timeout
@@ -482,12 +485,7 @@ class SharpConverter(BaseConverter):
                 output_paths.append(out_path)
                 # Fix: Preserve float distance values for JXL, otherwise cast to int
                 val_quality = float(q) if target_format == "jxl" else int(q)
-                request = {
-                    "inputPath": in_path,
-                    "outputPath": out_path,
-                    "format": target_format,
-                    "quality": val_quality,
-                }
+                request = build_sharp_request(in_path, out_path, target_format, val_quality)
                 sock.sendall((json.dumps(request) + "\n").encode("utf-8"))
 
             # 2. Read all responses

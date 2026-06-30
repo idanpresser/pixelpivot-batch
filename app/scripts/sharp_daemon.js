@@ -26,6 +26,13 @@ const server = net.createServer((socket) => {
                         continue;
                     }
 
+                    const traceId = request.trace_id || "system-daemon";
+                    console.error(JSON.stringify({
+                        "log.level": "INFO",
+                        "trace.id": traceId,
+                        "message": `sharp convert ${request.format}`
+                    }));
+
                     const { inputPath, outputPath, format, quality } = request;
 
                     if (!inputPath || !outputPath) {
