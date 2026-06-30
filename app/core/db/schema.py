@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS batch_errors (
     batch_id    INTEGER NOT NULL REFERENCES batch_runs(id) ON DELETE CASCADE,
     input_path  TEXT,
     error       TEXT NOT NULL,
+    is_dlq      INTEGER DEFAULT 0,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -221,6 +222,7 @@ CREATE TABLE IF NOT EXISTS batch_errors (
     batch_id    INTEGER NOT NULL REFERENCES batch_runs(id) ON DELETE CASCADE,
     input_path  TEXT,
     error       TEXT NOT NULL,
+    is_dlq      INTEGER DEFAULT 0,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

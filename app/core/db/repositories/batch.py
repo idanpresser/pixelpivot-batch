@@ -292,9 +292,9 @@ class BatchRepository:
         cur = conn.cursor()
         try:
             cur.executemany(
-                "INSERT INTO batch_errors (batch_id, input_path, error) "
-                "VALUES (?, ?, ?)",
-                [(batch_id, e.get("path"), str(e.get("error", "unknown"))) for e in errors],
+                "INSERT INTO batch_errors (batch_id, input_path, error, is_dlq) "
+                "VALUES (?, ?, ?, ?)",
+                [(batch_id, e.get("path"), str(e.get("error", "unknown")), 1 if e.get("dlq") else 0) for e in errors],
             )
         finally:
             cur.close()
@@ -310,13 +310,13 @@ class BatchRepository:
             limit: Maximum number of error rows to return (default 100).
 
         Returns:
-            list[dict] with columns: input_path, error, created_at.
+            list[dict] with columns: input_path, error, is_dlq, created_at.
         """
         cur = conn.cursor()
         try:
             cur.execute(
                 """
-                SELECT input_path, error, created_at 
+                SELECT input_path, error, is_dlq, created_at 
                 FROM batch_errors 
                 WHERE batch_id = ? 
                 ORDER BY id 

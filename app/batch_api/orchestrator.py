@@ -7,9 +7,10 @@ space monitoring. Writes aggregated metrics to batch_summary on completion.
 import os
 import time
 import sqlite3
+import shutil
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Dict, Any, Callable, TypeVar, Tuple
+from typing import List, Dict, Any, Callable, TypeVar, Tuple, Optional
 
 from .models import BatchRequest, Tool
 from .run_control import RunControl, RunControlRegistry
@@ -35,6 +36,18 @@ from ..core.paths import APP_ROOT, PROJ_ROOT
 log = get_logger(__name__)
 
 T = TypeVar("T")
+
+
+def quarantine_to_dlq(in_path: str, target_dir: str, reason: str) -> dict:
+    """Move a failed input into <target_dir>/corrupt_or_failed/ and return a batch_errors record."""
+    dlq_dir = Path(target_dir) / "corrupt_or_failed"
+    dlq_dir.mkdir(parents=True, exist_ok=True)
+    dest = dlq_dir / Path(in_path).name
+    try:
+        shutil.move(in_path, dest)
+    except FileNotFoundError:
+        pass  # already gone; still record the failure
+    return {"path": str(dest), "reason": reason, "dlq": True}
 
 
 
@@ -427,10 +440,24 @@ class BatchOrchestrator:
                         bytes_written=result.get("bytes_written", 0),
                     )
                 
+                # Quarantine failed files to DLQ
+                quarantined_errors = []
+                for err in result.errors:
+                    if err.get("path"):
+                        rec = quarantine_to_dlq(err["path"], request.target_dir, reason=err.get("error", "conversion failed"))
+                        quarantined_errors.append({
+                            "path": rec["path"],
+                            "error": rec["reason"],
+                            "dlq": True
+                        })
+                        log.warning("file quarantined to DLQ", extra={"subprocess": {"path": rec["path"], "reason": rec["reason"]}})
+                    else:
+                        quarantined_errors.append(err)
+
                 all_success_count += result.success_count
                 all_failure_count += result.failure_count
                 total_bytes_written += result.bytes_written
-                all_errors.extend(result.errors)
+                all_errors.extend(quarantined_errors)
                 if result.telemetry:
                     all_telemetry_summaries.append(result.telemetry)
                     
