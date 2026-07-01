@@ -38,6 +38,7 @@ class BatchRepository:
         trigger_type: str,
         heuristic_version: Optional[str] = None,
         status: str = "running",
+        priority: int = 0,
     ) -> int:
         """Insert a new batch run row and return its id.
 
@@ -50,6 +51,7 @@ class BatchRepository:
             trigger_type: How the batch was triggered (e.g. 'api', 'hot_folder').
             heuristic_version: Optional version of heuristic table used.
             status: Initial status of the batch run.
+            priority: Priority score for the run (higher is higher priority).
 
         Returns:
             int: The id of the newly created batch_runs row.
@@ -59,17 +61,54 @@ class BatchRepository:
             cur.execute(
                 """
                 INSERT INTO batch_runs (
-                    source_dir, target_dir, target_format, tool, trigger_type, status, heuristic_version
+                    source_dir, target_dir, target_format, tool, trigger_type, status, heuristic_version, priority
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
-                (source_dir, target_dir, target_format, tool, trigger_type, status, heuristic_version),
+                (source_dir, target_dir, target_format, tool, trigger_type, status, heuristic_version, priority),
             )
             row = cur.fetchone()
             return int(row["id"]) if row else 0
         finally:
             cur.close()
+
+    @with_db_retry
+    def claim_next_queued(self, get_conn) -> Optional[dict]:
+        """Atomically claim the highest-priority queued run and mark it running.
+
+        Ordering: priority DESC, then created_at ASC (FIFO within a lane).
+        Claim is a conditional UPDATE so concurrent workers never double-pick:
+        only the worker whose UPDATE affects the row (rowcount == 1) wins.
+        Returns the claimed run row as a dict, or None if nothing is queued.
+        """
+        with get_conn() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "SELECT id FROM batch_runs WHERE status = 'queued' "
+                    "ORDER BY priority DESC, created_at ASC, id ASC LIMIT 1"
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                run_id = row["id"]
+                cur.execute(
+                    "UPDATE batch_runs SET status = 'running' WHERE id = ? AND status = 'queued'",
+                    (run_id,),
+                )
+                if cur.rowcount != 1:
+                    return None  # lost the race; caller re-polls
+                cur.execute(
+                    "SELECT id, source_dir, target_dir, target_format, tool, trigger_type, priority "
+                    "FROM batch_runs WHERE id = ?",
+                    (run_id,),
+                )
+                claimed = cur.fetchone()
+                conn.commit()
+                return dict(claimed) if claimed else None
+            finally:
+                cur.close()
 
     @with_db_retry
     def reap_stale_running(self, conn: sqlite3.Connection) -> int:
