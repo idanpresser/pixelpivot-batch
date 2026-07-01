@@ -39,6 +39,7 @@ def start_batch(
         HTTPException: On database or validation errors (500).
     """
     try:
+        from ..core.config import PRIORITY_HIGH
         with get_connection() as conn:
             run_id = repo.create_run(
                 conn,
@@ -47,7 +48,8 @@ def start_batch(
                 target_format=",".join(req.target_format),
                 tool=",".join([t.value for t in req.tool]),
                 trigger_type=req.trigger_type,
-                heuristic_version=orchestrator.interpolator.version
+                heuristic_version=orchestrator.interpolator.version,
+                priority=PRIORITY_HIGH,
             )
 
         from .queue_manager import get_queue_manager

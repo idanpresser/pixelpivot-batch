@@ -23,6 +23,7 @@ from ..core.config import (
     HOT_FOLDER_READINESS_CHECK_MS,
     HOT_FOLDER_POLLING_INTERVAL_S,
     HOT_FOLDER_DEBOUNCE_MS,
+    PRIORITY_LOW,
 )
 
 log = get_logger(__name__)
@@ -190,7 +191,8 @@ class HotFolderHandler(FileSystemEventHandler):
                         target_format=db_formats,
                         tool=db_tools,
                         trigger_type="hot_folder",
-                        heuristic_version=self.orchestrator.interpolator.version
+                        heuristic_version=self.orchestrator.interpolator.version,
+                        priority=PRIORITY_LOW,
                     )
                 
                 # 3. Prepare request

@@ -52,3 +52,29 @@ def test_submit_batch_sets_queued_status():
     qm.submit_batch(rid, req)
     with get_connection() as conn:
         assert repo.get_run(conn, rid)["status"] == "queued"
+
+
+def test_api_submit_is_high_priority(monkeypatch):
+    from app.core.db.schema import init_db
+    from app.core.db.connection import get_connection
+    from app.core.db.repositories.batch import BatchRepository
+    from app.core.config import PRIORITY_HIGH
+    init_db()
+    seen = {}
+    repo = BatchRepository()
+    orig = repo.create_run
+
+    def _spy(conn, **kw):
+        seen["priority"] = kw.get("priority")
+        return orig(conn, **kw)
+
+    monkeypatch.setattr("app.batch_api.routes.repo.create_run", _spy)
+    from fastapi.testclient import TestClient
+    from app.batch_api.main import app
+    with TestClient(app) as client:
+        client.post("/api/v1/batch/start", json={
+            "source_dir": "s", "target_dir": "t", "target_format": ["webp"],
+            "tool": ["ffmpeg"], "category": ["general"], "trigger_type": "api",
+        })
+    assert seen.get("priority") == PRIORITY_HIGH
+
