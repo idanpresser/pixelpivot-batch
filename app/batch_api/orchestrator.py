@@ -564,6 +564,14 @@ class BatchOrchestrator:
             
             with_db_retry(_save_summary, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)
 
+            _emit_job_metrics(
+                final_status=final_status,
+                executed_cells_tools=[c.tool for c in executed_cells],
+                formats=[c.target_format for c in executed_cells],
+                duration_s=duration_ms / 1000.0,
+                savings_pct=metrics.get("savings_pct", 0.0),
+            )
+
             if all_failure_count > 0:
                 try:
                     with get_connection() as conn:
@@ -586,3 +594,18 @@ class BatchOrchestrator:
         finally:
             self.run_controls.pop(run_id, None)
             self.progress.pop(run_id, None)
+
+
+def _emit_job_metrics(final_status, executed_cells_tools, formats, duration_s, savings_pct):
+    """Record Prometheus counters for a finished batch (no-op when metrics off)."""
+    try:
+        from .metrics import record_job, observe_processing_seconds, observe_compression_ratio
+        observe_processing_seconds(duration_s)
+        # compression_ratio = output/input = (1 - savings/100)
+        observe_compression_ratio(max(0.0, 1.0 - (savings_pct / 100.0)))
+        for tool in set(executed_cells_tools):
+            for fmt in set(formats):
+                record_job(status=final_status, tool=tool, fmt=fmt)
+    except Exception:
+        pass
+

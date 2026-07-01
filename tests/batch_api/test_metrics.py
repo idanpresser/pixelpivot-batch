@@ -24,3 +24,15 @@ def test_record_noop_when_disabled(monkeypatch):
     metrics.record_job(status="failed", tool="magick", fmt="avif")
     metrics.set_queue_depth(3)
     metrics.observe_compression_ratio(0.4)
+
+
+def test_orchestrator_records_job_metrics(monkeypatch):
+    from app.batch_api import metrics
+    recorded = []
+    monkeypatch.setattr(metrics, "record_job", lambda status, tool, fmt: recorded.append((status, tool, fmt)))
+    from app.batch_api import orchestrator as orch_mod
+    # Drive the small helper the orchestrator will call at finalize:
+    orch_mod._emit_job_metrics(final_status="completed", executed_cells_tools=["ffmpeg"],
+                               formats=["webp"], duration_s=1.2, savings_pct=60.0)
+    assert ("completed", "ffmpeg", "webp") in recorded
+
