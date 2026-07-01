@@ -301,3 +301,27 @@ MAGICK_MOGRIFY_MAX_CMDLINE_BYTES = 7000
 def ffmpeg_wall_timeout_for(target_format: str) -> float:
     """Resolve the wall-clock timeout for a given target format."""
     return FFMPEG_TIMEOUT_BY_FORMAT.get(target_format, float(FFMPEG_TIMEOUT))
+
+
+# --- E5 telemetry + dynamic queue ---
+METRICS_ENABLED = os.getenv("PIXELPIVOT_METRICS_ENABLED", "1") not in ("0", "false", "False")
+"""Expose /metrics and record counters. Endpoint always mounts; recording no-ops when off."""
+
+OTEL_ENABLED = os.getenv("PIXELPIVOT_OTEL_ENABLED", "0") not in ("0", "false", "False")
+"""Emit OpenTelemetry spans. Default off; opentelemetry is imported lazily only when true."""
+
+CHUNK_RAM_BUDGET_FRACTION = float(os.getenv("PIXELPIVOT_CHUNK_RAM_FRACTION", "0.25"))
+"""Fraction of currently-available system RAM a single ffmpeg chunk may target."""
+
+DISK_BACKPRESSURE_PCT = float(os.getenv("PIXELPIVOT_DISK_BACKPRESSURE_PCT", "90"))
+"""Pause job pickup when the target_dir volume is at/above this percent full."""
+
+DISK_BACKPRESSURE_POLL_S = 2.0
+"""Seconds between disk-usage re-checks while paused for backpressure."""
+
+QUEUE_POLL_INTERVAL_S = float(os.getenv("PIXELPIVOT_QUEUE_POLL_S", "0.5"))
+"""Seconds a DB-polling worker sleeps when no queued job is available."""
+
+PRIORITY_HIGH = 100   # GUI / API submit
+PRIORITY_LOW = 0      # hot-folder sync
+
