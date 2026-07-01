@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS batch_runs (
     status          TEXT    NOT NULL,
     total_images    INTEGER DEFAULT 0,
     heuristic_version TEXT,
+    priority        INTEGER NOT NULL DEFAULT 0,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at    TIMESTAMP
 );
@@ -201,6 +202,7 @@ CREATE TABLE IF NOT EXISTS batch_runs (
     status          TEXT    NOT NULL,
     total_images    INTEGER DEFAULT 0,
     heuristic_version TEXT,
+    priority        INTEGER NOT NULL DEFAULT 0,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at    TIMESTAMP
 );
@@ -422,6 +424,9 @@ def _create_tables(conn: Any) -> None:
             if "heuristic_version" not in columns:
                 log.info("Migrating batch_runs: adding heuristic_version column")
                 cur.execute("ALTER TABLE batch_runs ADD COLUMN heuristic_version TEXT")
+            if "priority" not in columns:
+                log.info("Migrating batch_runs: adding priority column")
+                cur.execute("ALTER TABLE batch_runs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
 
             # Migration: Drop GPU columns from batch_summary and batch_telemetry.
             cur.execute("PRAGMA table_info('batch_summary')")
