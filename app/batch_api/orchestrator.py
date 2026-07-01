@@ -147,17 +147,21 @@ class MetricsCollector:
         executed_cells: List[MatrixCell],
         total_bytes_written: int,
         all_telemetry_summaries: List[Dict[str, Any]],
-        duration_ms: float
+        duration_ms: float,
+        input_sizes: Dict[str, int] | None = None
     ) -> Dict[str, Any]:
         from ..core.telemetry import aggregate_telemetry
         telemetry = aggregate_telemetry(all_telemetry_summaries) if all_telemetry_summaries else {}
         
         per_image_input_bytes = 0
         for p in input_paths:
-            try:
-                per_image_input_bytes += os.path.getsize(p)
-            except OSError:
-                pass
+            if input_sizes is not None:
+                per_image_input_bytes += input_sizes.get(p, 0)
+            else:
+                try:
+                    per_image_input_bytes += os.path.getsize(p)
+                except OSError:
+                    pass
         input_bytes = per_image_input_bytes * len(executed_cells)
         output_bytes = total_bytes_written
 
@@ -300,9 +304,16 @@ class BatchOrchestrator:
         failed_during_run = False
         failure_reason = None
 
+        input_sizes: Dict[str, int] = {}
+
         try:
             # 1. Scan source_dir using DirectoryScanner
             input_paths = DirectoryScanner.scan(request.source_dir, request.input_files)
+            for p in input_paths:
+                try:
+                    input_sizes[p] = os.path.getsize(p)
+                except OSError:
+                    input_sizes[p] = 0
             
             # Pre-flight resource validation check
             self._preflight_resources(request.target_dir)
@@ -506,7 +517,7 @@ class BatchOrchestrator:
                         self.repo.update_status(conn, run_id, "cancelled",
                                                 total_images=total_conversions)
                 with_db_retry(_mark_cancelled, max_retries=SQLITE_BUSY_ATTEMPTS,
-                               initial_delay=SQLITE_BUSY_BASE_DELAY_S)
+                               initial_delay=SQLITE_BUSY_BASE_DELAY_S)()
                 if all_failure_count > 0:
                     try:
                         with get_connection() as conn:
@@ -520,7 +531,7 @@ class BatchOrchestrator:
                 def _fail():
                     with get_connection() as conn:
                         self.repo.update_status(conn, run_id, "failed")
-                with_db_retry(_fail, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)
+                with_db_retry(_fail, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)()
                 
                 if all_failure_count > 0 or failure_reason:
                     errs_to_save = all_errors if all_errors else [{"path": None, "error": failure_reason}]
@@ -534,12 +545,13 @@ class BatchOrchestrator:
             # Compute and save metrics summary using MetricsCollector
             duration_ms = (time.time() - start_time) * 1000
             metrics = MetricsCollector.collect(
-                input_paths=input_paths,
-                executed_cells=executed_cells,
-                total_bytes_written=total_bytes_written,
-                all_telemetry_summaries=all_telemetry_summaries,
-                duration_ms=duration_ms
-            )
+                 input_paths=input_paths,
+                 executed_cells=executed_cells,
+                 total_bytes_written=total_bytes_written,
+                 all_telemetry_summaries=all_telemetry_summaries,
+                 duration_ms=duration_ms,
+                 input_sizes=input_sizes
+             )
 
             # A batch that produced zero successful conversions while accruing
             # failures (e.g. every tool unregistered, all images unreadable) is a
@@ -562,7 +574,15 @@ class BatchOrchestrator:
                     )
                     self.repo.update_status(conn, run_id, final_status, total_images=total_conversions)
             
-            with_db_retry(_save_summary, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)
+            with_db_retry(_save_summary, max_retries=SQLITE_BUSY_ATTEMPTS, initial_delay=SQLITE_BUSY_BASE_DELAY_S)()
+
+            _emit_job_metrics(
+                final_status=final_status,
+                executed_cells_tools=[c.tool for c in executed_cells],
+                formats=[c.target_format for c in executed_cells],
+                duration_s=duration_ms / 1000.0,
+                savings_pct=metrics.get("savings_pct", 0.0),
+            )
 
             if all_failure_count > 0:
                 try:
@@ -586,3 +606,18 @@ class BatchOrchestrator:
         finally:
             self.run_controls.pop(run_id, None)
             self.progress.pop(run_id, None)
+
+
+def _emit_job_metrics(final_status, executed_cells_tools, formats, duration_s, savings_pct):
+    """Record Prometheus counters for a finished batch (no-op when metrics off)."""
+    try:
+        from .metrics import record_job, observe_processing_seconds, observe_compression_ratio
+        observe_processing_seconds(duration_s)
+        # compression_ratio = output/input = (1 - savings/100)
+        observe_compression_ratio(max(0.0, 1.0 - (savings_pct / 100.0)))
+        for tool in set(executed_cells_tools):
+            for fmt in set(formats):
+                record_job(status=final_status, tool=tool, fmt=fmt)
+    except Exception:
+        pass
+

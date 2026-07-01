@@ -64,3 +64,22 @@ def partition_images(
         else:
             usable.append(p)
     return usable, errors
+
+
+def disk_pct_over_threshold(target_dir: str, threshold_pct: float) -> bool:
+    """True when the RESOLVED target_dir volume is at/above threshold_pct full.
+
+    Probes shutil.disk_usage(os.path.abspath(target_dir)) so it reads the volume
+    the outputs actually land on (a network mount / external drive / separate
+    logical volume), never a static system root like C:/ or /.
+    """
+    try:
+        import os
+        usage = shutil.disk_usage(os.path.abspath(target_dir))
+    except OSError:
+        return False  # can't probe -> do not block pickup
+    if usage.total <= 0:
+        return False
+    used_pct = 100.0 * usage.used / usage.total
+    return used_pct >= threshold_pct
+

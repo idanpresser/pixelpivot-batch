@@ -11,7 +11,8 @@ from .routes import router
 from .hot_folder import init_hot_folder_manager, get_hot_folder_manager
 from .orchestrator import BatchOrchestrator
 from ..core.db.schema import init_db
-from ..core.config import MIN_PYTHON_VERSION
+from ..core.config import MIN_PYTHON_VERSION, SHUTDOWN_GRACE_S
+from .shutdown import graceful_shutdown
 from ..core.logger import get_logger
 
 log = get_logger(__name__)
@@ -102,13 +103,12 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        manager.stop()
-        if hasattr(app.state, "queue_manager") and app.state.queue_manager:
-            try:
-                app.state.queue_manager.stop()
-            except Exception as e:
-                log.warning("Failed to stop BatchQueueManager on shutdown: %s", e)
-        # Eagerly stop Sharp daemon on shutdown
+        graceful_shutdown(
+            hot_folder_manager=getattr(app.state, "hot_folder_manager", None),
+            queue_manager=getattr(app.state, "queue_manager", None),
+            grace_s=SHUTDOWN_GRACE_S,
+        )
+        # Sharp daemon is a long-lived helper (not a per-conversion child); stop it last.
         sharp_conv = getattr(app.state, "orchestrator", None) and app.state.orchestrator.converters.get("sharp")
         if sharp_conv:
             try:
@@ -147,3 +147,41 @@ app.include_router(router, prefix="/api/v1")
 async def root():
     """Return health check response."""
     return {"message": "PixelPivot Batch Engine API is running"}
+
+
+from .health import LIVE_BODY, readiness_checks
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+
+@app.get("/healthz/live")
+async def healthz_live():
+    """Liveness probe: the process is up. Never depends on external state."""
+    return LIVE_BODY
+
+
+@app.get("/healthz/ready")
+async def healthz_ready(request: Request):
+    """Readiness probe: 200 when every dependency is reachable, else 503 naming failures."""
+    orchestrator = getattr(request.app.state, "orchestrator", None)
+    checks = readiness_checks(orchestrator)
+    failed = [c.name for c in checks if not c.ok]
+    body = {
+        "status": "ready" if not failed else "not_ready",
+        "failed": failed,
+        "checks": {c.name: {"ok": c.ok, "detail": c.detail} for c in checks},
+    }
+    return JSONResponse(status_code=200 if not failed else 503, content=body)
+
+
+from .metrics import render as render_metrics
+from fastapi import Response
+
+
+@app.get("/metrics")
+async def metrics_endpoint():
+    """Prometheus scrape endpoint. Tolerates no scraper; empty when disabled."""
+    return Response(content=render_metrics(), media_type="text/plain; version=0.0.4")
+
+
+

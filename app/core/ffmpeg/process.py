@@ -146,7 +146,10 @@ class FFmpegProcess:
             bufsize=1,
             creationflags=creationflags,
         )
+        from ..process_registry import register_process
+        register_process(self._proc)
         return self._proc.pid
+
 
     def run(self) -> FFmpegResult:
         """Supervise the ffmpeg process to completion and return result.
@@ -186,6 +189,9 @@ class FFmpegProcess:
                 pass
         stdout_thread.join(timeout=1.0)
         stderr_thread.join(timeout=1.0)
+
+        from ..process_registry import unregister_process
+        unregister_process(self._proc)
 
         duration_ms = (time.monotonic() - start) * 1000.0
         stderr_tail = self._snapshot_stderr_tail()

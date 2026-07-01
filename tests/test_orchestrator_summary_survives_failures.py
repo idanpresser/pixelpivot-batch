@@ -26,6 +26,9 @@ def isolated_db(tmp_path, monkeypatch):
     """
     db_path = tmp_path / "test.db"
     monkeypatch.setattr("app.core.db.connection.SQLITE_DB_PATH", db_path)
+    monkeypatch.setenv("PIXELPIVOT_DB_PATH", str(db_path))
+    from app.core.db.connection import reset_engine_cache
+    reset_engine_cache()
     with get_connection() as conn:
         init_db(conn)
     return db_path

@@ -17,6 +17,7 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 from ..logger import get_logger
 from ..utils import probe_image_dimensions, quality_to_jxl_distance
+from ..otel import span
 
 log = get_logger(__name__)
 
@@ -92,23 +93,24 @@ def stage_inputs_for_image2(
     Raises:
         OSError: If both hardlinking and copying fail.
     """
-    rename_map: Dict[int, str] = {}
-    for idx, src in enumerate(paths, start=1):
-        staged = os.path.join(staging_dir_path, f"frame{idx:05d}.{ext}")
-        try:
-            os.link(src, staged)
-        except OSError as link_err:
-            log.debug("Hardlink failed for %s -> %s (%s); copying instead.", src, staged, link_err)
+    with span("staging"):
+        rename_map: Dict[int, str] = {}
+        for idx, src in enumerate(paths, start=1):
+            staged = os.path.join(staging_dir_path, f"frame{idx:05d}.{ext}")
             try:
-                shutil.copy2(src, staged)
-            except OSError as copy_err:
-                log.error(
-                    "Staging failed for %s -> %s: hardlink raised %s; copy raised %s",
-                    src, staged, link_err, copy_err,
-                )
-                raise
-        rename_map[idx] = Path(src).stem
-    return rename_map
+                os.link(src, staged)
+            except OSError as link_err:
+                log.debug("Hardlink failed for %s -> %s (%s); copying instead.", src, staged, link_err)
+                try:
+                    shutil.copy2(src, staged)
+                except OSError as copy_err:
+                    log.error(
+                        "Staging failed for %s -> %s: hardlink raised %s; copy raised %s",
+                        src, staged, link_err, copy_err,
+                    )
+                    raise
+            rename_map[idx] = Path(src).stem
+        return rename_map
 
 
 @contextmanager
