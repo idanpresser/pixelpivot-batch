@@ -174,3 +174,14 @@ async def healthz_ready(request: Request):
     return JSONResponse(status_code=200 if not failed else 503, content=body)
 
 
+from .metrics import render as render_metrics
+from fastapi import Response
+
+
+@app.get("/metrics")
+async def metrics_endpoint():
+    """Prometheus scrape endpoint. Tolerates no scraper; empty when disabled."""
+    return Response(content=render_metrics(), media_type="text/plain; version=0.0.4")
+
+
+

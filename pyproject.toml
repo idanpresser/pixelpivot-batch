@@ -61,6 +61,7 @@ dependencies = [
     "rich>=13.0",
     "opencv-python-headless>=4.9",
     "sqlalchemy>=2.0,<3",
+    "prometheus-client>=0.20",
 ]
 
 [project.scripts]
