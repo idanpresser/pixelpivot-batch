@@ -22,6 +22,7 @@ from ..config import (
     IMAGE2_THRESHOLD,
     TELEMETRY_INTERVAL,
     ffmpeg_wall_timeout_for,
+    CHUNK_RAM_BUDGET_FRACTION,
 )
 from ..ffmpeg import FFmpegProcess
 from ..logger import get_logger
@@ -346,7 +347,7 @@ class FFmpegConverter(BaseConverter):
                             telemetry_samples.append(tele)
                         if leftovers:
                             ok2, fail2, errs2, tele2, multimap_bytes2 = self._run_multimap_path(
-                                leftovers, output_dir, target_format, q, batch_params, run_id, suffix=suffix
+                                leftovers, output_dir, target_format, q, batch_params, run_id, suffix=suffix, wh=wh
                             )
                             success_count += ok2
                             failure_count += fail2
@@ -356,7 +357,7 @@ class FFmpegConverter(BaseConverter):
                                 telemetry_samples.append(tele2)
                     else:
                         ok, fail, errs, tele, multimap_bytes = self._run_multimap_path(
-                            sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix
+                            sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix, wh=wh
                         )
                         success_count += ok
                         failure_count += fail
@@ -482,6 +483,7 @@ class FFmpegConverter(BaseConverter):
         encoder_params: List[str],
         run_id: Optional[int],
         suffix: str = "",
+        wh: Optional[tuple[int, int]] = None,
     ):
         """Run multi-input/multi-output batch on mixed or smaller image groups.
 
@@ -498,6 +500,7 @@ class FFmpegConverter(BaseConverter):
             encoder_params: Encoder-specific parameters.
             run_id: Optional batch run ID.
             suffix: Optional filename suffix.
+            wh: Optional (width, height) resolution tuple of this group.
 
         Returns:
             Tuple of (success_count, failure_count, errors, telemetry, bytes_written).
@@ -511,9 +514,17 @@ class FFmpegConverter(BaseConverter):
         # Per-pair: -i <in> + -map idx:v + encoder_params
         per_pair_overhead = 16 + sum(len(p) for p in encoder_params)
 
+        # Dynamic max files based on resolution and available RAM
+        w, h = wh if wh else (0, 0)
+        mp = (w * h) / 1_000_000.0
+        import psutil
+        from .chunk_sizing import dynamic_max_files
+        ram_budget = psutil.virtual_memory().available * CHUNK_RAM_BUDGET_FRACTION
+        max_files = dynamic_max_files(mp, ram_budget, ceiling=FFMPEG_BATCH_MAX_FILES)
+
         chunks = pack_chunks(
             pairs,
-            max_files=FFMPEG_BATCH_MAX_FILES,
+            max_files=max_files,
             max_cmdline_bytes=FFMPEG_BATCH_MAX_CMDLINE_BYTES,
             fixed_overhead=fixed_overhead,
             per_pair_overhead=per_pair_overhead,
