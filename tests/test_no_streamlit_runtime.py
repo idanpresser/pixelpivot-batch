@@ -1,10 +1,8 @@
-"""Streamlit is excluded from the runtime + air-gap build (bead y0z).
+"""Streamlit is decoupled from the core runtime but included in the air-gap GUI deploy (bead y0z).
 
-The Streamlit GUI (app/web/batch_gui) is a separate, optional component. The
-deployable backend (FastAPI + CLI/TUI) must not pull streamlit as a runtime
-dependency, must not ship it in the air-gap wheel manifest, and no runtime
-module outside app/web may import it. The GUI source is kept (installable via
-the ``gui`` extra) but excluded from the frozen build.
+The deployable backend (FastAPI + TUI) must not pull streamlit as a core runtime
+dependency. The optional GUI component (app/web/batch_gui) is allowed to import it.
+app/cli.py is also allowed to import it conditionally to serve the GUI.
 """
 
 import tomllib
@@ -29,10 +27,11 @@ def test_streamlit_available_as_optional_gui_extra():
     assert any("streamlit" in d.lower() for d in gui), extras
 
 
-def test_streamlit_not_in_air_gap_manifest():
+def test_streamlit_is_in_air_gap_manifest():
+    """Streamlit is re-enabled for air-gapped GUI packaging."""
     lines = (ROOT / "scripts" / "air_gap_deps.txt").read_text(encoding="utf-8").splitlines()
     pkgs = [ln.strip().lower() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
-    assert "streamlit" not in pkgs, pkgs
+    assert "streamlit" in pkgs, pkgs
 
 
 def test_no_runtime_module_imports_streamlit():
@@ -40,6 +39,8 @@ def test_no_runtime_module_imports_streamlit():
     offenders = []
     for py in app_dir.rglob("*.py"):
         if "web" in py.relative_to(app_dir).parts:  # GUI is the one allowed home
+            continue
+        if py.name == "cli.py":  # Allowed to import conditionally to launch the GUI
             continue
         text = py.read_text(encoding="utf-8", errors="ignore")
         if "import streamlit" in text:

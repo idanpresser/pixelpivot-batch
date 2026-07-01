@@ -248,7 +248,7 @@ class MagickConverter(BaseConverter):
                          text=True,
                          creationflags=creationflags,
                     ) as proc:
-                        from ...process_registry import register_process, unregister_process
+                        from ..process_registry import register_process, unregister_process
                         register_process(proc)
                         try:
                             monitor = TelemetryMonitor(pid=proc.pid, interval_ms=int(TELEMETRY_INTERVAL * 1000), run_id=run_id)

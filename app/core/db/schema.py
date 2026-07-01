@@ -428,6 +428,13 @@ def _create_tables(conn: Any) -> None:
                 log.info("Migrating batch_runs: adding priority column")
                 cur.execute("ALTER TABLE batch_runs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
 
+            # Migration: Add is_dlq to batch_errors if it's missing
+            cur.execute("PRAGMA table_info('batch_errors')")
+            err_columns = [row[1] for row in cur.fetchall()]
+            if "is_dlq" not in err_columns:
+                log.info("Migrating batch_errors: adding is_dlq column")
+                cur.execute("ALTER TABLE batch_errors ADD COLUMN is_dlq INTEGER DEFAULT 0")
+
             # Migration: Drop GPU columns from batch_summary and batch_telemetry.
             cur.execute("PRAGMA table_info('batch_summary')")
             summary_cols = {row[1] for row in cur.fetchall()}
