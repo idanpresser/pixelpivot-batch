@@ -352,45 +352,47 @@ class BaseConverter(ABC):
             creationflags = (
                 subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             )
-            with subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                creationflags=creationflags,
-            ) as proc:
-                from ..process_registry import register_process, unregister_process
-                register_process(proc)
-                try:
-                    monitor = TelemetryMonitor(
-                        pid=proc.pid, interval_ms=int(TELEMETRY_INTERVAL * 1000), run_id=run_id
-                    )
-                    monitor.start()
-                    error = None
-
+            from ..otel import span
+            with span("backend_exec"):
+                with subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    creationflags=creationflags,
+                ) as proc:
+                    from ..process_registry import register_process, unregister_process
+                    register_process(proc)
                     try:
-                        stdout, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT)
-                        success = proc.returncode == 0
-                        if success:
-                            target_out = cmd[-1]
-                            if not os.path.exists(target_out) or os.path.getsize(target_out) == 0:
-                                success = False
-                                error = f"{tool_name} claimed success but output file is missing or empty: {target_out}"
-                        error = _truncate(stderr) if not success and not error else error
-                        
-                        stderr_text = stderr or ""
-                        payload = build_subprocess_log_payload(tool_name, proc.returncode, stderr_text)
-                        if payload["returncode"] != 0:
-                            log.warning("subprocess failed", extra={"subprocess": payload})
-                    except subprocess.TimeoutExpired:
-                        log.warning(f"{tool_name} timed out, force cleaning process tree...")
-                        kill_process_tree(proc.pid)
-                        proc.communicate()
-                        success = False
-                        error = f"{tool_name} timed out after {FFMPEG_TIMEOUT} seconds."
-                        log.error(error)
-                finally:
-                    unregister_process(proc)
+                        monitor = TelemetryMonitor(
+                            pid=proc.pid, interval_ms=int(TELEMETRY_INTERVAL * 1000), run_id=run_id
+                        )
+                        monitor.start()
+                        error = None
+
+                        try:
+                            stdout, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT)
+                            success = proc.returncode == 0
+                            if success:
+                                target_out = cmd[-1]
+                                if not os.path.exists(target_out) or os.path.getsize(target_out) == 0:
+                                    success = False
+                                    error = f"{tool_name} claimed success but output file is missing or empty: {target_out}"
+                            error = _truncate(stderr) if not success and not error else error
+                            
+                            stderr_text = stderr or ""
+                            payload = build_subprocess_log_payload(tool_name, proc.returncode, stderr_text)
+                            if payload["returncode"] != 0:
+                                log.warning("subprocess failed", extra={"subprocess": payload})
+                        except subprocess.TimeoutExpired:
+                            log.warning(f"{tool_name} timed out, force cleaning process tree...")
+                            kill_process_tree(proc.pid)
+                            proc.communicate()
+                            success = False
+                            error = f"{tool_name} timed out after {FFMPEG_TIMEOUT} seconds."
+                            log.error(error)
+                    finally:
+                        unregister_process(proc)
         except Exception as e:
             success = False
             error = str(e)

@@ -69,26 +69,28 @@ class HeuristicInterpolator:
         Returns:
             Interpolated or fallback quality in the encoder's native scalar range.
         """
-        from .config import default_quality_for, quality_range_for
+        from .otel import span
+        with span("quality_curve"):
+            from .config import default_quality_for, quality_range_for
 
-        megapixels = (width * height) / 1_000_000.0
+            megapixels = (width * height) / 1_000_000.0
 
-        cell = self.table.get(category, {}).get(format, {}).get(tool)
-        if not cell or "a" not in cell or "b" not in cell:
-            # No fitted curve for this combo: fall back to a tool/format-native default.
-            fallback = default_quality_for(tool, format)
-            log.debug(f"No heuristic curve for {category}|{format}|{tool}. Falling back to default: {fallback}")
-            return fallback
+            cell = self.table.get(category, {}).get(format, {}).get(tool)
+            if not cell or "a" not in cell or "b" not in cell:
+                # No fitted curve for this combo: fall back to a tool/format-native default.
+                fallback = default_quality_for(tool, format)
+                log.debug(f"No heuristic curve for {category}|{format}|{tool}. Falling back to default: {fallback}")
+                return fallback
 
-        # Clamp MP to the observed range so we evaluate the curve, never extrapolate.
-        mp = max(cell.get("mp_min", megapixels), min(megapixels, cell.get("mp_max", megapixels)))
-        if mp <= 0:
-            return default_quality_for(tool, format)
+            # Clamp MP to the observed range so we evaluate the curve, never extrapolate.
+            mp = max(cell.get("mp_min", megapixels), min(megapixels, cell.get("mp_max", megapixels)))
+            if mp <= 0:
+                return default_quality_for(tool, format)
 
-        q = cell["a"] + cell["b"] * math.log10(mp)
+            q = cell["a"] + cell["b"] * math.log10(mp)
 
-        # Clamp the result to the encoder's valid native quality range.
-        lo, hi = quality_range_for(tool, format)
-        q = max(lo, min(q, hi))
+            # Clamp the result to the encoder's valid native quality range.
+            lo, hi = quality_range_for(tool, format)
+            q = max(lo, min(q, hi))
 
-        return round(float(q), 2)
+            return round(float(q), 2)
