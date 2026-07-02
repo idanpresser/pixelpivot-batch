@@ -5,7 +5,7 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 # --- Stage 2: Final Production Image ---
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # Install system dependencies
 # libheif-dev for AVIF, libvips-dev for Sharp/Vips, ffmpeg for FFmpeg tools
@@ -28,7 +28,7 @@ WORKDIR /app
 
 # Install Python dependencies
 COPY pyproject.toml .
-RUN pip install --no-cache-dir ".[dev]"
+RUN pip install --no-cache-dir ".[dev,gui]"
 
 # Copy Node.js dependencies from builder
 COPY --from=node-builder /app/node_modules ./node_modules

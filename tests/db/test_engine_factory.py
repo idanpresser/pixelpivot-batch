@@ -12,6 +12,12 @@ def test_engine_defaults_to_sqlite(tmp_path, monkeypatch):
 
 
 def test_engine_url_override_selects_dialect(monkeypatch):
+    try:
+        import psycopg
+    except ImportError:
+        import pytest
+        pytest.skip("psycopg (PostgreSQL driver) not installed")
+        
     monkeypatch.setenv("PIXELPIVOT_DB_URL", "postgresql+psycopg://u:p@localhost/x")
     conn.reset_engine_cache()
     eng = conn.get_engine()

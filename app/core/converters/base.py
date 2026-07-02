@@ -566,6 +566,16 @@ class BaseConverter(ABC):
         Returns:
             BatchResult containing conversion metrics, aggregated telemetry, errors, and bytes written.
         """
+        if not input_paths:
+            return BatchResult(
+                success_count=0,
+                failure_count=0,
+                duration_ms=0.0,
+                telemetry={},
+                errors=[],
+                bytes_written=0,
+            )
+
         self._set_active_run_id(run_id)
         start = time.time()
         success_count = 0

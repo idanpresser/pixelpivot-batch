@@ -200,15 +200,26 @@ class BatchOrchestrator:
             log.warning("pillow-heif not installed. Probing HEIC/AVIF files may fail.")
 
         # Resolve local binary paths for self-contained Windows execution
-        ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg.exe")
-        if not os.path.exists(ffmpeg_bin):
-            # Try deeper path if the top-level doesn't exist (handle zip extracts)
-            alt_ffmpeg = str(PROJ_ROOT / "bin" / "ffmpeg" / "8.1.1-essentials_build" / "ffmpeg.exe")
-            ffmpeg_bin = alt_ffmpeg if os.path.exists(alt_ffmpeg) else "ffmpeg"
+        import sys
+        if sys.platform == "win32":
+            ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg.exe")
+            if not os.path.exists(ffmpeg_bin):
+                # Try deeper path if the top-level doesn't exist (handle zip extracts)
+                alt_ffmpeg = str(PROJ_ROOT / "bin" / "ffmpeg" / "8.1.1-essentials_build" / "ffmpeg.exe")
+                ffmpeg_bin = alt_ffmpeg if os.path.exists(alt_ffmpeg) else "ffmpeg"
 
-        magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick.exe")
-        if not os.path.exists(magick_bin):
-            magick_bin = "magick"
+            magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick.exe")
+            if not os.path.exists(magick_bin):
+                magick_bin = "magick"
+        else:
+            ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg")
+            if not os.path.exists(ffmpeg_bin):
+                ffmpeg_bin = "ffmpeg"
+
+            magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick")
+            if not os.path.exists(magick_bin):
+                magick_bin = "magick"
+
 
         self.converters = {
             "magick": MagickConverter(magick_path=magick_bin),

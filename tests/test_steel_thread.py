@@ -20,9 +20,12 @@ from PIL import Image
 
 
 PROJ = Path(__file__).resolve().parent.parent
-BIN_FFMPEG = PROJ / "bin" / "ffmpeg" / "ffmpeg.exe"
-BIN_MAGICK = PROJ / "bin" / "magick" / "magick.exe"
-BIN_VIPS   = PROJ / "bin" / "vips" / "bin" / "vips.exe"
+if sys.platform == "win32":
+    BIN_FFMPEG = PROJ / "bin" / "ffmpeg" / "ffmpeg.exe"
+    BIN_MAGICK = PROJ / "bin" / "magick" / "magick.exe"
+else:
+    BIN_FFMPEG = PROJ / "bin" / "ffmpeg" / "ffmpeg"
+    BIN_MAGICK = PROJ / "bin" / "magick" / "magick"
 
 PEAK_RAM_LIMIT_MB = 300
 

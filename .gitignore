@@ -79,3 +79,8 @@ desktop.ini
 
 # Air-gap deploy bundle (build artifact, ~18k files)
 deploy/
+
+# Local testing folders
+test_pics/
+test_bin/
+
