@@ -68,6 +68,7 @@ from ..config import (
     CONCURRENT_ENCODES_SCALING_FACTOR,
     CONCURRENT_ENCODES_MIN_RAM_MB,
     CONCURRENT_ENCODES_MAX_WORKERS,
+    BATCH_FATAL_ABORT_THRESHOLD,
 )
 
 log = get_logger(__name__)
@@ -633,11 +634,39 @@ class BaseConverter(ABC):
         max_workers = min(len(input_paths), max_workers)
         log.info(f"Starting batch conversion with {max_workers} concurrent workers (CPU cores={cpu_count})")
 
+        # Mid-batch circuit breaker: a dead tool (missing binary, broken encoder)
+        # fails every file fatally. Abort the rest after a threshold of consecutive
+        # fatal errors instead of retrying all N. Ordinary per-file failures reset
+        # the counter, so one corrupt file never sinks a healthy batch.
+        fatal_lock = threading.Lock()
+        fatal_state = {"consecutive": 0, "aborted": False}
+
         def worker(args):
             in_path, q = args
+            with fatal_lock:
+                if fatal_state["aborted"]:
+                    return ConvertResult(
+                        success=False,
+                        error="batch aborted: too many consecutive fatal errors",
+                        fatal_error=True,
+                    )
             filename = Path(in_path).stem
             out_path = str(Path(output_dir) / f"{filename}{suffix}.{target_format}")
-            return self.convert(in_path, out_path, target_format, q, run_id=run_id)
+            res = self.convert(in_path, out_path, target_format, q, run_id=run_id)
+            with fatal_lock:
+                if res.get("fatal_error"):
+                    fatal_state["consecutive"] += 1
+                    if fatal_state["consecutive"] >= BATCH_FATAL_ABORT_THRESHOLD:
+                        if not fatal_state["aborted"]:
+                            fatal_state["aborted"] = True
+                            log.error(
+                                f"  [CIRCUIT BREAKER] {self.get_name()} batch aborted after "
+                                f"{fatal_state['consecutive']} consecutive fatal errors; "
+                                f"remaining files routed to DLQ."
+                            )
+                else:
+                    fatal_state["consecutive"] = 0
+            return res
 
         self._bypass_breaker = True
         try:
