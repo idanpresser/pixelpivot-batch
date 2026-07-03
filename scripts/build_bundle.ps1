@@ -57,7 +57,8 @@ $required = @(
     @('ffprobe',  'bin\ffmpeg\ffprobe.exe'),
     @('magick',   'bin\magick\magick.exe'),
     @('vips',     'bin\vips\bin\vips.exe'),
-    @('node',     'vendor\node\node.exe')
+    @('node',     'vendor\node\node.exe'),
+    @('cavif',    'bin\cavif\cavif.exe')
 )
 foreach ($r in $required) {
     $full = Join-Path $ProjectRoot $r[1]

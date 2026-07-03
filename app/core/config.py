@@ -180,6 +180,7 @@ DEFAULT_QUALITY_GENERIC = 80.0
 
 DEFAULT_QUALITY_BY_TOOL_FORMAT: dict[tuple[str, str], float] = {
     ("ffmpeg", "avif"): 30.0,   # libaom-av1 -crf (0..63), lower = better
+    ("cavif", "avif"): 80.0,    # cavif quality (0..100), higher = better
 }
 
 DEFAULT_QUALITY_BY_FORMAT: dict[str, float] = {

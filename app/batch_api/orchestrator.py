@@ -21,6 +21,7 @@ from ..core.converters.magick_converter import MagickConverter
 from ..core.converters.ffmpeg_converter import FFmpegConverter
 from ..core.converters.vips_converter import VipsConverter
 from ..core.converters.sharp_converter import SharpConverter
+from ..core.converters.cavif_converter import CavifConverter
 from ..core.logger import get_logger
 from ..core.config import (
     FFMPEG_TIMEOUT,
@@ -211,6 +212,10 @@ class BatchOrchestrator:
             magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick.exe")
             if not os.path.exists(magick_bin):
                 magick_bin = "magick"
+
+            cavif_bin = str(PROJ_ROOT / "bin" / "cavif" / "cavif.exe")
+            if not os.path.exists(cavif_bin):
+                cavif_bin = "cavif"
         else:
             ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg")
             if not os.path.exists(ffmpeg_bin):
@@ -220,12 +225,17 @@ class BatchOrchestrator:
             if not os.path.exists(magick_bin):
                 magick_bin = "magick"
 
+            cavif_bin = str(PROJ_ROOT / "bin" / "cavif" / "cavif")
+            if not os.path.exists(cavif_bin):
+                cavif_bin = "cavif"
+
 
         self.converters = {
             "magick": MagickConverter(magick_path=magick_bin),
             "ffmpeg": FFmpegConverter(ffmpeg_path=ffmpeg_bin),
             "vips":   VipsConverter(),
             "sharp":  SharpConverter(port=8765),
+            "cavif":  CavifConverter(cavif_path=cavif_bin),
         }
     def _preflight_resources(self, target_dir: str) -> None:
         """Validate available memory and disk space before batch execution.

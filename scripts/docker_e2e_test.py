@@ -14,8 +14,8 @@ API_BASE = "http://pixelpivot-batch-api:8000/api/v1"
 TOKEN = "dev_secret_token_change_me"
 SOURCE_DIR = "/app/test_pics/flat"
 TARGET_BASE = "/app/test_pics"
-FORMATS = ["webp"]  # Use webp as the base E2E format
-TOOLS = ["magick", "vips", "sharp", "ffmpeg"]
+FORMATS = ["avif"]  # Switch to avif for 5-way comparison
+TOOLS = ["magick", "vips", "sharp", "ffmpeg", "cavif"]
 
 headers = {
     "X-API-Token": TOKEN,

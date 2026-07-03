@@ -14,6 +14,7 @@ class Tool(str, Enum):
     ffmpeg = "ffmpeg"
     vips = "vips"
     sharp = "sharp"
+    cavif = "cavif"
 
 TargetFormat = Literal["webp", "avif", "jxl"]
 

@@ -138,6 +138,58 @@ def setup_imagemagick():
             
     print(f"🚀 ImageMagick set up at {MAGICK_DIR / 'magick'}")
 
+def get_latest_cavif_url() -> str:
+    """Query GitHub API to find the latest Cavif deb package URL."""
+    print("🔍 Querying GitHub for the latest Cavif release...")
+    url = "https://api.github.com/repos/kornelski/cavif-rs/releases/latest"
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    try:
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode())
+            for asset in data.get('assets', []):
+                name = asset.get('name', '')
+                if name.endswith('.deb') and 'amd64' in name:
+                    return asset.get('browser_download_url')
+    except Exception as e:
+        print(f"⚠️ Error querying GitHub: {e}")
+    # Hard fallback URL if GitHub API fails
+    return "https://github.com/kornelski/cavif-rs/releases/download/v1.5.6/cavif_1.5.6-1_amd64.deb"
+
+def setup_cavif():
+    """Download, extract, and copy Cavif binary."""
+    print("\n--- Setting up Cavif (Linux) ---")
+    CAVIF_DIR = BIN_DIR / "cavif"
+    
+    if CAVIF_DIR.exists():
+        print(f"🧹 Cleaning existing Cavif directory: {CAVIF_DIR}")
+        shutil.rmtree(CAVIF_DIR)
+    CAVIF_DIR.mkdir(parents=True, exist_ok=True)
+    
+    deb_url = get_latest_cavif_url()
+    deb_path = TEMP_DIR / "cavif.deb"
+    download_file(deb_url, deb_path)
+    
+    print("📦 Extracting Cavif deb package...")
+    extract_dir = TEMP_DIR / "cavif_extracted"
+    if extract_dir.exists():
+        shutil.rmtree(extract_dir)
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    
+    subprocess.run(
+        ["dpkg-deb", "-x", str(deb_path), str(extract_dir)],
+        check=True
+    )
+    
+    cavif_bin_src = extract_dir / "usr" / "bin" / "cavif"
+    cavif_bin_dest = CAVIF_DIR / "cavif"
+    
+    if not cavif_bin_src.exists():
+        raise RuntimeError("Could not find cavif binary in extracted deb package")
+        
+    shutil.copy2(cavif_bin_src, cavif_bin_dest)
+    cavif_bin_dest.chmod(0o755)
+    print(f"🚀 Cavif set up at {cavif_bin_dest}")
+
 def main():
     if sys.platform == "win32":
         print("❌ Error: This script is intended to download Linux binaries, but you are running on Windows.")
@@ -148,6 +200,7 @@ def main():
     try:
         setup_ffmpeg()
         setup_imagemagick()
+        setup_cavif()
         print("\n🎉 Linux binaries setup complete!")
     except Exception as e:
         print(f"\n❌ Setup failed: {e}")

@@ -23,9 +23,11 @@ PROJ = Path(__file__).resolve().parent.parent
 if sys.platform == "win32":
     BIN_FFMPEG = PROJ / "bin" / "ffmpeg" / "ffmpeg.exe"
     BIN_MAGICK = PROJ / "bin" / "magick" / "magick.exe"
+    BIN_CAVIF = PROJ / "bin" / "cavif" / "cavif.exe"
 else:
     BIN_FFMPEG = PROJ / "bin" / "ffmpeg" / "ffmpeg"
     BIN_MAGICK = PROJ / "bin" / "magick" / "magick"
+    BIN_CAVIF = PROJ / "bin" / "cavif" / "cavif"
 
 PEAK_RAM_LIMIT_MB = 300
 
@@ -65,6 +67,11 @@ def _run_converter(name: str, tmp_src: Path, tmp_dst: Path, quality: float = 80.
     elif name == "sharp":
         from app.core.converters.sharp_converter import SharpConverter
         conv = SharpConverter(port=8765)
+    elif name == "cavif":
+        if not BIN_CAVIF.exists():
+            return {"skipped": True, "reason": "cavif binary absent"}
+        from app.core.converters.cavif_converter import CavifConverter
+        conv = CavifConverter(cavif_path=str(BIN_CAVIF))
     else:
         return {"skipped": True, "reason": f"unknown converter {name}"}
 
@@ -102,10 +109,11 @@ QUALITY_BY_TOOL = {
     "ffmpeg": 28.0,  # libaom-av1 CRF, must be <= 63
     "vips":   80.0,
     "sharp":  80.0,
+    "cavif":  80.0,
 }
 
 
-@pytest.mark.parametrize("converter", ["magick", "ffmpeg", "vips", "sharp"])
+@pytest.mark.parametrize("converter", ["magick", "ffmpeg", "vips", "sharp", "cavif"])
 def test_converter_steel_thread(converter, image_dirs, capsys):
     """One image through one converter. Assert success and RAM delta < limit."""
     src, dst = image_dirs
