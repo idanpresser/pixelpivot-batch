@@ -72,3 +72,38 @@ def test_aggregate_telemetry_does_not_collapse_when_a_summary_is_empty():
     assert agg["cpu_peak"] == 40.0
     assert agg["ram_peak"] == 120.0
     assert agg["cpu_avg"] > 0
+
+
+def _monitor_busy_current_process(burn_s: float) -> dict:
+    """Fast in-process path (vips-like): monitor the current PID over a busy loop."""
+    monitor = TelemetryMonitor(interval_ms=5000)
+    monitor.start()
+    _burn_cpu(burn_s)
+    return monitor.stop()
+
+
+def _monitor_busy_subprocess() -> dict:
+    """Native path (mogrify/image2-like): monitor a short-lived CPU-active subprocess."""
+    proc = subprocess.Popen([sys.executable, "-c", _BURN_SRC])
+    monitor = TelemetryMonitor(pid=proc.pid, interval_ms=250)
+    monitor.start()
+    proc.wait()
+    return monitor.stop()
+
+
+def test_mixed_batch_telemetry_is_nonzero_regression():
+    """6.3 lock-in: a batch mixing fast in-process and native subprocess paths
+    must aggregate to nonzero telemetry.
+
+    Guards against silent regression to the E2E all-zero state. Would fail on
+    pre-6.1/6.2 code (both per-path summaries collapsed to cpu 0); passes now
+    that priming + the min-interval floor guarantee a real sample per path.
+    """
+    inproc = _monitor_busy_current_process(0.12)
+    native = _monitor_busy_subprocess()
+
+    batch_summary = aggregate_telemetry([inproc, native])
+
+    assert batch_summary["cpu_peak"] > 0
+    assert batch_summary["cpu_avg"] > 0
+    assert batch_summary["ram_peak"] > 0
