@@ -48,34 +48,22 @@ def test_telemetry_real_flush_to_db():
         assert count > 0
 
 
-def test_telemetry_fast_conversion_optimisation(monkeypatch):
+def test_telemetry_fast_conversion_captures_nonzero(monkeypatch):
     """
-    Verify that TelemetryMonitor skips the heavy _get_recursive_resources calls
-    during the first 200ms of self.is_running to optimize CPU for fast-running
-    conversions, but still takes a final sample on stop().
+    E6 6.1: a fast conversion must still yield a real sample. The old 200ms
+    sampling skip left the final stop() tick as the first-ever cpu_percent()
+    call (always 0.0); the monitor now primes at start() and takes at least one
+    real sample, so mocked nonzero resources surface in the summary.
     """
-    import time
-    
-    current_time = 1000.0
-    def mock_monotonic():
-        return current_time
-    monkeypatch.setattr(time, "monotonic", mock_monotonic)
-    
-    monitor = TelemetryMonitor(run_id=1, interval_ms=10)
-    
+    monitor = TelemetryMonitor(run_id=1, interval_ms=5000)
+
     with patch.object(monitor, "_get_recursive_resources", return_value=(10.0, 50.0)) as mock_get_res:
 
         monitor.start()
-        
-        current_time = 1000.05
-        # Sleep real time to let the background thread thread loop
-        time.sleep(0.08)
-        
-        # Even though real time has passed, mocked time says only 50ms has passed (< 200ms)
-        assert mock_get_res.call_count == 0
-        
-        # Stop should trigger the final sample and make exactly 1 call
         stats = monitor.stop()
-        assert mock_get_res.call_count == 1
+
+        # At least one real sample was taken (not skipped away).
+        assert mock_get_res.call_count >= 1
         assert stats["cpu_peak"] == 10.0
         assert stats["ram_peak"] == 50.0
+        assert stats["cpu_avg"] > 0

@@ -45,6 +45,7 @@ MIN_PYTHON_VERSION: tuple[int, int] = (3, 14)
 # ---------------------------------------------------------------------------
 FFMPEG_TIMEOUT = 120                # Default wall-clock timeout (s) — used as fallback
 TELEMETRY_INTERVAL = 0.25           # Seconds between resource polling (CPU/RAM/GPU)
+TELEMETRY_MIN_SAMPLE_INTERVAL = 0.05  # Min wall-clock (s) between cpu_percent() reads so the final tick's delta is meaningful (>=1 real sample per conversion)
 MAX_LOG_BUFFER = 500                # Max lines kept in memory for the live monitor
 
 SHUTDOWN_GRACE_S = float(os.getenv("PIXELPIVOT_SHUTDOWN_GRACE_S", "30"))

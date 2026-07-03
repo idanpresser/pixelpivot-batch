@@ -26,6 +26,7 @@ from .config import (
     TELEMETRY_BATCH_SIZE,
     TELEMETRY_QUEUE_TIMEOUT,
     TELEMETRY_CHILDREN_REFRESH_S,
+    TELEMETRY_MIN_SAMPLE_INTERVAL,
 )
 
 log = get_logger(__name__)
@@ -69,6 +70,11 @@ class TelemetryMonitor:
         self._last_children_walk_ts = 0.0
         self._cached_pids: set[int] = set()
         self.start_time = 0.0
+        # Wall-clock time of the most recent cpu_percent() read across the tree.
+        # Priming at start() and every _sample() update it; stop() floors the
+        # final tick against it so a fast conversion still yields a real delta.
+        self._min_sample_interval = TELEMETRY_MIN_SAMPLE_INTERVAL
+        self._last_cpu_read_ts = 0.0
 
     def _refresh_pid_tree(self, pid: int) -> None:
         """Re-walk the process tree and update the cached PID set."""
@@ -128,11 +134,20 @@ class TelemetryMonitor:
         return total_cpu, total_ram
 
     def _monitor(self):
-        """Producer loop: samples metrics and pushes to queue."""
-        self._sample()  # prime cpu_percent() deltas
+        """Producer loop: samples metrics and pushes to queue.
+
+        cpu_percent() deltas were primed in start(). The first real sample is
+        taken after a short floor (not the full interval) so a short-lived
+        native subprocess — which exits before stop() can sample it — still
+        contributes at least one nonzero live CPU reading. Subsequent samples
+        settle into the configured interval.
+        """
+        first_interval = min(self._min_sample_interval, self.interval)
         try:
+            first = True
             while self.is_running:
-                time.sleep(self.interval)
+                time.sleep(first_interval if first else self.interval)
+                first = False
                 if self.is_running:
                     self._sample()
         except Exception as e:
@@ -189,16 +204,18 @@ class TelemetryMonitor:
                 log.error(f"Critical error in telemetry flusher loop: {e}")
 
     def _sample(self):
-        """Take a single resource sample and queue for DB write."""
+        """Take a single resource sample and queue for DB write.
+
+        Every tick reads cpu_percent() so the per-PID deltas stay warm. The
+        previous implementation skipped sampling for the first 200ms to save
+        CPU, but that starved fast tools (vips ~40ms) of any real sample and
+        left the final stop() tick as the first-ever cpu_percent() call, which
+        always returns 0.0. Priming now happens in start() instead.
+        """
         root_pid = self.target_pid or os.getpid()
 
-        # Optimize CPU overhead by skipping sub-process checks for fast-running conversions
-        # during the first 200ms, relying on the final sample in stop() to capture metrics.
-        now = time.monotonic()
-        if self.is_running and (now - self.start_time < 0.2):
-            return
-
         cpu, ram = self._get_recursive_resources(root_pid)
+        self._last_cpu_read_ts = time.monotonic()
 
         with self._data_lock:
             if ram > 0 or not self.data["ram_mb"]:
@@ -224,6 +241,16 @@ class TelemetryMonitor:
         self.start_time = time.monotonic()
         self.is_running = True
 
+        # Prime cpu_percent() deltas up front so the first real sample (and the
+        # final stop() tick) measures against a baseline rather than returning
+        # 0.0 on its first-ever call for each PID.
+        root_pid = self.target_pid or os.getpid()
+        try:
+            self._refresh_pid_tree(root_pid)
+            self._last_cpu_read_ts = time.monotonic()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            self._last_cpu_read_ts = 0.0
+
         self.thread = threading.Thread(target=self._monitor, daemon=True)
         self.thread.start()
 
@@ -243,6 +270,14 @@ class TelemetryMonitor:
         self.is_running = False
         if self.thread:
             self.thread.join(timeout=1.0)
+
+        # Floor the final measurement window: if the whole conversion was
+        # faster than the minimum interval, the last cpu_percent() delta would
+        # be near-zero. Sleep the remainder so the final tick reflects real CPU.
+        if self._last_cpu_read_ts:
+            elapsed = time.monotonic() - self._last_cpu_read_ts
+            if elapsed < self._min_sample_interval:
+                time.sleep(self._min_sample_interval - elapsed)
 
         self._sample()  # final tick for completeness
 
