@@ -321,6 +321,7 @@ class BaseConverter(ABC):
         quality: Union[int, float],
         run_id: Optional[int] = None,
         output_path: Optional[str] = None,
+        timeout: Optional[float] = None,
     ) -> ConvertResult:
         """Execute a subprocess command with telemetry capture and circuit-breaker logic.
 
@@ -338,6 +339,7 @@ class BaseConverter(ABC):
             ConvertResult containing success status, duration, telemetry, parameters used, error, and fatal status.
         """
         self._set_active_run_id(run_id)
+        effective_timeout = timeout if timeout is not None else FFMPEG_TIMEOUT
         # Circuit Breaker with 30s self-healing cooldown bypass
         if self.is_broken and not getattr(self, "_bypass_breaker", False):
             if self.broken_since and (time.time() - self.broken_since) > self.cooldown_period:
@@ -372,7 +374,7 @@ class BaseConverter(ABC):
                         error = None
 
                         try:
-                            stdout, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT)
+                            stdout, stderr = proc.communicate(timeout=effective_timeout)
                             success = proc.returncode == 0
                             if success:
                                 target_out = cmd[-1]
@@ -390,7 +392,7 @@ class BaseConverter(ABC):
                             kill_process_tree(proc.pid)
                             proc.communicate()
                             success = False
-                            error = f"{tool_name} timed out after {FFMPEG_TIMEOUT} seconds."
+                            error = f"{tool_name} timed out after {effective_timeout} seconds."
                             log.error(error)
                     finally:
                         unregister_process(proc)

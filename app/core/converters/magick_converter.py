@@ -16,6 +16,7 @@ from ..config import (
     FFMPEG_TIMEOUT,
     MAGICK_MOGRIFY_CHUNK,
     MAGICK_MOGRIFY_MAX_CMDLINE_BYTES,
+    batch_subprocess_timeout,
 )
 from .ffmpeg_batch_helpers import pack_chunks
 
@@ -255,7 +256,7 @@ class MagickConverter(BaseConverter):
                             monitor.start()
 
                             try:
-                                stdout, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT * len(chunk_paths))
+                                stdout, stderr = proc.communicate(timeout=batch_subprocess_timeout(len(chunk_paths)))
                                 success = proc.returncode == 0
                             except subprocess.TimeoutExpired:
                                 log.warning("Mogrify timed out, force cleaning process tree...")
