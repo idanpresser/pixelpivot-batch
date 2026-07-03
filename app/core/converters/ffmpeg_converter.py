@@ -337,7 +337,7 @@ class FFmpegConverter(BaseConverter):
 
                     if can_use_image2 and len(sub_paths) >= IMAGE2_THRESHOLD and all_same_resolution(sub_paths):
                         ok, fail, errs, tele, leftovers, image2_bytes = self._run_image2_path(
-                            sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix
+                            sub_paths, output_dir, target_format, q, batch_params, run_id, suffix=suffix, wh=wh
                         )
                         success_count += ok
                         failure_count += fail
@@ -386,8 +386,72 @@ class FFmpegConverter(BaseConverter):
         encoder_params: List[str],
         run_id: Optional[int],
         suffix: str = "",
+        wh: Optional[tuple[int, int]] = None,
     ):
-        """Run image2 demuxer batch on uniform-size images via hardlink staging.
+        """Run the image2 demuxer over a uniform-size group, RAM-bounded.
+
+        A single image2 command is cheap on CPU but its decoded-frame footprint is
+        unbounded — a large uniform-size batch of big frames would feed every frame
+        into one ffmpeg process. This splits the group into chunks whose size is
+        derived from the projected decoded-frame footprint (dynamic_max_files),
+        the same RAM ceiling the multimap path already applies, then runs one image2
+        command per chunk and aggregates the results.
+
+        Args:
+            paths: List of input paths (all same resolution).
+            output_dir: Directory where outputs are written.
+            wh: (width, height) of the uniform group; drives the RAM-bounded chunk
+                size. Falls back to the batch-max ceiling when unknown.
+        """
+        import psutil
+        from .chunk_sizing import dynamic_max_files
+
+        w, h = wh if wh else (0, 0)
+        mp = (w * h) / 1_000_000.0
+        ram_budget = psutil.virtual_memory().available * CHUNK_RAM_BUDGET_FRACTION
+        max_files = dynamic_max_files(mp, ram_budget, ceiling=FFMPEG_BATCH_MAX_FILES)
+
+        chunks = [paths[i:i + max_files] for i in range(0, len(paths), max_files)]
+
+        total_ok = 0
+        total_fail = 0
+        total_bytes = 0
+        all_errors: List[Dict[str, Any]] = []
+        all_leftovers: List[str] = []
+        telemetry_samples: List[Dict[str, Any]] = []
+
+        for chunk in chunks:
+            ok, fail, errs, tele, leftovers, chunk_bytes = self._run_image2_single(
+                chunk, output_dir, target_format, quality, encoder_params, run_id, suffix=suffix
+            )
+            total_ok += ok
+            total_fail += fail
+            total_bytes += chunk_bytes
+            all_errors.extend(errs)
+            all_leftovers.extend(leftovers)
+            if tele:
+                telemetry_samples.append(tele)
+
+        return (
+            total_ok,
+            total_fail,
+            all_errors,
+            aggregate_telemetry(telemetry_samples),
+            all_leftovers,
+            total_bytes,
+        )
+
+    def _run_image2_single(
+        self,
+        paths: List[str],
+        output_dir: str,
+        target_format: str,
+        quality: float,
+        encoder_params: List[str],
+        run_id: Optional[int],
+        suffix: str = "",
+    ):
+        """Run one image2 demuxer command on a RAM-bounded uniform-size chunk.
 
         Creates frame00001.<ext>, frame00002.<ext>, ... in a temp directory,
         runs ffmpeg once to produce out00001.<fmt>, out00002.<fmt>, ... alongside,
