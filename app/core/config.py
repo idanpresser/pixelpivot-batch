@@ -310,6 +310,16 @@ def ffmpeg_wall_timeout_for(target_format: str) -> float:
     return FFMPEG_TIMEOUT_BY_FORMAT.get(target_format, float(FFMPEG_TIMEOUT))
 
 
+def batch_subprocess_timeout(file_count: int, base: float = FFMPEG_TIMEOUT) -> float:
+    """Scale a subprocess wall-clock timeout by the number of files in the command.
+
+    A native batch command (mogrify / image2 / multimap) that encodes N files in
+    one process legitimately needs ~N x the per-file budget; a flat timeout
+    false-kills large batches. A single file keeps the tight base timeout.
+    """
+    return base * max(1, file_count)
+
+
 # --- E5 telemetry + dynamic queue ---
 METRICS_ENABLED = os.getenv("PIXELPIVOT_METRICS_ENABLED", "1") not in ("0", "false", "False")
 """Expose /metrics and record counters. Endpoint always mounts; recording no-ops when off."""
