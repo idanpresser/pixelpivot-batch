@@ -7,9 +7,11 @@ faster than the sampling interval. They replace the previous
 skip caused fast tools (vips ~40ms) to report all-zero telemetry.
 """
 
+import subprocess
+import sys
 import time
 
-from app.core.telemetry import TelemetryMonitor
+from app.core.telemetry import TelemetryMonitor, aggregate_telemetry
 
 
 def _burn_cpu(seconds: float) -> int:
@@ -36,3 +38,37 @@ def test_fast_conversion_yields_nonzero_cpu_and_ram():
     assert summary["ram_peak"] > 0
     assert summary["cpu_avg"] > 0
     assert summary["cpu_peak"] > 0
+
+
+# CPU-active subprocess (~150ms) standing in for a native batch (mogrify/image2).
+_BURN_SRC = "import time\nx=0\nend=time.time()+0.15\nwhile time.time()<end:\n x+=1\n"
+
+
+def test_native_subprocess_batch_captures_nonzero_cpu_and_ram():
+    """Native-batch monitoring of a short-lived subprocess yields nonzero cpu+ram.
+
+    Mirrors the mogrify/image2 path: the monitored PID exits before stop(), so
+    the capture must come from a real live sample. interval_ms is the production
+    default (250ms), larger than the subprocess lifetime, so only the producer's
+    live sampling can supply CPU signal.
+    """
+    proc = subprocess.Popen([sys.executable, "-c", _BURN_SRC])
+    monitor = TelemetryMonitor(pid=proc.pid, interval_ms=250)
+    monitor.start()
+    proc.wait()
+    summary = monitor.stop()
+
+    assert summary["ram_peak"] > 0
+    assert summary["cpu_peak"] > 0
+
+
+def test_aggregate_telemetry_does_not_collapse_when_a_summary_is_empty():
+    """A real per-subprocess summary must survive aggregation alongside empty ones."""
+    summaries = [
+        {"cpu_avg": 5.0, "cpu_peak": 40.0, "ram_peak": 120.0},
+        {},  # e.g. a chunk whose monitor produced nothing
+    ]
+    agg = aggregate_telemetry(summaries)
+    assert agg["cpu_peak"] == 40.0
+    assert agg["ram_peak"] == 120.0
+    assert agg["cpu_avg"] > 0
