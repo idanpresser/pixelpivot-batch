@@ -134,11 +134,20 @@ class TelemetryMonitor:
         return total_cpu, total_ram
 
     def _monitor(self):
-        """Producer loop: samples metrics and pushes to queue."""
-        self._sample()  # prime cpu_percent() deltas
+        """Producer loop: samples metrics and pushes to queue.
+
+        cpu_percent() deltas were primed in start(). The first real sample is
+        taken after a short floor (not the full interval) so a short-lived
+        native subprocess — which exits before stop() can sample it — still
+        contributes at least one nonzero live CPU reading. Subsequent samples
+        settle into the configured interval.
+        """
+        first_interval = min(self._min_sample_interval, self.interval)
         try:
+            first = True
             while self.is_running:
-                time.sleep(self.interval)
+                time.sleep(first_interval if first else self.interval)
+                first = False
                 if self.is_running:
                     self._sample()
         except Exception as e:
