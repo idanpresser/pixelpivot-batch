@@ -121,6 +121,11 @@ PERIODIC_EXPORT_BATCH_SIZE = 50     # Conversions between auto-exports
 SQLITE_BUSY_ATTEMPTS = 5            # Number of retries for busy locks
 SQLITE_BUSY_BASE_DELAY_S = 0.1      # Base delay for exponential backoff
 
+# Mid-batch circuit breaker: abort the remaining files after this many
+# consecutive *fatal* errors (missing binary, broken encoder). Ordinary per-file
+# failures do not count — one corrupt file must not sink a healthy batch.
+BATCH_FATAL_ABORT_THRESHOLD = int(os.getenv("PIXELPIVOT_BATCH_FATAL_ABORT_THRESHOLD", "3"))
+
 # Thread pool for concurrent encodes (if tool doesn't support native batching)
 CONCURRENT_ENCODES_SCALING_FACTOR = float(os.getenv("PIXELPIVOT_CONCURRENT_ENCODES_SCALING_FACTOR", "2.0"))
 CONCURRENT_ENCODES_MIN_RAM_MB = 200      # min available RAM to spawn a new worker
