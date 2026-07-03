@@ -121,6 +121,11 @@ PERIODIC_EXPORT_BATCH_SIZE = 50     # Conversions between auto-exports
 SQLITE_BUSY_ATTEMPTS = 5            # Number of retries for busy locks
 SQLITE_BUSY_BASE_DELAY_S = 0.1      # Base delay for exponential backoff
 
+# Mid-batch circuit breaker: abort the remaining files after this many
+# consecutive *fatal* errors (missing binary, broken encoder). Ordinary per-file
+# failures do not count — one corrupt file must not sink a healthy batch.
+BATCH_FATAL_ABORT_THRESHOLD = int(os.getenv("PIXELPIVOT_BATCH_FATAL_ABORT_THRESHOLD", "3"))
+
 # Thread pool for concurrent encodes (if tool doesn't support native batching)
 CONCURRENT_ENCODES_SCALING_FACTOR = float(os.getenv("PIXELPIVOT_CONCURRENT_ENCODES_SCALING_FACTOR", "2.0"))
 CONCURRENT_ENCODES_MIN_RAM_MB = 200      # min available RAM to spawn a new worker
@@ -303,6 +308,16 @@ MAGICK_MOGRIFY_MAX_CMDLINE_BYTES = 7000
 def ffmpeg_wall_timeout_for(target_format: str) -> float:
     """Resolve the wall-clock timeout for a given target format."""
     return FFMPEG_TIMEOUT_BY_FORMAT.get(target_format, float(FFMPEG_TIMEOUT))
+
+
+def batch_subprocess_timeout(file_count: int, base: float = FFMPEG_TIMEOUT) -> float:
+    """Scale a subprocess wall-clock timeout by the number of files in the command.
+
+    A native batch command (mogrify / image2 / multimap) that encodes N files in
+    one process legitimately needs ~N x the per-file budget; a flat timeout
+    false-kills large batches. A single file keeps the tight base timeout.
+    """
+    return base * max(1, file_count)
 
 
 # --- E5 telemetry + dynamic queue ---
