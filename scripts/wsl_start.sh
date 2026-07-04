@@ -2,7 +2,8 @@
 # WSL Docker Startup Script for PixelPivot Batch Engine
 
 # 1. Resolve paths
-PROJECT_ROOT="/mnt/i/DEV/PixelPivot_202605/pixelpivot_batch"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPTS_DIR")"
 cd "$PROJECT_ROOT" || exit
 
 echo "🚀 [PIXELPIVOT] Initializing Linux Docker Stack via WSL..."
