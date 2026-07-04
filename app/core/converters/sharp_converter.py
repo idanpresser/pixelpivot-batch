@@ -554,10 +554,16 @@ class SharpConverter(BaseConverter):
                             success_count += 1
                             out_p = output_paths[received_count] if received_count < len(output_paths) else None
                             if out_p:
-                                try:
-                                    bytes_written += os.path.getsize(out_p)
-                                except OSError:
-                                    pass
+                                size = 0
+                                for _ in range(5):
+                                    try:
+                                        size = os.path.getsize(out_p)
+                                        if size > 0:
+                                            break
+                                    except OSError:
+                                        pass
+                                    time.sleep(0.01)
+                                bytes_written += size
                         else:
                             failure_count += 1
                             errors.append({"path": path, "error": result.get("error") or "Unknown daemon error"})
