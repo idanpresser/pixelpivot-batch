@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS batch_runs (
     target_dir      TEXT    NOT NULL,
     target_format   TEXT    NOT NULL,
     tool            TEXT    NOT NULL,
+    category        TEXT    NOT NULL DEFAULT 'general',
     trigger_type    TEXT    NOT NULL,
     status          TEXT    NOT NULL,
     total_images    INTEGER DEFAULT 0,
@@ -198,6 +199,7 @@ CREATE TABLE IF NOT EXISTS batch_runs (
     target_dir      TEXT    NOT NULL,
     target_format   TEXT    NOT NULL,
     tool            TEXT    NOT NULL,
+    category        TEXT    NOT NULL DEFAULT 'general',
     trigger_type    TEXT    NOT NULL,
     status          TEXT    NOT NULL,
     total_images    INTEGER DEFAULT 0,
@@ -427,6 +429,9 @@ def _create_tables(conn: Any) -> None:
             if "priority" not in columns:
                 log.info("Migrating batch_runs: adding priority column")
                 cur.execute("ALTER TABLE batch_runs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
+            if "category" not in columns:
+                log.info("Migrating batch_runs: adding category column")
+                cur.execute("ALTER TABLE batch_runs ADD COLUMN category TEXT NOT NULL DEFAULT 'general'")
 
             # Migration: Add is_dlq to batch_errors if it's missing
             cur.execute("PRAGMA table_info('batch_errors')")

@@ -50,6 +50,7 @@ def start_batch(
                 trigger_type=req.trigger_type,
                 heuristic_version=orchestrator.interpolator.version,
                 priority=PRIORITY_HIGH,
+                category=",".join(req.category),
             )
 
         from .queue_manager import get_queue_manager
@@ -75,6 +76,7 @@ def start_calibration(
                 tool=",".join([t.value for t in req.tool]),
                 trigger_type="calibration",
                 heuristic_version=orchestrator.interpolator.version,
+                category=",".join(req.category),
             )
         from .queue_manager import get_queue_manager
         get_queue_manager().submit_calibration(run_id, req)
@@ -250,7 +252,7 @@ def restart_batch(
             target_dir=run["target_dir"],
             target_format=[f for f in run["target_format"].split(",") if f],
             tool=[Tool(t) for t in run["tool"].split(",") if t],
-            category=["general"],
+            category=[c for c in run["category"].split(",") if c] if run.get("category") else ["general"],
             trigger_type="restart",
         )
         new_id = repo.create_run(
@@ -261,6 +263,7 @@ def restart_batch(
             tool=",".join([t.value for t in new_req.tool]),
             trigger_type="restart",
             heuristic_version=orchestrator.interpolator.version,
+            category=",".join(new_req.category),
         )
     from .queue_manager import get_queue_manager
     get_queue_manager().submit_batch(new_id, new_req)

@@ -193,6 +193,7 @@ class HotFolderHandler(FileSystemEventHandler):
                         trigger_type="hot_folder",
                         heuristic_version=self.orchestrator.interpolator.version,
                         priority=PRIORITY_LOW,
+                        category=",".join(self.config.get("category", ["general"])),
                     )
                 
                 # 3. Prepare request

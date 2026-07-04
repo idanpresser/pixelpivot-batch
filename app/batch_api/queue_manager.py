@@ -81,12 +81,13 @@ class BatchQueueManager:
             time.sleep(DISK_BACKPRESSURE_POLL_S)
 
     def _reconstruct_request(self, row: dict):
+        category_list = [c for c in row["category"].split(",") if c] if row.get("category") else ["general"]
         if row["trigger_type"] == "calibration":
             return CalibrationRequest(
                 source_dir=row["source_dir"],
                 target_format=[f for f in row["target_format"].split(",") if f],
                 tool=[Tool(t) for t in row["tool"].split(",") if t],
-                category=["general"],
+                category=category_list,
                 sample=30,
                 target_ssim=0.98,
                 regenerate_table=True,
@@ -96,7 +97,7 @@ class BatchQueueManager:
             target_dir=row["target_dir"],
             target_format=[f for f in row["target_format"].split(",") if f],
             tool=[Tool(t) for t in row["tool"].split(",") if t],
-            category=["general"],
+            category=category_list,
             trigger_type=row["trigger_type"],
         )
 

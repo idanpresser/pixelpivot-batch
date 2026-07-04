@@ -39,6 +39,7 @@ class BatchRepository:
         heuristic_version: Optional[str] = None,
         status: str = "running",
         priority: int = 0,
+        category: str = "general",
     ) -> int:
         """Insert a new batch run row and return its id.
 
@@ -52,6 +53,7 @@ class BatchRepository:
             heuristic_version: Optional version of heuristic table used.
             status: Initial status of the batch run.
             priority: Priority score for the run (higher is higher priority).
+            category: Comma-separated categories for the run.
 
         Returns:
             int: The id of the newly created batch_runs row.
@@ -61,12 +63,12 @@ class BatchRepository:
             cur.execute(
                 """
                 INSERT INTO batch_runs (
-                    source_dir, target_dir, target_format, tool, trigger_type, status, heuristic_version, priority
+                    source_dir, target_dir, target_format, tool, category, trigger_type, status, heuristic_version, priority
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
-                (source_dir, target_dir, target_format, tool, trigger_type, status, heuristic_version, priority),
+                (source_dir, target_dir, target_format, tool, category, trigger_type, status, heuristic_version, priority),
             )
             row = cur.fetchone()
             return int(row["id"]) if row else 0
@@ -100,7 +102,7 @@ class BatchRepository:
                 if cur.rowcount != 1:
                     return None  # lost the race; caller re-polls
                 cur.execute(
-                    "SELECT id, source_dir, target_dir, target_format, tool, trigger_type, priority "
+                    "SELECT id, source_dir, target_dir, target_format, tool, category, trigger_type, priority "
                     "FROM batch_runs WHERE id = ?",
                     (run_id,),
                 )
@@ -232,6 +234,7 @@ class BatchRepository:
                         r.status        AS status,
                         r.target_format AS target_format,
                         r.tool          AS tool,
+                        r.category      AS category,
                         r.trigger_type  AS trigger_type,
                         r.total_images  AS total_images,
                         r.created_at    AS created_at,
