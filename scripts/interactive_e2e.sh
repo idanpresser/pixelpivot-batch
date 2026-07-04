@@ -189,7 +189,7 @@ with httpx.Client(timeout=60.0) as client:
             ;;
         4)
             echo -e "${CYAN}📊 Fetching Run History & Metrics from SQLite...${NC}"
-            docker exec pixelpivot_cli sqlite3 -header -column /app/data/pixelpivot.db "
+            docker exec pixelpivot_cli sqlite3 -header -column /data/pixelpivot.db "
             SELECT r.id AS run_id, r.trigger_type, r.tool, r.category, r.sample, r.status, s.success_count, s.savings_pct, s.duration_ms
             FROM batch_runs r
             LEFT JOIN batch_summary s ON r.id = s.batch_id

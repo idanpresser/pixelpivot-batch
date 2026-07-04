@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
     procps \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js runtime (required for Sharp daemon)
