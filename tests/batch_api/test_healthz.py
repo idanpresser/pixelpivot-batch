@@ -43,6 +43,41 @@ def test_readiness_db_failure_named(monkeypatch):
 
 
 from app.batch_api import health as health_mod
+from app.core import toolcheck
+
+
+def test_readiness_marks_magick_not_ok_when_binary_absent(monkeypatch):
+    # E8 8.1 lock-in: readiness_checks must probe each encoder binary, so a
+    # missing magick binary surfaces as an unhealthy check named "magick"
+    # (not only DB/storage failures). Force the other probes healthy so the
+    # encoder probe alone decides the result.
+    def _fake_check_binary(name, path_str):
+        if name == "magick":
+            return toolcheck.ToolStatus("magick", ok=False, detail="not found")
+        return toolcheck.ToolStatus(name, ok=True, detail="ok")
+    monkeypatch.setattr(health.toolcheck, "check_binary", _fake_check_binary)
+    monkeypatch.setattr(health, "_check_db", lambda: health.Check("db", True, "ok"))
+    monkeypatch.setattr(health, "_check_storage", lambda: health.Check("storage", True, "ok"))
+    monkeypatch.setattr(
+        health.toolcheck, "check_sharp_daemon",
+        lambda port: toolcheck.ToolStatus("sharp", ok=True, detail="ok"),
+    )
+    checks = {c.name: c for c in health.readiness_checks(_FakeOrch())}
+    assert checks["magick"].ok is False
+    assert "not found" in checks["magick"].detail
+    assert checks["ffmpeg"].ok is True
+
+
+def test_ready_returns_503_naming_magick_when_encoder_absent(monkeypatch):
+    # Endpoint-level acceptance: magick absent -> 503 naming the missing encoder.
+    def _magick_down(_orch):
+        out = _all_ok(_orch)
+        return [c if c.name != "magick" else health_mod.Check("magick", False, "not found") for c in out]
+    monkeypatch.setattr("app.batch_api.main.readiness_checks", _magick_down)
+    with TestClient(app) as client:
+        resp = client.get("/healthz/ready")
+    assert resp.status_code == 503
+    assert "magick" in resp.json()["failed"]
 
 
 def _all_ok(_orch):
