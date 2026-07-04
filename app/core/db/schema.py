@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS batch_runs (
     total_images    INTEGER DEFAULT 0,
     heuristic_version TEXT,
     priority        INTEGER NOT NULL DEFAULT 0,
+    sample          INTEGER,
+    input_files     TEXT,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at    TIMESTAMP
 );
@@ -205,6 +207,8 @@ CREATE TABLE IF NOT EXISTS batch_runs (
     total_images    INTEGER DEFAULT 0,
     heuristic_version TEXT,
     priority        INTEGER NOT NULL DEFAULT 0,
+    sample          INTEGER,
+    input_files     TEXT,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at    TIMESTAMP
 );
@@ -432,6 +436,12 @@ def _create_tables(conn: Any) -> None:
             if "category" not in columns:
                 log.info("Migrating batch_runs: adding category column")
                 cur.execute("ALTER TABLE batch_runs ADD COLUMN category TEXT NOT NULL DEFAULT 'general'")
+            if "sample" not in columns:
+                log.info("Migrating batch_runs: adding sample column")
+                cur.execute("ALTER TABLE batch_runs ADD COLUMN sample INTEGER")
+            if "input_files" not in columns:
+                log.info("Migrating batch_runs: adding input_files column")
+                cur.execute("ALTER TABLE batch_runs ADD COLUMN input_files TEXT")
 
             # Migration: Add is_dlq to batch_errors if it's missing
             cur.execute("PRAGMA table_info('batch_errors')")

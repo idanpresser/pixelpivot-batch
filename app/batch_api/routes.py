@@ -51,6 +51,8 @@ def start_batch(
                 heuristic_version=orchestrator.interpolator.version,
                 priority=PRIORITY_HIGH,
                 category=",".join(req.category),
+                sample=req.sample,
+                input_files=",".join(req.input_files) if req.input_files else None,
             )
 
         from .queue_manager import get_queue_manager
@@ -77,6 +79,7 @@ def start_calibration(
                 trigger_type="calibration",
                 heuristic_version=orchestrator.interpolator.version,
                 category=",".join(req.category),
+                sample=req.sample,
             )
         from .queue_manager import get_queue_manager
         get_queue_manager().submit_calibration(run_id, req)
@@ -254,6 +257,8 @@ def restart_batch(
             tool=[Tool(t) for t in run["tool"].split(",") if t],
             category=[c for c in run["category"].split(",") if c] if run.get("category") else ["general"],
             trigger_type="restart",
+            sample=run.get("sample"),
+            input_files=[f for f in run["input_files"].split(",") if f] if run.get("input_files") else None,
         )
         new_id = repo.create_run(
             conn,
@@ -264,6 +269,8 @@ def restart_batch(
             trigger_type="restart",
             heuristic_version=orchestrator.interpolator.version,
             category=",".join(new_req.category),
+            sample=new_req.sample,
+            input_files=",".join(new_req.input_files) if new_req.input_files else None,
         )
     from .queue_manager import get_queue_manager
     get_queue_manager().submit_batch(new_id, new_req)

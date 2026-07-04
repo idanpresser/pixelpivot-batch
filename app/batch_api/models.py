@@ -64,11 +64,19 @@ class BatchRequest(BaseModel):
     category: Annotated[List[str], Field(min_length=1)] = ["general"]
     trigger_type: str = "manual"
     input_files: Optional[List[str]] = None
+    sample: Optional[int] = None
 
     @field_validator("source_dir", "target_dir")
     @classmethod
     def resolve_path(cls, v: str) -> str:
         return _resolve_path(v)
+
+    @field_validator("sample")
+    @classmethod
+    def validate_sample(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v <= 1:
+            raise ValueError("sample must be a positive integer greater than 1")
+        return v
 
 
 class CalibrationRequest(BaseModel):
@@ -85,6 +93,13 @@ class CalibrationRequest(BaseModel):
     @classmethod
     def resolve_path(cls, v: str) -> str:
         return _resolve_path(v)
+
+    @field_validator("sample")
+    @classmethod
+    def validate_sample(cls, v: int) -> int:
+        if v <= 1:
+            raise ValueError("sample must be a positive integer greater than 1")
+        return v
 
 
 class HotFolderRequest(BaseModel):

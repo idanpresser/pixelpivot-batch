@@ -82,13 +82,15 @@ class BatchQueueManager:
 
     def _reconstruct_request(self, row: dict):
         category_list = [c for c in row["category"].split(",") if c] if row.get("category") else ["general"]
+        sample_val = row.get("sample")
+        input_files_list = [f for f in row["input_files"].split(",") if f] if row.get("input_files") else None
         if row["trigger_type"] == "calibration":
             return CalibrationRequest(
                 source_dir=row["source_dir"],
                 target_format=[f for f in row["target_format"].split(",") if f],
                 tool=[Tool(t) for t in row["tool"].split(",") if t],
                 category=category_list,
-                sample=30,
+                sample=sample_val if sample_val is not None else 30,
                 target_ssim=0.98,
                 regenerate_table=True,
             )
@@ -99,6 +101,8 @@ class BatchQueueManager:
             tool=[Tool(t) for t in row["tool"].split(",") if t],
             category=category_list,
             trigger_type=row["trigger_type"],
+            input_files=input_files_list,
+            sample=sample_val,
         )
 
     def _refresh_queue_depth(self) -> None:

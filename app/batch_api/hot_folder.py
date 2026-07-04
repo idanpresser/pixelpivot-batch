@@ -194,6 +194,8 @@ class HotFolderHandler(FileSystemEventHandler):
                         heuristic_version=self.orchestrator.interpolator.version,
                         priority=PRIORITY_LOW,
                         category=",".join(self.config.get("category", ["general"])),
+                        sample=self.config.get("sample"),
+                        input_files=",".join(input_paths) if input_paths else None,
                     )
                 
                 # 3. Prepare request
@@ -204,7 +206,8 @@ class HotFolderHandler(FileSystemEventHandler):
                     tool=self.config["tool"],
                     category=self.config.get("category", ["general"]),
                     trigger_type="hot_folder",
-                    input_files=input_paths
+                    input_files=input_paths,
+                    sample=self.config.get("sample"),
                 )
                 
                 # 4. Dispatch to orchestrator (sync → thread pool to avoid blocking event loop)

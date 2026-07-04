@@ -40,6 +40,8 @@ class BatchRepository:
         status: str = "running",
         priority: int = 0,
         category: str = "general",
+        sample: Optional[int] = None,
+        input_files: Optional[str] = None,
     ) -> int:
         """Insert a new batch run row and return its id.
 
@@ -54,6 +56,8 @@ class BatchRepository:
             status: Initial status of the batch run.
             priority: Priority score for the run (higher is higher priority).
             category: Comma-separated categories for the run.
+            sample: Optional max number of images to process.
+            input_files: Optional comma-separated specific files to process.
 
         Returns:
             int: The id of the newly created batch_runs row.
@@ -63,12 +67,12 @@ class BatchRepository:
             cur.execute(
                 """
                 INSERT INTO batch_runs (
-                    source_dir, target_dir, target_format, tool, category, trigger_type, status, heuristic_version, priority
+                    source_dir, target_dir, target_format, tool, category, trigger_type, status, heuristic_version, priority, sample, input_files
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
-                (source_dir, target_dir, target_format, tool, category, trigger_type, status, heuristic_version, priority),
+                (source_dir, target_dir, target_format, tool, category, trigger_type, status, heuristic_version, priority, sample, input_files),
             )
             row = cur.fetchone()
             return int(row["id"]) if row else 0
@@ -102,7 +106,7 @@ class BatchRepository:
                 if cur.rowcount != 1:
                     return None  # lost the race; caller re-polls
                 cur.execute(
-                    "SELECT id, source_dir, target_dir, target_format, tool, category, trigger_type, priority "
+                    "SELECT id, source_dir, target_dir, target_format, tool, category, trigger_type, priority, sample, input_files "
                     "FROM batch_runs WHERE id = ?",
                     (run_id,),
                 )
@@ -237,6 +241,8 @@ class BatchRepository:
                         r.category      AS category,
                         r.trigger_type  AS trigger_type,
                         r.total_images  AS total_images,
+                        r.sample        AS sample,
+                        r.input_files   AS input_files,
                         r.created_at    AS created_at,
                         r.completed_at  AS completed_at,
                         COALESCE(s.duration_ms,   0) AS duration_ms,

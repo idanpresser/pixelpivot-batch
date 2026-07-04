@@ -173,8 +173,9 @@ class DirectoryScanner:
         if input_files is not None:
             for p in input_files:
                 path_obj = Path(p)
-                if path_obj.is_file() and path_obj.suffix.lower() in valid_exts:
-                    input_paths.append(str(path_obj))
+                full_path = source_path / path_obj if not path_obj.is_absolute() else path_obj
+                if full_path.is_file() and full_path.suffix.lower() in valid_exts:
+                    input_paths.append(str(full_path))
         else:
             max_attempts = 3
             for attempt in range(1, max_attempts + 1):
@@ -408,6 +409,8 @@ class BatchOrchestrator:
         try:
             # 1. Scan source_dir using DirectoryScanner
             input_paths = DirectoryScanner.scan(request.source_dir, request.input_files)
+            if getattr(request, "sample", None) is not None:
+                input_paths = input_paths[:request.sample]
             for p in input_paths:
                 try:
                     input_sizes[p] = os.path.getsize(p)
