@@ -1,5 +1,6 @@
 """Cavif converter via command-line encoder subprocess."""
 
+import os
 from typing import List, Union, Optional
 from .base import BaseConverter, ConvertResult
 
@@ -29,6 +30,7 @@ class CavifConverter(BaseConverter):
         output_path: str,
         target_format: str,
         quality: Union[int, float],
+        is_intermediate: bool = False,
         run_id: Optional[int] = None,
     ) -> ConvertResult:
         """Convert a single image file via cavif subprocess.
@@ -53,6 +55,11 @@ class CavifConverter(BaseConverter):
             return ConvertResult(success=False, error=f"{self.get_name()} is marked as broken")
 
         # Build cavif command: cavif --quality <quality> -o <out> <in>
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
         quality_val = round(quality)
         cmd = [
             self.cavif_path,
