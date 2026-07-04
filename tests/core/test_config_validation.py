@@ -66,6 +66,21 @@ def test_optional_max_workers_defaults_to_none_but_validates_when_present():
         validate_startup_config({"PIXELPIVOT_CONCURRENT_ENCODES_MAX_WORKERS": "0"})
 
 
+def test_app_import_fails_fast_on_bad_env(monkeypatch):
+    # Service-level: importing the FastAPI app with a malformed tunable must
+    # raise the clear ConfigValidationError at import — before the converter
+    # base parses the same var into a cryptic bare ValueError.
+    import importlib
+    import app.batch_api.main as main_mod
+
+    monkeypatch.setenv("PIXELPIVOT_WORKER_RAM_HEADROOM", "abc")
+    with pytest.raises(ConfigValidationError):
+        importlib.reload(main_mod)
+    # Restore a clean module for the rest of the session.
+    monkeypatch.delenv("PIXELPIVOT_WORKER_RAM_HEADROOM", raising=False)
+    importlib.reload(main_mod)
+
+
 def test_validate_and_log_emits_resolved_config_once(caplog):
     with caplog.at_level(logging.INFO):
         resolved = validate_and_log_startup_config({})

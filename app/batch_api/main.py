@@ -7,6 +7,13 @@ import asyncio
 import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+
+# Fail fast on malformed env tunables with a clear, var-named error BEFORE the
+# modules that consume them (converters/base, config) are imported below — a bad
+# value would otherwise surface as a cryptic bare ValueError at some import site.
+from ..core.config_validation import validate_startup_config
+validate_startup_config()
+
 from .routes import router
 from .hot_folder import init_hot_folder_manager, get_hot_folder_manager
 from .orchestrator import BatchOrchestrator
@@ -20,6 +27,10 @@ log = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage FastAPI app lifecycle: startup initialization and shutdown cleanup."""
+    # Validate env tunables and log the resolved effective config once per boot.
+    from ..core.config_validation import validate_and_log_startup_config
+    validate_and_log_startup_config()
+
     from .security import check_security_config
     check_security_config()
 
