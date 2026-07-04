@@ -70,8 +70,8 @@ def run_batch(label: str, request_data: dict) -> dict:
                         summary = status_data.get("summary") or {}
                         success_count = summary.get("success_count", 0)
                         failure_count = summary.get("failure_count", 0)
-                        cpu_avg = summary.get("cpu_avg", 0.0)
-                        ram_peak = summary.get("ram_peak", 0.0)
+                        cpu_avg = summary.get("cpu_avg_pct") or summary.get("cpu_avg", 0.0)
+                        ram_peak = summary.get("ram_peak_mb") or summary.get("ram_peak", 0.0)
                         savings = summary.get("savings_pct", 0.0)
                         
                         # Get errors if any
