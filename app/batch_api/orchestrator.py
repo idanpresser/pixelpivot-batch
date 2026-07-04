@@ -74,6 +74,34 @@ def quarantine_rejected(rejected: List[dict], target_dir: str) -> List[dict]:
 
 
 
+def cross_tool_fallback_tool() -> Optional[str]:
+    """Alternate tool for per-file fallback, or None when disabled (default).
+
+    Env-gated via PIXELPIVOT_FALLBACK_TOOL. Off by default so batches stay
+    deterministic; set to a tool name (e.g. "vips") to opt in.
+    """
+    tool = os.getenv("PIXELPIVOT_FALLBACK_TOOL", "").strip().lower()
+    return tool or None
+
+
+def apply_cross_tool_fallback(errors: List[dict], retry_one: Callable[[str], bool]):
+    """Split a cell's error records into (recovered_paths, remaining_errors).
+
+    ``retry_one(path)`` re-runs the file on the alternate tool and returns True
+    on success. Errors without a path (e.g. an unsupported-tool marker) are kept
+    as-is — there is nothing to retry.
+    """
+    recovered: List[str] = []
+    remaining: List[dict] = []
+    for err in errors:
+        path = err.get("path")
+        if path and retry_one(path):
+            recovered.append(path)
+        else:
+            remaining.append(err)
+    return recovered, remaining
+
+
 @dataclass(frozen=True)
 class MatrixCell:
     """A single (category, tool, format) combination in a batch matrix."""
@@ -281,6 +309,34 @@ class BatchOrchestrator:
         """
         from .image_guards import check_free_disk
         check_free_disk(target_dir)
+
+    def _fallback_retry_one(
+        self,
+        in_path: str,
+        alt_tool: str,
+        target_dir: str,
+        target_format: str,
+        quality: float,
+        suffix: str,
+        run_id: Optional[int],
+    ) -> bool:
+        """Retry a single failed file on the alternate tool. True on success.
+
+        Writes to the same cell output name (same suffix) so a recovered file
+        satisfies the cell it was failing in. Never raises — any error in the
+        alternate path just means the fallback did not recover the file.
+        """
+        alt = self.converters.get(alt_tool)
+        if alt is None or getattr(alt, "is_broken", False):
+            return False
+        stem = Path(in_path).stem
+        out_path = str(Path(target_dir) / f"{stem}{suffix}.{target_format}")
+        try:
+            res = alt.convert(in_path, out_path, target_format, quality, run_id=run_id)
+            return bool(getattr(res, "success", False))
+        except Exception as e:
+            log.warning("cross-tool fallback via %s failed for %s: %s", alt_tool, Path(in_path).name, e)
+            return False
 
     def _probe_quality(self, path: str, category: str, tool: str, target_format: str, cached_dim: tuple[int, int] | None = None) -> float:
         """Probes a single image and returns its target quality."""
@@ -499,6 +555,26 @@ class BatchOrchestrator:
                     if tool_val:
                         result.tool = tool_val
                 
+                # Optional per-file cross-tool fallback (env-gated, off by
+                # default). Retry each failed file on the configured alternate
+                # tool before it is counted as a failure / quarantined.
+                fb_tool = cross_tool_fallback_tool()
+                if fb_tool and fb_tool != t_name and result.errors:
+                    q_by_path = dict(zip(input_paths, qualities))
+                    recovered, result.errors = apply_cross_tool_fallback(
+                        result.errors,
+                        lambda p: self._fallback_retry_one(
+                            p, fb_tool, request.target_dir, fmt,
+                            q_by_path.get(p, default_quality_for(fb_tool, fmt)),
+                            suffix, run_id,
+                        ),
+                    )
+                    if recovered:
+                        n = len(recovered)
+                        result.success_count += n
+                        result.failure_count = max(0, result.failure_count - n)
+                        log.info("cross-tool fallback via %s recovered %d file(s)", fb_tool, n)
+
                 # Quarantine failed files to DLQ
                 quarantined_errors = []
                 for err in result.errors:
