@@ -51,6 +51,28 @@ def quarantine_to_dlq(in_path: str, target_dir: str, reason: str) -> dict:
     return {"path": str(dest), "reason": reason, "dlq": True}
 
 
+def quarantine_rejected(rejected: List[dict], target_dir: str) -> List[dict]:
+    """Route upfront-rejected inputs to the DLQ, returning dlq error records.
+
+    Rejects come from the shared partition gate (partition_images), which runs
+    once before any converter — so every tool sees the same usable set and
+    reject counts are identical cross-tool. Moving each rejected file to
+    corrupt_or_failed/ here (instead of only logging it) means malformed inputs
+    land in the DLQ with a reason, consistent with per-file conversion failures.
+    Pathless records (e.g. an unsupported-tool error) are passed through as-is.
+    """
+    out: List[dict] = []
+    for rej in rejected:
+        path = rej.get("path")
+        reason = rej.get("error", "rejected")
+        if path and path != "N/A":
+            rec = quarantine_to_dlq(path, target_dir, reason=reason)
+            out.append({"path": rec["path"], "error": rec["reason"], "dlq": True})
+        else:
+            out.append(rej)
+    return out
+
+
 
 @dataclass(frozen=True)
 class MatrixCell:
@@ -386,7 +408,9 @@ class BatchOrchestrator:
             # (single source of truth, also used by the calibration runner).
             from .image_guards import partition_images
             input_paths, rejected = partition_images(input_paths, dim_cache)
-            for rej in rejected:
+            # Route rejects to the DLQ once (files moved a single time), then
+            # accrue one failure per matrix cell they would have run in.
+            for rej in quarantine_rejected(rejected, request.target_dir):
                 log.error(rej["error"])
                 all_failure_count += len(plan)
                 for _ in plan:
