@@ -41,6 +41,7 @@ test_results_snippet.txt
 # Ignore vendored binaries and offline installers
 bin/
 vendor/
+scratch/
 python-3.14.5-embed-amd64/
 python-3.14.5-embed-amd64.zip
 
