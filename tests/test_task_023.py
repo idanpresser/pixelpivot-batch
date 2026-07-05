@@ -49,9 +49,9 @@ def test_starts_sharp_via_npm_start_when_node_modules_present() -> None:
     assert re.search(r"node_modules[\\/]sharp", text), (
         "sandbox_init.ps1 must check for the vendored node_modules\\sharp path"
     )
-    # Must call `npm start` (or node app/scripts/sharp_daemon.js) on the
+    # Must call `npm start` (or node services/sharp-daemon/sharp_daemon.js) on the
     # offline-mapped install
-    assert re.search(r"\bnpm\s+start\b|node\s+app[\\/]scripts[\\/]sharp_daemon\.js", text), (
+    assert re.search(r"\bnpm\s+start\b|node\s+services[\\/]sharp-daemon[\\/]sharp_daemon\.js", text), (
         "sandbox_init.ps1 must boot Sharp via `npm start` or the daemon directly"
     )
 

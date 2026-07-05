@@ -29,23 +29,25 @@ if vips_dir.exists():
 datas = [
     ('app/core/heuristic_table.json', 'app/core'),
     ('app/core/heuristic_weights.json', 'app/core'),
-    ('app/scripts', 'app/scripts'),
+    ('services/sharp-daemon/package.json', 'services/sharp-daemon'),
+    ('services/sharp-daemon/package-lock.json', 'services/sharp-daemon'),
+    ('services/sharp-daemon/sharp_daemon.js', 'services/sharp-daemon'),
     ('vendor/node', 'node'),
     ('bin/ffmpeg', 'bin/ffmpeg'),
     ('bin/magick', 'bin/magick'),
 ] + vips_datas
 
-# Dynamically map node_modules to the bundle root
+# Dynamically map node_modules to services/sharp-daemon/node_modules
 if Path('vendor/node/node_modules').exists():
-    datas.append(('vendor/node/node_modules', 'node_modules'))
-elif Path('node_modules').exists():
-    datas.append(('node_modules', 'node_modules'))
+    datas.append(('vendor/node/node_modules', 'services/sharp-daemon/node_modules'))
+elif Path('services/sharp-daemon/node_modules').exists():
+    datas.append(('services/sharp-daemon/node_modules', 'services/sharp-daemon/node_modules'))
 
-# Map sharp node module to node_modules/sharp in the bundle
-if Path('node_modules/sharp').exists():
-    datas.append(('node_modules/sharp', 'node_modules/sharp'))
+# Map sharp node module to services/sharp-daemon/node_modules/sharp in the bundle
+if Path('services/sharp-daemon/node_modules/sharp').exists():
+    datas.append(('services/sharp-daemon/node_modules/sharp', 'services/sharp-daemon/node_modules/sharp'))
 elif Path('vendor/node/node_modules/sharp').exists():
-    datas.append(('vendor/node/node_modules/sharp', 'node_modules/sharp'))
+    datas.append(('vendor/node/node_modules/sharp', 'services/sharp-daemon/node_modules/sharp'))
 
 # Hidden imports
 hiddenimports = (

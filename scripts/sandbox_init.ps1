@@ -88,13 +88,13 @@ Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "cd $ProjectRo
 # vendored `node_modules\sharp` is mapped in from the host (run `npm install`
 # on the host once, then ship the tree to the sandbox).
 if (Get-Command node -ErrorAction SilentlyContinue) {
-    $SharpModule = Join-Path $ProjectRoot "node_modules\sharp"
+    $SharpModule = Join-Path $ProjectRoot "services\sharp-daemon\node_modules\sharp"
     if (Test-Path $SharpModule) {
         Write-Host "  -> Node.js + node_modules\sharp found. Starting Sharp Daemon (offline)..."
-        Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "cd $ProjectRoot; npm start" -WindowStyle Minimized
+        Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "cd $ProjectRoot\services\sharp-daemon; npm start" -WindowStyle Minimized
     } else {
-        Write-Host "  -> node_modules\sharp not vendored. Sharp converter unavailable." -ForegroundColor Yellow
-        Write-Host "     Run ``npm install`` on the host before launching the sandbox to fix." -ForegroundColor Yellow
+        Write-Host "  -> node_modules\sharp not vendored in services/sharp-daemon. Sharp converter unavailable." -ForegroundColor Yellow
+        Write-Host "     Run ``npm install`` on the host inside services/sharp-daemon before launching the sandbox to fix." -ForegroundColor Yellow
     }
 } else {
     Write-Host "  -> Node.js not found. Sharp converter will be unavailable." -ForegroundColor Yellow

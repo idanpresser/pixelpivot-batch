@@ -12,7 +12,7 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
-      - /app/node_modules        # preserve image contents over the host mount
+      - /app/services/sharp-daemon/node_modules        # preserve image contents over the host mount
       - sqlitedata:/data         # SQLite file lives on a Docker volume, NOT /mnt
                                  # (WSL2 mounts under /mnt are slow for fsync-heavy workloads)
       - ./test_examples:/app/test_examples
@@ -59,7 +59,7 @@ services:
     command: ["tail", "-f", "/dev/null"]   # keep alive
     volumes:
       - .:/app
-      - /app/node_modules
+      - /app/services/sharp-daemon/node_modules
       - sqlitedata:/data
     environment:
       - IS_DOCKER=true

@@ -1,7 +1,7 @@
 """History panel — displays past batch runs and aggregated metrics."""
 import streamlit as st
 import pandas as pd
-from app.core.api_client import APIClient
+from app.web.batch_gui.api_client import APIClient
 
 def render_history_panel(client: APIClient):
     """Render the history panel with batch runs table and failure details.

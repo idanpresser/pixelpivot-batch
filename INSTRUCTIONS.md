@@ -18,7 +18,7 @@ Both modes share the same Python codebase, REST API surface, database schema, an
 | FastAPI Backend (`app/batch_api`) | Orchestrates batches, manages hot folders, persists telemetry | `8000` |
 | Streamlit GUI (`app/web/batch_gui`) | Manual job entry, hot-folder management, history review | `8503` |
 | **SQLite Database** | Batch runs, summaries, image tracking, analytics | **`/data/pixelpivot.db`** (Docker) · **`./data/pixelpivot.db`** (native) |
-| Sharp Daemon (`app/scripts/sharp_daemon.js`) | Persistent Node.js worker for pipelined Sharp conversions | `8765` (dynamic) |
+| Sharp Daemon (`services/sharp-daemon/sharp_daemon.js`) | Persistent Node.js worker for pipelined Sharp conversions | `8765` (dynamic) |
 
 There is no separate database service. The engine writes to a single SQLite file with WAL journaling, 5-second busy-timeout, and foreign keys enforced.
 

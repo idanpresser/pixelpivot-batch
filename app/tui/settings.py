@@ -18,7 +18,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     "api":      {"host": "127.0.0.1", "port": 8000},
     "paths":    {"db": "./data/pixelpivot.db", "sharp_port": 8765},
     "tools":    {"ffmpeg": "", "magick": "",
-                 "sharp_script": "app/scripts/sharp_daemon.js",
+                 "sharp_script": "services/sharp-daemon/sharp_daemon.js",
                  "enabled": ["magick", "ffmpeg", "vips", "sharp"]},
     "security": {"allowed_root": ""},
     "limits":   {"max_workers": 0},

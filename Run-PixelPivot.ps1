@@ -11,7 +11,7 @@ $root = $PSScriptRoot
 
 $py    = Join-Path $root 'python-3.14.5-embed-amd64\python.exe'
 $node  = Join-Path $root 'vendor\node\node.exe'
-$sharp = Join-Path $root 'app\scripts\sharp_daemon.js'
+$sharp = Join-Path $root 'services\sharp-daemon\sharp_daemon.js'
 $db    = Join-Path $root 'data\pixelpivot.db'
 
 if (-not (Test-Path $py))   { throw "Embedded Python not found: $py" }
@@ -34,7 +34,7 @@ Write-Host "  Root : $root"
 Write-Host "  API  : http://localhost:$Port"
 
 $sharpProc = Start-Process -FilePath $node -ArgumentList $sharp `
-    -WorkingDirectory $root -PassThru -WindowStyle Hidden
+    -WorkingDirectory (Join-Path $root 'services\sharp-daemon') -PassThru -WindowStyle Hidden
 Write-Host "  Sharp PID: $($sharpProc.Id)"
 
 $apiProc = Start-Process -FilePath $py `

@@ -1,7 +1,7 @@
 # --- Stage 1: Node.js Dependencies ---
 FROM node:20-slim AS node-builder
-WORKDIR /app
-COPY package*.json ./
+WORKDIR /app/services/sharp-daemon
+COPY services/sharp-daemon/package*.json ./
 RUN npm install --omit=dev
 
 # --- Stage 2: Final Production Image ---
@@ -32,8 +32,8 @@ COPY pyproject.toml .
 RUN pip install --no-cache-dir ".[dev,gui]"
 
 # Copy Node.js dependencies from builder
-COPY --from=node-builder /app/node_modules ./node_modules
-COPY package*.json ./
+COPY --from=node-builder /app/services/sharp-daemon/node_modules ./services/sharp-daemon/node_modules
+COPY services/sharp-daemon/package*.json ./services/sharp-daemon/
 
 # Copy application code
 COPY . .

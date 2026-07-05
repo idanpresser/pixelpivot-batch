@@ -31,7 +31,7 @@ if (Test-Path $ExtractedDir) {
 $env:Path = "$NodeDir;" + $env:Path
 
 Write-Host "Installing Sharp dependencies..." -ForegroundColor Cyan
-Set-Location ".."
+Set-Location "..\services\sharp-daemon"
 & npm install
 
 Write-Host "`nPortable Sharp environment ready!" -ForegroundColor Green

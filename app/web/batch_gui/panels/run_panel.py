@@ -4,7 +4,7 @@ import time
 import json
 import os
 from pathlib import Path
-from app.core.api_client import APIClient
+from app.web.batch_gui.api_client import APIClient
 from app.web.batch_gui.style_utils import render_metric_dashboard, render_status_header
 
 def load_defaults():

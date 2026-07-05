@@ -86,7 +86,7 @@ def sharp(state: UiState, supervisor: Any, action: str) -> None:
         return
     try:
         settings = state.settings or {}
-        sharp_script = settings.get("tools", {}).get("sharp_script", "app/scripts/sharp_daemon.js")
+        sharp_script = settings.get("tools", {}).get("sharp_script", "services/sharp-daemon/sharp_daemon.js")
         sharp_port = settings.get("paths", {}).get("sharp_port", 8765)
 
         if action == "stop":

@@ -110,9 +110,9 @@ Pass "API started (PID $($script:apiProc.Id))"
 # ---- Phase 3: Sharp Daemon ----
 Step "Phase 3: Sharp daemon"
 $node  = Join-Path $DeployDir 'vendor\node\node.exe'
-$sharp = Join-Path $DeployDir 'app\scripts\sharp_daemon.js'
+$sharp = Join-Path $DeployDir 'services\sharp-daemon\sharp_daemon.js'
 $script:sharpProc = Start-Process -FilePath $node -ArgumentList $sharp `
-    -WorkingDirectory $DeployDir -PassThru -WindowStyle Hidden
+    -WorkingDirectory (Join-Path $DeployDir 'services\sharp-daemon') -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 3
 if ($script:sharpProc.HasExited) {
     Fail "Sharp daemon" "exited immediately (code $($script:sharpProc.ExitCode))"

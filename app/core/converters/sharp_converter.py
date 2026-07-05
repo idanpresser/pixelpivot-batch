@@ -172,15 +172,15 @@ class SharpConverter(BaseConverter):
         if self._is_port_open() and self._test_daemon_ready():
             return  # already up and responsive
 
-        # Resolve daemon path: app/scripts/sharp_daemon.js
+        # Resolve daemon path: services/sharp-daemon/sharp_daemon.js
         # __file__ is in app/core/converters/, so we need to go up 2 levels to 'app'
         app_dir = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         )
-        daemon_path = os.path.join(app_dir, "scripts", "sharp_daemon.js")
+        root_dir = os.path.dirname(app_dir)  # Go up one more level to project root
+        daemon_path = os.path.join(root_dir, "services", "sharp-daemon", "sharp_daemon.js")
 
         # Check for portable Node.js or system Node.js
-        root_dir = os.path.dirname(app_dir)  # Go up one more level to project root
         portable_node = (
             os.path.join(root_dir, "node", "node.exe")
             if sys.platform == "win32"
@@ -200,7 +200,7 @@ class SharpConverter(BaseConverter):
 
         max_spawn_retries = 3
         for spawn_attempt in range(max_spawn_retries):
-            # Run daemon with cwd=project root so require('sharp') resolves to ./node_modules
+            # Run daemon with cwd=services/sharp-daemon so require('sharp') resolves to ./node_modules
             log.info(f"Starting Sharp daemon on atomic port 0 (attempt {spawn_attempt+1})...")
             # Use CREATE_NO_WINDOW on Windows to prevent console flash
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -210,7 +210,7 @@ class SharpConverter(BaseConverter):
                 stderr=subprocess.PIPE,
                 stdin=subprocess.PIPE,  # Keep pipe open so Node dies when Python dies
                 text=True,
-                cwd=root_dir,
+                cwd=os.path.join(root_dir, "services", "sharp-daemon"),
                 creationflags=creationflags,
             )
 

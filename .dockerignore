@@ -1,0 +1,51 @@
+# Ignore all build and deployment outputs
+out/
+deploy/
+dist/
+build/
+pixelpivot_batch.egg-info/
+
+# Ignore local Python virtual environments and caches
+.venv/
+.venv*/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore local databases and dynamic logs
+data/
+*.db
+*.log
+*.log.*
+.beads/
+.antigravitycli/
+. remember/
+.coverage
+
+# Ignore host Node dependencies (rebuilt inside Docker stage 1)
+**/node_modules/
+services/sharp-daemon/node_modules/
+
+# Ignore heavy testing assets and samples
+test_pics/
+image_samples/
+converted_images/
+corrupt_or_failed/
+dummy_out/
+test_results_snippet.txt
+
+# Ignore vendored binaries and offline installers
+bin/
+vendor/
+python-3.14.5-embed-amd64/
+python-3.14.5-embed-amd64.zip
+
+# Ignore Git files
+.git/
+.gitignore
+.gitattributes
+.worktrees/

@@ -47,6 +47,13 @@ Step "Stage app\"
 & robocopy (Join-Path $ProjectRoot 'app') (Join-Path $DeployDir 'app') `
     /E /XD __pycache__ /XF *.pyc /NFL /NDL /NJH /NJS | Out-Null
 
+# ---- 3b. Stage services ----
+Step "Stage services\"
+New-Item -ItemType Directory -Force (Join-Path $DeployDir 'services\sharp-daemon') | Out-Null
+Copy-Item -Force (Join-Path $ProjectRoot 'services\sharp-daemon\package.json') (Join-Path $DeployDir 'services\sharp-daemon\package.json')
+Copy-Item -Force (Join-Path $ProjectRoot 'services\sharp-daemon\package-lock.json') (Join-Path $DeployDir 'services\sharp-daemon\package-lock.json')
+Copy-Item -Force (Join-Path $ProjectRoot 'services\sharp-daemon\sharp_daemon.js') (Join-Path $DeployDir 'services\sharp-daemon\sharp_daemon.js')
+
 # ---- 4. Stage embedded Python ----
 Step "Stage embedded Python"
 & robocopy $pyEmbed (Join-Path $DeployDir 'python-3.14.5-embed-amd64') /E /NFL /NDL /NJH /NJS | Out-Null

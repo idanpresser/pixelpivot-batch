@@ -94,6 +94,13 @@ if (Test-Path (Join-Path $ProjectRoot '.streamlit')) {
     Copy-Into '.streamlit'
 }
 
+# Copy services/sharp-daemon files explicitly
+New-Item -ItemType Directory -Force (Join-Path $BundleDir 'services\sharp-daemon') | Out-Null
+Copy-Item -Force (Join-Path $ProjectRoot 'services\sharp-daemon\package.json') (Join-Path $BundleDir 'services\sharp-daemon\package.json')
+Copy-Item -Force (Join-Path $ProjectRoot 'services\sharp-daemon\package-lock.json') (Join-Path $BundleDir 'services\sharp-daemon\package-lock.json')
+Copy-Item -Force (Join-Path $ProjectRoot 'services\sharp-daemon\sharp_daemon.js') (Join-Path $BundleDir 'services\sharp-daemon\sharp_daemon.js')
+Write-Host '  + services'
+
 # --- 4. Runtime ---
 
 Step 'Staging runtime (Python + wheels + node + binaries)'
@@ -117,8 +124,6 @@ Copy-Into 'bin'                  # ffmpeg, magick, vips
 Step 'Staging project metadata'
 $metaFiles = @(
     'pyproject.toml',
-    'package.json',
-    'package-lock.json',
     'PixelPivot.wsb',
     'README.md',
     'CLAUDE.md',

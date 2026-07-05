@@ -1,2 +1,2 @@
-from app.core.api_client import APIClient
+from app.web.batch_gui.api_client import APIClient
 print("Success")
