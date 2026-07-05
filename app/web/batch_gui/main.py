@@ -7,7 +7,7 @@ import streamlit as st
 import os
 from pathlib import Path
 import base64
-from app.web.batch_gui.api_client import APIClient
+from app.core.api_client import APIClient
 from app.web.batch_gui.panels.run_panel import render_run_panel
 from app.web.batch_gui.panels.history_panel import render_history_panel
 from app.web.batch_gui.panels.hot_folder_panel import render_hot_folder_panel

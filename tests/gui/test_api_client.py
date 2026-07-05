@@ -1,7 +1,7 @@
 import httpx
 import pytest
 import respx
-from app.web.batch_gui.api_client import APIClient
+from app.core.api_client import APIClient
 
 @pytest.fixture
 def client():
