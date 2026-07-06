@@ -565,6 +565,20 @@ class BatchOrchestrator:
                 except Exception as err:
                     log.warning(f"Analytics recording failed (best-effort): {err}")
 
+            # Automatically generate HTML report in the target directory
+            try:
+                with get_connection() as conn:
+                    run_info = self.repo.get_run(conn, run_id)
+                if run_info and run_info.get("target_dir"):
+                    from app.core.reports.generator import generate_report_for_run
+                    from app.batch_api.models import _resolve_path
+                    target_dir = _resolve_path(run_info["target_dir"])
+                    report_path = os.path.join(target_dir, f"batch_report_run_{run_id}.html")
+                    generate_report_for_run(run_id, report_path)
+                    log.info(f"HTML batch report generated successfully: {report_path}")
+            except Exception as report_err:
+                log.warning(f"Failed to automatically generate HTML report: {report_err}")
+
         except Exception as e:
             log.error(f"Error during finalization for run {run_id}: {e}")
         finally:
