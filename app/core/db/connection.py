@@ -302,7 +302,14 @@ class _CompatConnection:
         self._paramstyle = paramstyle
 
     def cursor(self) -> _CompatCursor:
-        return _CompatCursor(self._raw.cursor(), self._paramstyle)
+        cur = self._raw.cursor()
+        if self._paramstyle != "qmark":
+            try:
+                from psycopg.rows import dict_row
+                cur.row_factory = dict_row  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        return _CompatCursor(cur, self._paramstyle)
 
     def execute(self, sql, params=()):
         cur = self.cursor()
@@ -383,12 +390,6 @@ def get_connection() -> Iterator[Any]:
             _local.depth = 0
 
         raw = engine.raw_connection()
-        if paramstyle != "qmark":
-            try:
-                from psycopg.rows import dict_row
-                raw.row_factory = dict_row  # type: ignore[attr-defined]
-            except Exception:
-                pass
         c = _CompatConnection(raw, paramstyle)
         _local.conn = c
         _local.conn_path = current_path
