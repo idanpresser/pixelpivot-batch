@@ -15,7 +15,7 @@ from typing import Optional
 
 from ... import config
 from ...logger import get_logger
-from ..connection import with_db_retry
+from ..connection import with_db_retry, DBConnection
 
 log = get_logger(__name__)
 
@@ -30,7 +30,7 @@ class BatchRepository:
     @with_db_retry
     def create_run(
         self,
-        conn: sqlite3.Connection,
+        conn: DBConnection,
         source_dir: str,
         target_dir: str,
         target_format: str,
@@ -46,7 +46,7 @@ class BatchRepository:
         """Insert a new batch run row and return its id.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             source_dir: Input directory path.
             target_dir: Output directory path.
             target_format: Target image format (e.g. 'webp', 'avif').
@@ -117,14 +117,14 @@ class BatchRepository:
                 cur.close()
 
     @with_db_retry
-    def reap_stale_running(self, conn: sqlite3.Connection) -> int:
+    def reap_stale_running(self, conn: DBConnection) -> int:
         """Transition all 'running' batches to 'interrupted' state.
 
         Called on startup to clear ghost runs left by a process crash/restart.
         Sets completed_at=CURRENT_TIMESTAMP for each affected row.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
 
         Returns:
             int: The number of batch_runs rows transitioned to 'interrupted'.
@@ -145,7 +145,7 @@ class BatchRepository:
     @with_db_retry
     def update_status(
         self,
-        conn: sqlite3.Connection,
+        conn: DBConnection,
         run_id: int,
         status: str,
         total_images: Optional[int] = None,
@@ -156,7 +156,7 @@ class BatchRepository:
         'completed' or 'failed' (terminal states).
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             run_id: batch_runs.id to update.
             status: New status value (e.g. 'running', 'completed', 'failed').
             total_images: Optional total image count for this batch.
@@ -179,11 +179,11 @@ class BatchRepository:
         finally:
             cur.close()
 
-    def get_run(self, conn: sqlite3.Connection, run_id: int) -> Optional[dict]:
+    def get_run(self, conn: DBConnection, run_id: int) -> Optional[dict]:
         """Fetch a single batch_runs row by id.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             run_id: batch_runs.id to retrieve.
 
         Returns:
@@ -197,11 +197,11 @@ class BatchRepository:
         finally:
             cur.close()
 
-    def get_summary(self, conn: sqlite3.Connection, batch_id: int) -> Optional[dict]:
+    def get_summary(self, conn: DBConnection, batch_id: int) -> Optional[dict]:
         """Fetch a single batch_summary row by batch_id.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             batch_id: batch_summary.batch_id to retrieve.
 
         Returns:
@@ -215,14 +215,14 @@ class BatchRepository:
         finally:
             cur.close()
 
-    def get_all_runs(self, conn: sqlite3.Connection) -> list[dict]:
+    def get_all_runs(self, conn: DBConnection) -> list[dict]:
         """Fetch recent batch_runs with summary fields joined (up to 100 rows).
 
         Columns are explicitly aliased (run_id, duration_ms, etc.) to avoid
         collisions with r.id from batch_runs. Ordered by created_at DESC.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
 
         Returns:
             list[dict] with aliased columns: run_id, status, target_format, tool,
@@ -266,7 +266,7 @@ class BatchRepository:
     @with_db_retry
     def save_summary(
         self,
-        conn: sqlite3.Connection,
+        conn: DBConnection,
         batch_id: int,
         duration_ms: float,
         cpu_avg_pct: float,
@@ -283,7 +283,7 @@ class BatchRepository:
         Uses SQLite UPSERT to idempotently update an existing row.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             batch_id: batch_summary.batch_id (PRIMARY KEY).
             duration_ms: Total batch runtime in milliseconds.
             cpu_avg_pct: Average CPU utilization (0-100).
@@ -323,7 +323,7 @@ class BatchRepository:
 
     @with_db_retry
     def save_errors(
-        self, conn: sqlite3.Connection, batch_id: int, errors: list[dict]
+        self, conn: DBConnection, batch_id: int, errors: list[dict]
     ) -> None:
         """Insert batch_errors rows for per-file conversion failures.
 
@@ -331,7 +331,7 @@ class BatchRepository:
         (error message). Empty list is a no-op.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             batch_id: batch_errors.batch_id foreign key.
             errors: list[dict] with "path" and "error" keys.
         """
@@ -348,12 +348,12 @@ class BatchRepository:
             cur.close()
 
     def get_errors(
-        self, conn: sqlite3.Connection, batch_id: int, limit: int = 100
+        self, conn: DBConnection, batch_id: int, limit: int = 100
     ) -> list[dict]:
         """Fetch batch_errors rows for a given batch.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             batch_id: batch_errors.batch_id to filter by.
             limit: Maximum number of error rows to return (default 100).
 
@@ -379,7 +379,7 @@ class BatchRepository:
     @with_db_retry
     def save_calibration_result(
         self,
-        conn: sqlite3.Connection,
+        conn: DBConnection,
         batch_id: int,
         input_path: str,
         target_ssim: float,
@@ -392,7 +392,7 @@ class BatchRepository:
         Persists detailed quality calibration data for per-image analysis.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             batch_id: calibration_results.batch_id foreign key.
             input_path: Path to the input image file.
             target_ssim: Target SSIM value for calibration.
@@ -429,11 +429,11 @@ class BatchRepository:
         finally:
             cur.close()
 
-    def get_calibration_results(self, conn: sqlite3.Connection, batch_id: int) -> list[dict]:
+    def get_calibration_results(self, conn: DBConnection, batch_id: int) -> list[dict]:
         """Fetch all calibration_results rows for a given batch.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             batch_id: calibration_results.batch_id to filter by.
 
         Returns:
@@ -449,14 +449,14 @@ class BatchRepository:
         finally:
             cur.close()
 
-    def export_calibration_data(self, conn: sqlite3.Connection, batch_id: int) -> list[dict]:
+    def export_calibration_data(self, conn: DBConnection, batch_id: int) -> list[dict]:
         """Fetch calibration results with data_json deserialized to 'attempts'.
 
         Returns an empty list when no results exist. Modifies returned dicts
         in-place to unpack data_json into an "attempts" key.
 
         Args:
-            conn: sqlite3.Connection for database access.
+            conn: DBConnection for database access.
             batch_id: calibration_results.batch_id to filter by.
 
         Returns:

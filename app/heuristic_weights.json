@@ -1,0 +1,76 @@
+{
+  "description": "PixelPivot heuristic quality curves (quality = a + b*log10(MP)).",
+  "generated_from": "SQLite",
+  "lookup": {
+    "general|webp|vips": {
+      "a": 80.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "general|webp|sharp": {
+      "a": 80.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "general|webp|ffmpeg": {
+      "a": 80.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "general|webp|magick": {
+      "a": 80.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "general|avif|vips": {
+      "a": 80.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "general|avif|sharp": {
+      "a": 80.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "general|avif|ffmpeg": {
+      "a": 30.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "general|avif|cavif": {
+      "a": 80.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "general|avif|magick": {
+      "a": 80.0,
+      "b": -0.0,
+      "n": 204,
+      "mp_min": 0.0,
+      "mp_max": 8.2944
+    },
+    "highRes|avif|cavif": {
+      "a": 90.6,
+      "b": 0.0,
+      "n": 50,
+      "mp_min": 8.2944,
+      "mp_max": 8.2944
+    }
+  }
+}

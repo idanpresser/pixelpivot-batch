@@ -84,3 +84,35 @@ def test_transaction_atomicity_nested_caught(monkeypatch):
             assert len(rows) == 1
             assert rows[0][0] == "outer"
 
+
+def test_thread_local_connection_depth_resilience_under_pool_reuse():
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def task_with_exception():
+        try:
+            with get_connection() as conn:
+                conn.execute("SELECT 1")
+                raise ValueError("Mid-block exception")
+        except ValueError:
+            pass
+        return "done"
+        
+    def task_normal():
+        from app.core.db.connection import _local
+        # Ensure depth is clean at task start
+        assert getattr(_local, "depth", 0) == 0
+        with get_connection() as conn:
+            assert getattr(_local, "depth", 0) == 1
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        return "ok"
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        f1 = executor.submit(task_with_exception)
+        assert f1.result() == "done"
+        
+        f2 = executor.submit(task_normal)
+        assert f2.result() == "ok"
+
+

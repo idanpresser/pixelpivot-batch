@@ -1,6 +1,6 @@
 """Hot folder panel — manages automatic directory monitoring and batch triggers."""
 import streamlit as st
-from app.web.batch_gui.api_client import APIClient
+from app.core.api_client import APIClient
 
 def render_hot_folder_panel(client: APIClient):
     """Render the hot folder management panel with registration form and active watchers.

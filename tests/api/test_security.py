@@ -30,7 +30,7 @@ def test_startup_loopback_default():
             assert response.status_code == 200
 
 def test_mutating_routes_auth_enforced():
-    """When PIXELPIVOT_API_TOKEN is set, mutating routes should return 401 without correct token."""
+    """When PIXELPIVOT_API_TOKEN is set, routes under /api/ or mutating routes should return 401 without correct token."""
     with patch.dict(os.environ, {"PIXELPIVOT_HOST": "127.0.0.1", "PIXELPIVOT_API_TOKEN": "mysecrettoken"}):
         from app.batch_api.main import app
         with TestClient(app) as client:
@@ -43,10 +43,14 @@ def test_mutating_routes_auth_enforced():
             res = client.post("/api/v1/batch/start", headers={"X-API-Token": "wrong"}, json={})
             assert res.status_code == 401
 
-            # 3. GET route (safe) without token -> does not return 401
+            # 3. GET route under /api/ without token -> returns 401
             res = client.get("/api/v1/batch/history")
-            assert res.status_code != 401
+            assert res.status_code == 401
 
-            # 4. Mutating POST with correct token -> goes past auth layer (returns validation error 422)
+            # 4. GET route under /api/ with correct token -> goes past auth layer
+            res = client.get("/api/v1/batch/history", headers={"X-API-Token": "mysecrettoken"})
+            assert res.status_code == 200
+
+            # 5. Mutating POST with correct token -> goes past auth layer (returns validation error 422)
             res = client.post("/api/v1/batch/start", headers={"X-API-Token": "mysecrettoken"}, json={})
             assert res.status_code == 422

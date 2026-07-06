@@ -10,6 +10,12 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 
+class APIError(Exception):
+    """Exception raised when an API request fails."""
+    pass
+
+
+
 class ClientCallableWrapper:
     """Wrapper that delegates attribute access to the underlying httpx.Client,
     and is also callable as a method for backward compatibility.
@@ -60,38 +66,29 @@ class APIClient:
             )
         return self._client_instance
 
-    def _get(self, path: str) -> Any:
+    def _request(self, method: str, path: str, json: Optional[dict] = None) -> Any:
         c = self._get_or_create_client()
-        r = c.get(f"{self.base_url}{path}")
+        try:
+            r = c.request(method, f"{self.base_url}{path}", json=json)
+        except httpx.RequestError as e:
+            raise APIError(f"API Connection Error: {e}") from e
+
         if r.status_code != 200:
             try:
                 detail = r.json().get("detail", r.text)
             except Exception:
                 detail = r.text
-            raise Exception(f"API Error: {detail}")
+            raise APIError(f"API Error: {detail}")
         return r.json()
+
+    def _get(self, path: str) -> Any:
+        return self._request("GET", path)
 
     def _post(self, path: str, json: Optional[dict] = None) -> Any:
-        c = self._get_or_create_client()
-        r = c.post(f"{self.base_url}{path}", json=json)
-        if r.status_code != 200:
-            try:
-                detail = r.json().get("detail", r.text)
-            except Exception:
-                detail = r.text
-            raise Exception(f"API Error: {detail}")
-        return r.json()
+        return self._request("POST", path, json=json)
 
     def _delete(self, path: str) -> Any:
-        c = self._get_or_create_client()
-        r = c.delete(f"{self.base_url}{path}")
-        if r.status_code != 200:
-            try:
-                detail = r.json().get("detail", r.text)
-            except Exception:
-                detail = r.text
-            raise Exception(f"API Error: {detail}")
-        return r.json()
+        return self._request("DELETE", path)
 
     def close(self) -> None:
         """Close the underlying HTTPX client."""
@@ -134,9 +131,6 @@ class APIClient:
         """Retrieve error records for a batch job."""
         return self._get(f"/batch/{run_id}/errors")
 
-    def get_batch_errors(self, run_id: int) -> List[Dict[str, Any]]:
-        """Alias for get_errors to support Streamlit GUI interface."""
-        return self.get_errors(run_id)
 
     def control(self, run_id: int, action: str) -> Dict[str, Any]:
         """Send a control command (pause/resume) to a batch job."""

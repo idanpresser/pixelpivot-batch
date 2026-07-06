@@ -6,6 +6,7 @@ computation across conversions.
 """
 
 import sqlite3
+from ..connection import DBConnection
 from typing import List, Optional
 
 _METRIC_COLUMNS = frozenset(
@@ -13,7 +14,7 @@ _METRIC_COLUMNS = frozenset(
 )
 
 def update_single_metric(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     conversion_id: int,
     column: str,
     value,
@@ -24,7 +25,7 @@ def update_single_metric(
     Uses whitelist of allowed column names to prevent SQL injection.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         conversion_id: metrics.conversion_id to update.
         column: Column name from _METRIC_COLUMNS (ssim, ms_ssim, psnr_db, etc.).
         value: New value for the column.
@@ -48,7 +49,7 @@ def update_single_metric(
         cur.close()
 
 def update_lcp_metric(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     conversion_id: int,
     lcp_ms: float,
     lcp_method: str,
@@ -57,7 +58,7 @@ def update_lcp_metric(
     """Update both lcp_ms and lcp_method columns in a single transaction.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         conversion_id: metrics.conversion_id to update.
         lcp_ms: Largest Contentful Paint timing in milliseconds.
         lcp_method: Method or tool used to compute lcp_ms.
@@ -74,14 +75,14 @@ def update_lcp_metric(
     finally:
         cur.close()
 
-def get_pending_metric_tasks(conn: sqlite3.Connection, metric_column: str) -> list:
+def get_pending_metric_tasks(conn: DBConnection, metric_column: str) -> list:
     """Fetch conversions with NULL value in a specific metric column.
 
     Finds successful conversions missing a particular quality metric for
     batch computation.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         metric_column: Column name from _METRIC_COLUMNS to check for NULL.
 
     Returns:
@@ -109,11 +110,11 @@ def get_pending_metric_tasks(conn: sqlite3.Connection, metric_column: str) -> li
     finally:
         cur.close()
 
-def get_conversion_metrics(conn: sqlite3.Connection, conversion_id: int) -> dict:
+def get_conversion_metrics(conn: DBConnection, conversion_id: int) -> dict:
     """Fetch all metric values for a single conversion.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         conversion_id: metrics.conversion_id to retrieve.
 
     Returns:

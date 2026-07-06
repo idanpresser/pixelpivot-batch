@@ -11,7 +11,7 @@ import atexit
 import shutil
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional
-from .base import BaseConverter, ConvertResult, BatchResult
+from .base import BaseConverter, ConvertResult, BatchResult, register_converter
 from ..telemetry import TelemetryMonitor
 from ..logger import get_logger
 
@@ -28,6 +28,7 @@ def build_sharp_request(in_path, out_path, fmt, quality, **extra) -> dict:
     return req
 
 
+@register_converter("sharp")
 class SharpConverter(BaseConverter):
     """Convert still images via Sharp (Node.js binding to libvips) over a persistent socket.
 

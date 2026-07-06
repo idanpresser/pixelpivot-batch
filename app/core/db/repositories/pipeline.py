@@ -5,12 +5,13 @@ for the old batch orchestration system. The batch path uses batch_runs instead.
 """
 
 import sqlite3
+from ..connection import DBConnection
 import json
 from datetime import datetime, timezone
 from typing import Optional, Any
 
 def create_pipeline_run(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     config: Any,
     dataset_root: str,
     auto_commit: bool = True,
@@ -20,7 +21,7 @@ def create_pipeline_run(
     Sets start_time=CURRENT_TIMESTAMP and serializes config to JSON.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         config: Configuration object (serialized to JSON, or None).
         dataset_root: Root directory path for the dataset being processed.
         auto_commit: If True, commits the transaction on success.
@@ -44,7 +45,7 @@ def create_pipeline_run(
         cur.close()
 
 def update_pipeline_run_phase(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     run_id: int,
     phase: str,
     progress: Any = None,
@@ -53,7 +54,7 @@ def update_pipeline_run_phase(
     """Update the current_phase and optional progress_json snapshot.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         run_id: pipeline_runs.id to update.
         phase: New phase name (e.g. 'init', 'processing', 'complete').
         progress: Optional progress snapshot object (serialized to JSON).
@@ -73,7 +74,7 @@ def update_pipeline_run_phase(
         cur.close()
 
 def complete_pipeline_run(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     run_id: int,
     status: str = "completed",
     error_message: str = None,
@@ -84,7 +85,7 @@ def complete_pipeline_run(
     Sets end_time=CURRENT_TIMESTAMP and status to a terminal value.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         run_id: pipeline_runs.id to complete.
         status: Terminal status value (default 'completed', or 'failed').
         error_message: Optional error message on failure.
@@ -103,13 +104,13 @@ def complete_pipeline_run(
     finally:
         cur.close()
 
-def get_interrupted_run(conn: sqlite3.Connection) -> Optional[dict]:
+def get_interrupted_run(conn: DBConnection) -> Optional[dict]:
     """Fetch the most recent pipeline run with status='running' and no end_time.
 
     Deserializes config_json and progress_json to dicts.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
 
     Returns:
         dict with columns: id, start_time, current_phase, dataset_root,
@@ -135,11 +136,11 @@ def get_interrupted_run(conn: sqlite3.Connection) -> Optional[dict]:
     finally:
         cur.close()
 
-def get_pipeline_run_history(conn: sqlite3.Connection, limit: int = 10) -> list:
+def get_pipeline_run_history(conn: DBConnection, limit: int = 10) -> list:
     """Fetch the most recent pipeline runs for UI display.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         limit: Maximum number of rows to return (default 10).
 
     Returns:

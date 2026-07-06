@@ -23,10 +23,21 @@ import functools
 import time
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterator, Callable, Any
+from typing import Iterator, Callable, Any, Protocol
 
 from ..logger import get_logger
 from ..paths import SQLITE_DB_PATH
+
+
+class DBConnection(Protocol):
+    """Protocol defining the database connection interface to support SQLite and Postgres."""
+    def cursor(self) -> Any: ...
+    def execute(self, sql: str, params: Any = None) -> Any: ...
+    def commit(self) -> None: ...
+    def rollback(self) -> None: ...
+    def close(self) -> None: ...
+    def __enter__(self) -> DBConnection: ...
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Any: ...
 
 log = get_logger(__name__)
 
@@ -75,6 +86,14 @@ def reset_engine_cache() -> None:
     _engines.clear()
 
 
+SQLITE_PRAGMAS: tuple[str, ...] = (
+    "PRAGMA journal_mode=WAL",
+    "PRAGMA synchronous=NORMAL",
+    "PRAGMA busy_timeout=5000",
+    "PRAGMA foreign_keys=ON",
+)
+
+
 @event.listens_for(Engine, "connect")
 def _apply_sqlite_pragmas(dbapi_connection, connection_record):
     """WAL + project pragmas on every sqlite connection from any engine in the pool."""
@@ -82,10 +101,8 @@ def _apply_sqlite_pragmas(dbapi_connection, connection_record):
         dbapi_connection.row_factory = sqlite3.Row
         cur = dbapi_connection.cursor()
         try:
-            cur.execute("PRAGMA journal_mode=WAL")
-            cur.execute("PRAGMA synchronous=NORMAL")
-            cur.execute("PRAGMA busy_timeout=5000")
-            cur.execute("PRAGMA foreign_keys=ON")
+            for pragma in SQLITE_PRAGMAS:
+                cur.execute(pragma)
         finally:
             cur.close()
 
@@ -123,28 +140,6 @@ sqlite3.register_adapter(date, _adapt_date)
 sqlite3.register_converter("TIMESTAMP", _convert_timestamp)
 sqlite3.register_converter("DATE", _convert_date)
 
-# ---------------------------------------------------------------------------
-# Pragmas applied on every fresh connection. Centralized here so test
-# connections (in-memory or file-backed) inherit the same defaults via
-# _configure().
-# ---------------------------------------------------------------------------
-# journal_mode=WAL is set once during schema bootstrap (schema.py).
-_PRAGMAS: tuple[str, ...] = (
-    "PRAGMA synchronous=NORMAL",
-    "PRAGMA busy_timeout=5000",
-    "PRAGMA foreign_keys=ON",
-)
-
-
-def _configure(conn: sqlite3.Connection) -> None:
-    """Apply project pragmas to a freshly-opened connection."""
-    cur = conn.cursor()
-    try:
-        for stmt in _PRAGMAS:
-            cur.execute(stmt)
-    finally:
-        cur.close()
-
 
 def get_db_path() -> Path:
     """Dynamically resolve the database path, checking environment variables.
@@ -162,20 +157,96 @@ def get_db_path() -> Path:
     return SQLITE_DB_PATH
 
 
-def _open(db_path: Path | None = None) -> sqlite3.Connection:
-    """Open a fresh SQLite connection with pragmas applied."""
-    target = db_path if db_path is not None else get_db_path()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(
-        str(target),
-        check_same_thread=False,
-        timeout=5.0,
-        isolation_level="DEFERRED",
-        detect_types=sqlite3.PARSE_DECLTYPES,
-    )
-    conn.row_factory = sqlite3.Row
-    _configure(conn)
-    return conn
+def _replace_qmark_with_format(sql: str) -> str:
+    """Replace parameter placeholder '?' with '%s', ignoring '?' inside SQL string literals,
+    quoted identifiers, or comments.
+    """
+    result = []
+    i = 0
+    n = len(sql)
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = False
+
+    while i < n:
+        char = sql[i]
+        
+        # Handle block comments /* ... */
+        if in_block_comment:
+            if char == "*" and i + 1 < n and sql[i + 1] == "/":
+                in_block_comment = False
+                result.append("*/")
+                i += 2
+                continue
+            result.append(char)
+            i += 1
+            continue
+
+        # Handle line comments -- ...
+        if in_line_comment:
+            if char == "\n" or char == "\r":
+                in_line_comment = False
+            result.append(char)
+            i += 1
+            continue
+
+        # Handle single-quoted strings '...'
+        if in_single_quote:
+            if char == "'":
+                if i + 1 < n and sql[i + 1] == "'":
+                    result.append("''")
+                    i += 2
+                    continue
+                in_single_quote = False
+            result.append(char)
+            i += 1
+            continue
+
+        # Handle double-quoted identifiers "..."
+        if in_double_quote:
+            if char == '"':
+                in_double_quote = False
+            result.append(char)
+            i += 1
+            continue
+
+        # Start of block comment
+        if char == "/" and i + 1 < n and sql[i + 1] == "*":
+            in_block_comment = True
+            result.append("/*")
+            i += 2
+            continue
+
+        # Start of line comment
+        if char == "-" and i + 1 < n and sql[i + 1] == "-":
+            in_line_comment = True
+            result.append("--")
+            i += 2
+            continue
+
+        # Start of single quote
+        if char == "'":
+            in_single_quote = True
+            result.append(char)
+            i += 1
+            continue
+
+        # Start of double quote
+        if char == '"':
+            in_double_quote = True
+            result.append(char)
+            i += 1
+            continue
+
+        # Replace '?' placeholder
+        if char == "?":
+            result.append("%s")
+        else:
+            result.append(char)
+        i += 1
+
+    return "".join(result)
 
 
 class _CompatCursor:
@@ -187,12 +258,12 @@ class _CompatCursor:
 
     def execute(self, sql: str, params=()):
         if self._paramstyle != "qmark" and "?" in sql:
-            sql = sql.replace("?", "%s")
+            sql = _replace_qmark_with_format(sql)
         return self._cur.execute(sql, params or ())
 
     def executemany(self, sql: str, seq):
         if self._paramstyle != "qmark" and "?" in sql:
-            sql = sql.replace("?", "%s")
+            sql = _replace_qmark_with_format(sql)
         return self._cur.executemany(sql, seq)
 
     def fetchone(self):
@@ -283,16 +354,34 @@ def get_connection() -> Iterator[Any]:
     engine = get_engine()
     paramstyle = engine.dialect.paramstyle
     current_path = get_db_path()
+    
+    # 1. Reset-on-entry guard for stale or invalid depth/connection state
     if (
-        not hasattr(_local, "conn")
-        or _local.conn is None
-        or getattr(_local, "conn_path", None) != current_path
+        not hasattr(_local, "depth")
+        or _local.depth <= 0
+        or getattr(_local, "conn", None) is None
     ):
+        _local.depth = 0
         if getattr(_local, "conn", None) is not None:
             try:
                 _local.conn.close()
             except Exception:
                 pass
+        _local.conn = None
+        _local.conn_path = None
+
+    # 2. Check if we need to open a new connection or reuse
+    if _local.conn is None or _local.conn_path != current_path:
+        # If there was a connection for a different path, clean it up first
+        if _local.conn is not None:
+            try:
+                _local.conn.close()
+            except Exception:
+                pass
+            _local.conn = None
+            _local.conn_path = None
+            _local.depth = 0
+
         raw = engine.raw_connection()
         if paramstyle != "qmark":
             try:
@@ -307,7 +396,7 @@ def get_connection() -> Iterator[Any]:
         try:
             yield c
             c.commit()
-        except Exception:
+        except BaseException:
             try:
                 c.rollback()
             except Exception as e:
@@ -330,7 +419,7 @@ def get_connection() -> Iterator[Any]:
         try:
             yield _local.conn
             _local.conn.execute(f"RELEASE SAVEPOINT {sp_name}")
-        except Exception:
+        except BaseException:
             try:
                 _local.conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
                 _local.conn.execute(f"RELEASE SAVEPOINT {sp_name}")
@@ -340,6 +429,45 @@ def get_connection() -> Iterator[Any]:
         finally:
             _local.depth -= 1
 
+try:
+    import psycopg
+    from psycopg import errors as pg_errors
+    _PG_RETRY_CLASSES = (
+        psycopg.OperationalError,
+        pg_errors.SerializationFailure,
+        pg_errors.DeadlockDetected,
+        pg_errors.LockNotAvailable,
+    )
+except ImportError:
+    _PG_RETRY_CLASSES = ()
+
+
+def _is_retryable_db_exception(e: Exception) -> bool:
+    """Check if the exception is a retryable SQLite or Postgres lock/busy/serialization error."""
+    # 1. Direct check for SQLite operational errors
+    if isinstance(e, sqlite3.OperationalError):
+        msg = str(e).lower()
+        return "locked" in msg or "busy" in msg
+
+    # 2. Check SQLAlchemy wrapped exceptions
+    orig = getattr(e, "orig", None)
+    if orig is not None and isinstance(orig, Exception):
+        return _is_retryable_db_exception(orig)
+
+    # 3. Check psycopg exceptions if psycopg is loaded
+    if _PG_RETRY_CLASSES and isinstance(e, _PG_RETRY_CLASSES):
+        return True
+
+    # 4. Fallback check by class and module names to catch mocked exceptions or imports in test
+    cls_name = e.__class__.__name__
+    cls_module = e.__class__.__module__
+    if "psycopg" in cls_module or "psycopg" in cls_name:
+        if cls_name in ("SerializationFailure", "DeadlockDetected", "LockNotAvailable", "OperationalError"):
+            return True
+
+    return False
+
+
 def with_db_retry(
     func: Callable[..., T] | None = None,
     *,
@@ -347,7 +475,8 @@ def with_db_retry(
     initial_delay: float = 0.1,
 ) -> Any:
     """
-    Retry a database operation/function with exponential backoff on SQLite lock/busy errors.
+    Retry a database operation/function with exponential backoff on SQLite lock/busy errors
+    and Postgres lock/serialization/operational errors.
     Can be used as a decorator or called directly with a callable.
     """
     def decorator(fn: Callable[..., T]) -> Callable[..., T]:
@@ -357,21 +486,19 @@ def with_db_retry(
             for attempt in range(max_retries + 1):
                 try:
                     return fn(*args, **kwargs)
-                except sqlite3.OperationalError as e:
-                    if "locked" not in str(e).lower() and "busy" not in str(e).lower():
+                except Exception as e:
+                    if not _is_retryable_db_exception(e):
                         raise
                     if attempt == max_retries:
-                        log.error(f"SQLite operation failed after {max_retries} retries due to lock: {e}")
+                        log.error(f"Database operation failed after {max_retries} retries: {e}")
                         raise e
-                    log.warning(f"SQLite database locked/busy, retrying in {delay}s... (Attempt {attempt+1}/{max_retries}): {e}")
+                    log.warning(f"Database locked/busy/serialization error, retrying in {delay}s... (Attempt {attempt+1}/{max_retries}): {e}")
                     time.sleep(delay)
                     delay *= 2
-                except Exception as e:
-                    log.error(f"Non-retryable DB error: {e}")
-                    raise
             raise sqlite3.OperationalError("Database busy retry limit reached")
         return wrapper
 
     if func is not None:
         return decorator(func)
     return decorator
+

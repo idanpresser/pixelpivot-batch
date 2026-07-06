@@ -16,6 +16,7 @@ project moved to a CPU-only deployment target -- see refactor/remove-gpu-support
 from __future__ import annotations
 
 import sqlite3
+from ..connection import DBConnection
 from datetime import datetime, timezone
 from typing import Sequence
 
@@ -25,7 +26,7 @@ log = get_logger(__name__)
 
 
 def insert_telemetry(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     run_id: int,
     cpu_pct: float,
     ram_mb: float,
@@ -38,7 +39,7 @@ def insert_telemetry(
     per-batch metrics live in batch_summary.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         run_id: batch_telemetry.run_id foreign key (batch_runs.id).
         cpu_pct: CPU utilization percentage (0-100).
         ram_mb: RAM usage in megabytes.
@@ -64,7 +65,7 @@ def insert_telemetry(
 
 
 def insert_telemetry_batch(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     samples: Sequence[tuple],
     auto_commit: bool = True,
 ) -> None:
@@ -75,7 +76,7 @@ def insert_telemetry_batch(
     per-batch metrics live in batch_summary.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         samples: Sequence of (run_id, timestamp, cpu_pct, ram_mb) tuples,
             where run_id is batch_runs.id.
         auto_commit: If True, commits the transaction on success.

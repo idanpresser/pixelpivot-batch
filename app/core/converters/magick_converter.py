@@ -7,7 +7,7 @@ import subprocess
 import time
 import os
 import sys
-from .base import BaseConverter, _win32_safe_path, ConvertResult, BatchResult
+from .base import BaseConverter, _win32_safe_path, ConvertResult, BatchResult, register_converter
 from ..logger import get_logger
 from ..telemetry import TelemetryMonitor, aggregate_telemetry
 from ..utils import kill_process_tree, quality_to_jxl_distance, get_resolution_bucket_from_path
@@ -29,6 +29,7 @@ except ImportError:
 log = get_logger(__name__)
 
 
+@register_converter("magick")
 class MagickConverter(BaseConverter):
     """Convert still images via ImageMagick subprocess with mogrify batch optimization.
 

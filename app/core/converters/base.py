@@ -74,6 +74,34 @@ from ..config import (
 log = get_logger(__name__)
 
 
+_converter_registry = {}
+
+
+def register_converter(name: str):
+    """Decorator to register a BaseConverter subclass by its tool name."""
+    def decorator(cls):
+        _converter_registry[name] = cls
+        return cls
+    return decorator
+
+
+def get_converter_registry() -> Dict[str, type]:
+    """Discover, load, and return all registered converter classes."""
+    import pkgutil
+    import importlib
+    import app.core.converters as converters_pkg
+
+    if not _converter_registry:
+        for _, module_name, _ in pkgutil.walk_packages(
+            converters_pkg.__path__, converters_pkg.__name__ + "."
+        ):
+            try:
+                importlib.import_module(module_name)
+            except Exception:
+                pass
+    return _converter_registry
+
+
 def _win32_safe_path(path: str) -> str:
     """Prefix absolute Windows paths with \\\\?\\ to bypass the 260-char MAX_PATH limit.
 

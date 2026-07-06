@@ -252,3 +252,58 @@ def test_no_pre_loop_stat_storm_and_savings_math(tmp_path, monkeypatch):
         assert summary["success_count"] == 1
         assert summary["failure_count"] == 0
         assert round(summary["savings_pct"], 1) == -12.0
+
+
+def test_execute_batch_srp_decomposed_units(tmp_path, monkeypatch):
+    """Test the decomposed helper methods under execute_batch (SRP validation)."""
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+
+    img1 = source_dir / "image1.jpg"
+    img1.write_bytes(b"1234567890")
+
+    db_path = tmp_path / "test_srp.db"
+    import app.core.db.connection as connection
+    monkeypatch.setattr(connection, "SQLITE_DB_PATH", db_path)
+    monkeypatch.setenv("PIXELPIVOT_DB_PATH", str(db_path))
+
+    from app.core.db.schema import init_db
+    with connection.get_connection() as _c:
+        init_db(_c)
+
+    orchestrator = BatchOrchestrator()
+    # Stub probing so it doesn't call external binaries or crash on dummy files
+    monkeypatch.setattr(orchestrator, "_probe_all_dimensions", lambda paths: {paths[0]: (100, 100)})
+
+    request = BatchRequest(
+        source_dir=str(source_dir),
+        target_dir=str(target_dir),
+        target_format=["webp"],
+        tool=["magick"],
+        category=["general"]
+    )
+
+    # 1. Test _scan_and_preflight
+    paths, sizes = orchestrator._scan_and_preflight(request)
+    assert len(paths) == 1
+    assert str(img1) in paths
+    assert sizes[str(img1)] == 10
+
+    # 2. Test _reset_converters
+    for c in orchestrator.converters.values():
+        c.is_broken = True
+    orchestrator._reset_converters(run_id=42)
+    from app.core.converters.base import BaseConverter
+    for c in orchestrator.converters.values():
+        if isinstance(c, BaseConverter):
+            assert c.is_broken is False
+
+    # 3. Test _prepare_image_plan
+    from app.batch_api.orchestrator import MatrixCell
+    plan = [MatrixCell(category="general", tool="magick", target_format="webp")]
+    active, dim_cache, fail_count, rejects = orchestrator._prepare_image_plan(paths, plan, str(target_dir))
+    assert len(active) == 1
+    assert fail_count == 0
+    assert len(rejects) == 0
