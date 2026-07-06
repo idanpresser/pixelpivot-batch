@@ -23,9 +23,11 @@ def load_defaults():
     return {
         "source_dir": "",
         "target_dir": "",
-        "target_format": ["webp"],
-        "tool": ["magick"],
-        "category": ["general"]
+        "target_format": ["webp", "avif", "jxl"],
+        "tool": ["magick", "ffmpeg", "vips", "sharp", "cavif"],
+        "category": ["general", "highRes", "web", "uiSharp", "lowContrst", "edgeCase"],
+        "sample": None,
+        "input_files": None
     }
 
 def render_run_panel(client: APIClient):
@@ -54,12 +56,26 @@ def render_run_panel(client: APIClient):
             
             c1, c2, c3 = st.columns(3)
             with c1:
-                target_formats = st.multiselect("FORMAT", ["webp", "avif", "jxl"], default=defaults.get("target_format", ["webp"]))
+                target_formats = st.multiselect("FORMAT", ["webp", "avif", "jxl"], default=defaults.get("target_format", ["webp", "avif", "jxl"]))
             with c2:
-                tools = st.multiselect("ENGINE", ["magick", "ffmpeg", "vips", "sharp", "cavif"], default=defaults.get("tool", ["magick"]))
+                tools = st.multiselect("ENGINE", ["magick", "ffmpeg", "vips", "sharp", "cavif"], default=defaults.get("tool", ["magick", "ffmpeg", "vips", "sharp", "cavif"]))
             with c3:
-                categories = st.multiselect("CATEGORY", ["general", "highRes", "web", "uiSharp", "lowContrst", "edgeCase"], default=defaults.get("category", ["general"]))
+                categories = st.multiselect("CATEGORY", ["general", "highRes", "web", "uiSharp", "lowContrst", "edgeCase"], default=defaults.get("category", ["general", "highRes", "web", "uiSharp", "lowContrst", "edgeCase"]))
             
+            st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
+            st.markdown("##### 🛠️ ADVANCED OPTIONS")
+            c_opt1, c_opt2 = st.columns(2)
+            with c_opt1:
+                use_sample = st.checkbox("LIMIT SAMPLE SIZE", value=defaults.get("sample") is not None)
+                sample_val = defaults.get("sample", 30)
+                if sample_val is None or not isinstance(sample_val, int) or sample_val < 2:
+                    sample_val = 30
+                sample_size = st.number_input("MAX IMAGES", min_value=2, value=sample_val, step=1, disabled=not use_sample)
+            with c_opt2:
+                use_filter = st.checkbox("SPECIFIC FILES FILTER", value=defaults.get("input_files") is not None)
+                filter_val = ",".join(defaults.get("input_files", [])) if defaults.get("input_files") else ""
+                input_files_str = st.text_input("COMMA-SEPARATED FILENAMES", value=filter_val, placeholder="image1.jpg, image2.png", disabled=not use_filter)
+
             st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
             submitted = st.form_submit_button("LAUNCH BATCH PROCESSOR", use_container_width=True)
             
@@ -70,8 +86,11 @@ def render_run_panel(client: APIClient):
                     st.error("CONFIGURATION ERROR: At least one format, engine, and category must be selected.")
                 else:
                     try:
+                        sample_arg = int(sample_size) if use_sample else None
+                        input_files_arg = [f.strip() for f in input_files_str.split(",") if f.strip()] if use_filter else None
                         result = client.start_batch(
-                            source_dir, target_dir, target_formats, tools, categories
+                            source_dir, target_dir, target_formats, tools, categories,
+                            sample=sample_arg, input_files=input_files_arg
                         )
                         st.toast(f"Batch {result['run_id']} launched successfully!", icon="🚀")
                         st.session_state.active_run_id = result["run_id"]

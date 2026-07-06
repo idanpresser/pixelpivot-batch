@@ -104,16 +104,23 @@ class APIClient:
         target_dir: str,
         target_format: List[str],
         tool: List[str],
-        category: List[str] = ["general"]
+        category: List[str] = ["general"],
+        sample: Optional[int] = None,
+        input_files: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Initiate a batch conversion job."""
-        return self._post("/batch/start", {
+        payload = {
             "source_dir": source_dir,
             "target_dir": target_dir,
             "target_format": target_format,
             "tool": tool,
             "category": category
-        })
+        }
+        if sample is not None:
+            payload["sample"] = sample
+        if input_files is not None:
+            payload["input_files"] = input_files
+        return self._post("/batch/start", payload)
 
     def get_status(self, run_id: int) -> Dict[str, Any]:
         """Query batch job status and summary metrics."""
