@@ -6,6 +6,7 @@ RUN npm install --omit=dev
 
 # --- Stage 2: cavif binary (Rust; not in Debian repos) ---
 FROM rust:slim AS cavif-builder
+RUN apt-get update && apt-get install -y nasm && rm -rf /var/lib/apt/lists/*
 RUN cargo install cavif
 
 # --- Stage 3: Final Production Image ---
