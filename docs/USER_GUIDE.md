@@ -95,12 +95,27 @@ Skip this step entirely if you are not using the `sharp` tool.
 The API orchestrates all conversion. Point `PIXELPIVOT_DB_PATH` at your SQLite
 analytics DB (optional; defaults to `./data/pixelpivot.db`).
 
+### Configuring Security (Optional / Public Binds)
+If you bind the server publicly (`--host 0.0.0.0`), you must configure shared secret environment variables to avoid startup safety aborts:
+1. **Generate a secure token**:
+   - **Python**: `python -c "import secrets; print(secrets.token_hex(32))"`
+   - **OpenSSL**: `openssl rand -hex 32`
+2. **Export the token before starting the server and any client**:
+   - *Linux/macOS*: `export PIXELPIVOT_API_TOKEN="your_token"`
+   - *Windows PowerShell*: `$env:PIXELPIVOT_API_TOKEN="your_token"`
+
 ```powershell
 $env:PIXELPIVOT_DB_PATH = "./data/pixelpivot.db"
+# If exposing publicly:
+# $env:PIXELPIVOT_ALLOW_PUBLIC = "1"
+# $env:PIXELPIVOT_API_TOKEN = "your_secure_token_here"
 uvicorn app.batch_api.main:app --host 127.0.0.1 --port 8000
 
 # Air-gap / embedded interpreter:
 $env:PYTHONPATH = "."
+# If exposing publicly:
+# $env:PIXELPIVOT_ALLOW_PUBLIC = "1"
+# $env:PIXELPIVOT_API_TOKEN = "your_secure_token_here"
 .\python-3.14.5-embed-amd64\python.exe -m uvicorn app.batch_api.main:app --host 127.0.0.1 --port 8000
 ```
 

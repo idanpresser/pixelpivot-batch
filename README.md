@@ -192,6 +192,39 @@ Binding the server to `0.0.0.0` or a public/LAN IP exposes the API endpoints (wh
 
 If network exposure is detected without both configurations, the application will raise a safety error and refuse to start.
 
+### Creating and Configuring an API Token
+
+To generate a cryptographically secure token and apply it to your environment:
+
+1. **Generate the Token**:
+   - **Python (Recommended)**:
+     ```bash
+     python -c "import secrets; print(secrets.token_hex(32))"
+     ```
+   - **openssl**:
+     ```bash
+     openssl rand -hex 32
+     ```
+   - **PowerShell**:
+     ```powershell
+     [Convert]::ToBase64String((1..32 | % { [byte](Get-Random -Minimum 0 -Maximum 256) }))
+     ```
+
+2. **Configure the Environment**:
+   - **Docker / Compose**: Add or export the variable on your host environment before running docker-compose, or create a `.env` file in the project root:
+     ```env
+     PIXELPIVOT_API_TOKEN=your_secure_token_here
+     ```
+   - **Local Server & Client CLI/GUI/TUI**: Export the environment variable in your terminal session before launching the backend and any client tools:
+     - *Unix/macOS/Git Bash*:
+       ```bash
+       export PIXELPIVOT_API_TOKEN="your_secure_token_here"
+       ```
+     - *PowerShell*:
+       ```powershell
+       $env:PIXELPIVOT_API_TOKEN="your_secure_token_here"
+       ```
+
 ### Client Authentication
 When `PIXELPIVOT_API_TOKEN` is configured:
 * All mutating API routes (`POST`, `PUT`, `DELETE`) require the `X-API-Token` header.
