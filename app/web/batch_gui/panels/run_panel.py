@@ -70,11 +70,11 @@ def render_run_panel(client: APIClient):
                 sample_val = defaults.get("sample", 30)
                 if sample_val is None or not isinstance(sample_val, int) or sample_val < 2:
                     sample_val = 30
-                sample_size = st.number_input("MAX IMAGES", min_value=2, value=sample_val, step=1, disabled=not use_sample)
+                sample_size = st.number_input("MAX IMAGES", min_value=2, value=sample_val, step=1)
             with c_opt2:
                 use_filter = st.checkbox("SPECIFIC FILES FILTER", value=defaults.get("input_files") is not None)
                 filter_val = ",".join(defaults.get("input_files", [])) if defaults.get("input_files") else ""
-                input_files_str = st.text_input("COMMA-SEPARATED FILENAMES", value=filter_val, placeholder="image1.jpg, image2.png", disabled=not use_filter)
+                input_files_str = st.text_input("COMMA-SEPARATED FILENAMES", value=filter_val, placeholder="image1.jpg, image2.png")
 
             st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
             submitted = st.form_submit_button("LAUNCH BATCH PROCESSOR", use_container_width=True)
