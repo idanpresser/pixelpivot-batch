@@ -37,7 +37,16 @@ def _resolve_path(v: str) -> str:
     if not v or not v.strip():
         raise ValueError("Path must not be empty.")
     try:
-        resolved = Path(v).resolve()
+        normalized = v.replace('\\', '/')
+        if normalized.startswith('~'):
+            expanded = os.path.expanduser(normalized)
+            if not os.path.exists(expanded):
+                home_fallback = normalized.replace('~', '/home', 1)
+                if os.path.exists(home_fallback):
+                    expanded = home_fallback
+            normalized = expanded
+            
+        resolved = Path(normalized).resolve()
 
         # Optional containment check
         allowed_root = os.environ.get("PIXELPIVOT_ALLOWED_ROOT")
