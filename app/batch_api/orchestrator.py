@@ -687,14 +687,9 @@ class BatchOrchestrator:
                 if hasattr(converter, "supported_formats"):
                     formats_list = converter.supported_formats()
                     if isinstance(formats_list, list) and fmt not in formats_list:
-                        err_msg = f"Unsupported combination: {t_name} does not support {fmt} encoding."
-                        log.error(err_msg)
-                        all_failure_count += len(active_paths)
-                        for _p in active_paths:
-                            all_errors.append({"path": _p, "error": err_msg})
+                        log.info(f"Skipping unsupported combination: {t_name} does not support {fmt} encoding.")
                         cells_processed += 1
                         self.progress[run_id]["cells_done"] = cells_processed
-                        self.progress[run_id]["fail"] = all_failure_count
                         continue
 
                 if converter.is_broken:
