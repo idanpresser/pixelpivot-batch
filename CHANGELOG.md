@@ -8,12 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- _Reserved for changes landing on `main` that have not been released yet._
+- **Interactive TUI**: Built a terminal user interface using `prompt_toolkit` and `Rich` for configuring/submitting batches, live telemetry progress bars, settings forms, and managing tool daemons.
+- **SQLite-backed Job Queue**: Introduced a concurrency-capped serial/priority queue manager for submitting and processing batches asynchronously.
+- **cavif AVIF Encoder Support**: Integrated custom `CavifConverter` for native AVIF conversion including configurations and packaging scripts.
+- **Dual-Dialect Database Support**: Migrated database structures and repositories to SQLAlchemy Core, enabling simultaneous support for SQLite and PostgreSQL.
+- **Prometheus Metrics & Otel Tracing**: Plumbed Prometheus `/metrics` endpoints and OpenTelemetry context propagation to track in-flight runs and sample worker execution.
+- **Process Supervision**: Structured checks and automatic daemon lifecycle management for Node.js `sharp` daemon.
+- **Windows Service Wrapping**: Added `install_windows_service.ps1` and NSSM documentation to run the engine as a persistent Windows Service.
+- **WSL / Docker Offline Distribution**: Added scripts (`scripts/manifest.ps1`, `scripts/build_bundle.ps1`, `scripts/smoke_test.ps1`) and WSL image exporters to compile minimal Alpine WSL-based distribution bundles under 10GB for air-gapped environments.
+- **Dual-Dialect CI Pipeline**: Wired a pytest CI runner matrix testing both SQLite and Postgres.
 
 ### Changed
+- **Runtime Surface Decoupling**: Decoupled the Streamlit GUI from core conversion utilities, disabling default phone-home telemetry and pruning development dependencies.
+- **Orchestrator SRP Refactoring**: Decomposed the 250-line `execute_batch` god method and decoupled the converter registry for better Single Responsibility and Open-Closed Principle compliance.
+- **Universal Connection Facade**: Replaced raw sqlite3 connections with a thread-safe connection wrapper supporting transaction savepoints.
 
 ### Fixed
 - **Circuit Breaker Concurrency**: Replaced `threading.Lock` with `threading.RLock` in `BaseConverter` and synchronized all reads and mutations of circuit breaker state (e.g. `consecutive_failures`, `is_broken`, `broken_since`) under `_breaker_lock`. This prevents race conditions and torn failure counts during concurrent worker execution in the `ThreadPoolExecutor` batch path.
+- **Circuit Breaker Granularity**: Refactored the circuit breaker from tool-level to file-level to prevent single poison-pill files from blacking out whole tools.
+- **Calibration OOM Safety**: Diagnosed and fixed ProcessPoolExecutor crashes by pruning unpicklable closures and memory-limiting calibration frames.
+- **API Security Hardening**: Restricted REST API binding to local interfaces and enforced token-based authentication.
+- **Subprocess RAM Capping**: Extended memory-aware worker throttling to all native subprocess execution pipelines.
+- **Telemetry Reliability**: Fixed sample skips on quick-ticks and ensured native Mogrify batches record non-zero telemetry samples.
+- **SQLite Lock-Retry Cohesion**: Consolidated duplicate lock-handling routines to prevent database locking/timeout errors.
 
 ### Removed
 - **GPU / NVENC backend.** `FFmpegNvencConverter`, the `Tool.ffmpeg_nvenc`
