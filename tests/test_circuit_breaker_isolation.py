@@ -198,3 +198,30 @@ def test_orchestrator_broken_converter_errors_have_quarantine_marker(_orch, tmp_
     assert errors, "No errors recorded"
     for e in errors:
         assert e.get("quarantined") is True, f"Missing quarantined flag: {e}"
+
+
+def test_circuit_breaker_concurrency():
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from app.core.converters.base import BaseConverter
+    from typing import List
+
+    class ConcurrencyTestConverter(BaseConverter):
+        def get_name(self) -> str:
+            return "concurrency_test"
+        def supported_formats(self) -> List[str]:
+            return ["webp"]
+        def convert(self, *args, **kwargs):
+            pass
+
+    conv = ConcurrencyTestConverter()
+    conv.failure_threshold = 1000
+
+    M = 100
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        futures = [executor.submit(conv._mark_failure) for _ in range(M)]
+        for f in futures:
+            f.result()
+
+    assert conv.consecutive_failures == M
+

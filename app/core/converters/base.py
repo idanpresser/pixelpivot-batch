@@ -196,7 +196,7 @@ class BaseConverter(ABC):
     for efficiency (e.g., FFmpegConverter uses hybrid image2 + multimap paths).
     """
     def __init__(self):
-        self._breaker_lock = threading.Lock()
+        self._breaker_lock = threading.RLock()
         self._breaker_states: Dict[Optional[int], Dict[str, Any]] = {}
         self._local = threading.local()
         self.failure_threshold = 3
@@ -221,35 +221,41 @@ class BaseConverter(ABC):
 
     @property
     def consecutive_failures(self) -> int:
-        global_failures = self._breaker_states.get(None, {}).get("consecutive_failures", 0)
-        if global_failures > 0:
-            return global_failures
-        return self._get_state()["consecutive_failures"]
+        with self._breaker_lock:
+            global_failures = self._breaker_states.get(None, {}).get("consecutive_failures", 0)
+            if global_failures > 0:
+                return global_failures
+            return self._get_state()["consecutive_failures"]
 
     @consecutive_failures.setter
     def consecutive_failures(self, val: int):
-        self._get_state()["consecutive_failures"] = val
+        with self._breaker_lock:
+            self._get_state()["consecutive_failures"] = val
 
     @property
     def is_broken(self) -> bool:
-        if self._breaker_states.get(None, {}).get("is_broken"):
-            return True
-        return self._get_state()["is_broken"]
+        with self._breaker_lock:
+            if self._breaker_states.get(None, {}).get("is_broken"):
+                return True
+            return self._get_state()["is_broken"]
 
     @is_broken.setter
     def is_broken(self, val: bool):
-        self._get_state()["is_broken"] = val
+        with self._breaker_lock:
+            self._get_state()["is_broken"] = val
 
     @property
     def broken_since(self) -> Optional[float]:
-        global_broken_since = self._breaker_states.get(None, {}).get("broken_since")
-        if global_broken_since is not None:
-            return global_broken_since
-        return self._get_state()["broken_since"]
+        with self._breaker_lock:
+            global_broken_since = self._breaker_states.get(None, {}).get("broken_since")
+            if global_broken_since is not None:
+                return global_broken_since
+            return self._get_state()["broken_since"]
 
     @broken_since.setter
     def broken_since(self, val: Optional[float]):
-        self._get_state()["broken_since"] = val
+        with self._breaker_lock:
+            self._get_state()["broken_since"] = val
 
     @property
     def _bypass_breaker(self) -> bool:
@@ -277,27 +283,29 @@ class BaseConverter(ABC):
             self._breaker_states[run_id]["bypass_breaker"] = val
 
     def _mark_failure(self):
-        state = self._get_state()
-        state["consecutive_failures"] += 1
-        threshold = 10 if self.get_name() == "ffmpeg" else self.failure_threshold
-        if state["consecutive_failures"] >= threshold:
-            if not state["is_broken"]:
-                state["is_broken"] = True
-                state["broken_since"] = time.time()
-                log.error(f"  [CIRCUIT BREAKER] {self.get_name()} is now marked as BROKEN after {state['consecutive_failures']} failures.")
+        with self._breaker_lock:
+            state = self._get_state()
+            state["consecutive_failures"] += 1
+            threshold = 10 if self.get_name() == "ffmpeg" else self.failure_threshold
+            if state["consecutive_failures"] >= threshold:
+                if not state["is_broken"]:
+                    state["is_broken"] = True
+                    state["broken_since"] = time.time()
+                    log.error(f"  [CIRCUIT BREAKER] {self.get_name()} is now marked as BROKEN after {state['consecutive_failures']} failures.")
 
     def _reset_failures(self):
-        state = self._get_state()
-        state["consecutive_failures"] = 0
-        state["is_broken"] = False
-        state["broken_since"] = None
-        # Reset default/global state as well to prevent cross-test/bleed leftovers
-        if self._get_active_run_id() is not None:
-            global_state = self._breaker_states.get(None)
-            if global_state:
-                global_state["consecutive_failures"] = 0
-                global_state["is_broken"] = False
-                global_state["broken_since"] = None
+        with self._breaker_lock:
+            state = self._get_state()
+            state["consecutive_failures"] = 0
+            state["is_broken"] = False
+            state["broken_since"] = None
+            # Reset default/global state as well to prevent cross-test/bleed leftovers
+            if self._get_active_run_id() is not None:
+                global_state = self._breaker_states.get(None)
+                if global_state:
+                    global_state["consecutive_failures"] = 0
+                    global_state["is_broken"] = False
+                    global_state["broken_since"] = None
 
     def _account_native_batch(self, *, failed: bool) -> None:
         """Drive the circuit breaker from one native-batch chunk's net outcome."""
