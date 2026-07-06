@@ -264,6 +264,49 @@ a libaom CRF where *lower is better*). See the
 
 ---
 
+## Monitoring & Maintenance
+
+### Database Health
+
+Periodically check for orphaned rows left by hot-folder trigger failures or crashes:
+
+```sql
+SELECT * FROM batch_runs 
+WHERE status = 'running' AND completed_at IS NULL;
+```
+
+If a `running` row is stale (older than the process start time), mark it as `interrupted`:
+
+```sql
+UPDATE batch_runs 
+SET status = 'interrupted', completed_at = CURRENT_TIMESTAMP 
+WHERE status = 'running' AND created_at < datetime('now', '-1 hour');
+```
+
+### Process Restarts
+
+Restart the API process in these cases:
+
+1. **After calibration**: The `CALIBRATION_ENABLED` flag is not auto-reset. Until you restart, all subsequent batches record calibration rows instead of normal batch rows.
+
+2. **Long-lived hot folders** (>8 hours): The `processed_files` set grows unbounded in memory. A restart clears it.
+
+3. **Crash recovery**: Stale `running` rows are auto-reaped on startup as `interrupted`. Check the output directory for partial/corrupt files from the interrupted batch before restarting or re-running.
+
+### Logs & Debugging
+
+Check the API server logs for error messages from converters:
+
+```
+ERROR [FATAL] ffmpeg encountered an unrecoverable error: ...
+WARNING Mogrify timed out, force cleaning process tree...
+ERROR Failed to trigger hot folder batch: ...
+```
+
+See [CLAUDE.md](../CLAUDE.md#known-issues--gotchas) for workarounds and issue tracking links for known concurrency, hot-folder, and shutdown gotchas.
+
+---
+
 ## See also
 
 - [API_REFERENCE.md](API_REFERENCE.md) — complete endpoint-by-endpoint REST reference (all routes, schemas, status codes, out-of-scope)
