@@ -59,7 +59,7 @@ def render_history_panel(client: APIClient):
             display_df,
             column_config={
                 "run_id": "ID",
-                "status": st.column_config.StatusColumn("Status"),
+                "status": st.column_config.TextColumn("Status"),
                 "success_count": "Success",
                 "failure_count": "Failure",
                 "duration_s": "Duration (s)",
