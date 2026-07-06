@@ -33,6 +33,7 @@ services:
       - /app/services/sharp-daemon/node_modules        # preserve image contents over the host mount
       - ./test_examples:/app/test_examples
       - ./out:/app/out
+      - ${PIXELPIVOT_DATA_DIR:-/tmp/pixelpivot_data}:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,6 +61,8 @@ services:
     environment:
       - BATCH_API_URL=http://pixelpivot-batch-api:8000/api/v1
       - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-dev_secret_token_change_me}
+    volumes:
+      - ${PIXELPIVOT_DATA_DIR:-/tmp/pixelpivot_data}:/data
     depends_on:
       pixelpivot-batch-api:
         condition: service_healthy

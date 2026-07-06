@@ -342,7 +342,7 @@ class BatchRepository:
             cur.executemany(
                 "INSERT INTO batch_errors (batch_id, input_path, error, is_dlq) "
                 "VALUES (?, ?, ?, ?)",
-                [(batch_id, e.get("path"), str(e.get("error", "unknown")), 1 if e.get("dlq") else 0) for e in errors],
+                [(batch_id, e.get("path"), str(e.get("error", "unknown")), bool(e.get("dlq"))) for e in errors],
             )
         finally:
             cur.close()

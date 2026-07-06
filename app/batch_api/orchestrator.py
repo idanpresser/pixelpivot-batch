@@ -164,6 +164,14 @@ class DirectoryScanner:
     @staticmethod
     def scan(source_dir: str, input_files: Optional[List[str]] = None) -> List[str]:
         source_path = Path(source_dir)
+        if not source_path.is_absolute():
+            # Windows UNC (\\server\share) or drive paths (C:\...) look relative on Linux
+            if source_dir.startswith("\\\\") or (len(source_dir) > 1 and source_dir[1] == ":"):
+                raise ValueError(
+                    f"Windows path '{source_dir}' is not accessible from the container. "
+                    "Mount the share in WSL (e.g. sudo mount -t cifs //server/share /mnt/share), "
+                    "add a volume in docker-compose.yml, then use the Linux container path."
+                )
         if not source_path.exists():
             raise ValueError(f"Source directory {source_dir} does not exist.")
         
