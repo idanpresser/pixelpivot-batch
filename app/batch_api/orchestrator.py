@@ -665,14 +665,33 @@ class BatchOrchestrator:
                     log.error(err_msg)
                     all_failure_count += len(active_paths)
                     all_errors.append({"path": "N/A", "error": err_msg})
+                    cells_processed += 1
+                    self.progress[run_id]["cells_done"] = cells_processed
+                    self.progress[run_id]["fail"] = all_failure_count
                     continue
                 
+                if hasattr(converter, "supported_formats"):
+                    formats_list = converter.supported_formats()
+                    if isinstance(formats_list, list) and fmt not in formats_list:
+                        err_msg = f"Unsupported combination: {t_name} does not support {fmt} encoding."
+                        log.error(err_msg)
+                        all_failure_count += len(active_paths)
+                        for _p in active_paths:
+                            all_errors.append({"path": _p, "error": err_msg})
+                        cells_processed += 1
+                        self.progress[run_id]["cells_done"] = cells_processed
+                        self.progress[run_id]["fail"] = all_failure_count
+                        continue
+
                 if converter.is_broken:
                     err_msg = f"Quarantined: {t_name} circuit breaker tripped — not attempted."
                     log.error(f"Aborting sub-batch: {t_name} is marked as BROKEN. Quarantining {len(active_paths)} files.")
                     all_failure_count += len(active_paths)
                     for _p in active_paths:
                         all_errors.append({"path": _p, "error": err_msg, "quarantined": True})
+                    cells_processed += 1
+                    self.progress[run_id]["cells_done"] = cells_processed
+                    self.progress[run_id]["fail"] = all_failure_count
                     continue
 
                 if DISK_RECHECK_EVERY_CELLS > 0 and cells_processed > 0 and cells_processed % DISK_RECHECK_EVERY_CELLS == 0:
