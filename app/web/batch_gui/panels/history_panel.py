@@ -1,6 +1,7 @@
 """History panel — displays past batch runs and aggregated metrics."""
 import streamlit as st
 import pandas as pd
+import altair as alt
 from app.core.api_client import APIClient
 
 def render_history_panel(client: APIClient):
@@ -36,12 +37,38 @@ def render_history_panel(client: APIClient):
         # Note: In our current implementation yield_mb_sec is 0.0 because it's a TODO.
         # But we can plot success vs failure count
         st.subheader("Processing Performance")
-        
+
         chart_data = df[["created_at", "success_count", "failure_count"]].copy()
         chart_data["created_at"] = pd.to_datetime(chart_data["created_at"])
-        chart_data = chart_data.set_index("created_at")
-        
-        st.bar_chart(chart_data[["success_count", "failure_count"]])
+        chart_long = chart_data.melt(
+            id_vars="created_at",
+            value_vars=["success_count", "failure_count"],
+            var_name="metric",
+            value_name="count",
+        )
+        color_scale = alt.Scale(
+            domain=["success_count", "failure_count"],
+            range=["#009688", "#E65100"],
+        )
+        chart = (
+            alt.Chart(chart_long)
+            .mark_bar()
+            .encode(
+                x=alt.X("created_at:T", title="Run Time"),
+                y=alt.Y("count:Q", title="Images"),
+                color=alt.Color("metric:N", scale=color_scale,
+                                legend=alt.Legend(title=None,
+                                                  labelExpr="datum.value === 'success_count' ? 'Success' : 'Failure'")),
+                xOffset="metric:N",
+                tooltip=[
+                    alt.Tooltip("created_at:T", title="Time"),
+                    alt.Tooltip("metric:N", title="Metric"),
+                    alt.Tooltip("count:Q", title="Count"),
+                ],
+            )
+            .properties(height=220)
+        )
+        st.altair_chart(chart, use_container_width=True)
 
         # Detailed Table
         st.subheader("Recent Runs")
