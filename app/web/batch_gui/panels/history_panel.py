@@ -1,7 +1,7 @@
 """History panel — displays past batch runs and aggregated metrics."""
 import streamlit as st
 import pandas as pd
-from app.web.batch_gui.api_client import APIClient
+from app.core.api_client import APIClient
 
 def render_history_panel(client: APIClient):
     """Render the history panel with batch runs table and failure details.
@@ -77,7 +77,7 @@ def render_history_panel(client: APIClient):
                 run_id = row["run_id"]
                 with st.expander(f"Run {run_id} — {row['failure_count']} failures ({row['tool']} to {row['target_format']})"):
                     try:
-                        errors = client.get_batch_errors(run_id)
+                        errors = client.get_errors(run_id)
                         if errors:
                             # Show errors in a nice table
                             err_df = pd.DataFrame(errors)

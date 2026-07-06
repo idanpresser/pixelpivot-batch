@@ -1,7 +1,7 @@
 import httpx
 import pytest
 import respx
-from app.web.batch_gui.api_client import APIClient
+from app.core.api_client import APIClient, APIError
 
 @pytest.fixture
 def client():
@@ -36,7 +36,7 @@ def test_api_error_handling(client):
         return_value=httpx.Response(500, json={"detail": "Internal error"})
     )
     
-    with pytest.raises(Exception) as excinfo:
+    with pytest.raises(APIError) as excinfo:
         client.start_batch("/src", "/dst", "webp", "magick")
     assert "Internal error" in str(excinfo.value)
 

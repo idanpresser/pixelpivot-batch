@@ -4,7 +4,7 @@ import time
 import json
 import os
 from pathlib import Path
-from app.web.batch_gui.api_client import APIClient
+from app.core.api_client import APIClient
 from app.web.batch_gui.style_utils import render_metric_dashboard, render_status_header
 
 def load_defaults():
@@ -56,7 +56,7 @@ def render_run_panel(client: APIClient):
             with c1:
                 target_formats = st.multiselect("FORMAT", ["webp", "avif", "jxl"], default=defaults.get("target_format", ["webp"]))
             with c2:
-                tools = st.multiselect("ENGINE", ["magick", "ffmpeg", "vips", "sharp"], default=defaults.get("tool", ["magick"]))
+                tools = st.multiselect("ENGINE", ["magick", "ffmpeg", "vips", "sharp", "cavif"], default=defaults.get("tool", ["magick"]))
             with c3:
                 categories = st.multiselect("CATEGORY", ["general", "highRes", "web", "uiSharp", "lowContrst", "edgeCase"], default=defaults.get("category", ["general"]))
             
@@ -101,7 +101,7 @@ def render_run_panel(client: APIClient):
                 if summary.get("failure_count", 0) > 0:
                     st.warning(f"BATCH FINISHED WITH ERRORS")
                     try:
-                        errors = client.get_batch_errors(st.session_state.active_run_id)
+                        errors = client.get_errors(st.session_state.active_run_id)
                         if errors:
                             import pandas as pd
                             err_df = pd.DataFrame(errors)

@@ -140,11 +140,12 @@ async def trace_id_middleware(request, call_next):
 @app.middleware("http")
 async def api_token_auth_middleware(request, call_next):
     import os
+    import secrets
     token = os.environ.get("PIXELPIVOT_API_TOKEN")
     if token:
-        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        if request.method in ("POST", "PUT", "DELETE", "PATCH") or request.url.path.startswith("/api/"):
             req_token = request.headers.get("X-API-Token")
-            if not req_token or req_token != token:
+            if not req_token or not secrets.compare_digest(req_token, token):
                 from fastapi.responses import JSONResponse
                 return JSONResponse(
                     status_code=401,

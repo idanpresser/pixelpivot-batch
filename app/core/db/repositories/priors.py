@@ -5,13 +5,14 @@ for the heuristic interpolator feedback loop.
 """
 
 import sqlite3
+from ..connection import DBConnection
 from typing import Optional
 
-def get_quality_prior(conn: sqlite3.Connection, category: str, tool: str, fmt: str, current_bpp: Optional[float] = None) -> Optional[dict]:
+def get_quality_prior(conn: DBConnection, category: str, tool: str, fmt: str, current_bpp: Optional[float] = None) -> Optional[dict]:
     """Fetch quality prior statistics for a (category, format, tool) triplet.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         category: Image category (e.g. 'photo', 'screenshot').
         tool: Converter tool name (e.g. 'magick', 'ffmpeg').
         fmt: Image format (e.g. 'webp', 'avif').
@@ -37,7 +38,7 @@ def get_quality_prior(conn: sqlite3.Connection, category: str, tool: str, fmt: s
         cur.close()
 
 def update_quality_prior(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     category: str,
     format: str,
     tool: str,
@@ -53,7 +54,7 @@ def update_quality_prior(
     re-runs and quality feedback loop updates.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         category: Image category identifier.
         format: Target image format.
         tool: Converter tool name.

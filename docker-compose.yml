@@ -1,6 +1,24 @@
 version: '3.8'
 
 services:
+  # Persistent PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: pixelpivot_postgres
+    environment:
+      POSTGRES_USER: pixelpivot
+      POSTGRES_PASSWORD: pixelpivot
+      POSTGRES_DB: pixelpivot
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pixelpivot -d pixelpivot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # Headless FastAPI Engine
   pixelpivot-batch-api:
     build:
@@ -13,10 +31,11 @@ services:
     volumes:
       - .:/app
       - /app/services/sharp-daemon/node_modules        # preserve image contents over the host mount
-      - sqlitedata:/data         # SQLite file lives on a Docker volume, NOT /mnt
-                                 # (WSL2 mounts under /mnt are slow for fsync-heavy workloads)
       - ./test_examples:/app/test_examples
       - ./out:/app/out
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/ || exit 1"]
       interval: 10s
@@ -25,9 +44,9 @@ services:
       start_period: 10s
     environment:
       - IS_DOCKER=true
-      - PIXELPIVOT_DB_PATH=/data/pixelpivot.db
+      - PIXELPIVOT_DB_URL=postgresql+psycopg://pixelpivot:pixelpivot@postgres:5432/pixelpivot
       - PIXELPIVOT_ALLOW_PUBLIC=1
-      - PIXELPIVOT_API_TOKEN=dev_secret_token_change_me
+      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-dev_secret_token_change_me}
 
   # Standalone Batch GUI
   pixelpivot-batch-gui:
@@ -40,7 +59,7 @@ services:
       - "8503:8503"
     environment:
       - BATCH_API_URL=http://pixelpivot-batch-api:8000/api/v1
-      - PIXELPIVOT_API_TOKEN=dev_secret_token_change_me
+      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-dev_secret_token_change_me}
     depends_on:
       pixelpivot-batch-api:
         condition: service_healthy
@@ -50,7 +69,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # CLI Access / Test Runner — shares the SQLite volume so it can inspect the DB
+  # CLI Access / Test Runner
   pixelpivot-cli:
     build:
       context: .
@@ -60,24 +79,17 @@ services:
     volumes:
       - .:/app
       - /app/services/sharp-daemon/node_modules
-      - sqlitedata:/data
     environment:
       - IS_DOCKER=true
-      - PIXELPIVOT_DB_PATH=/data/pixelpivot.db
-      - PIXELPIVOT_API_TOKEN=dev_secret_token_change_me
+      - PIXELPIVOT_DB_URL=postgresql+psycopg://pixelpivot:pixelpivot@postgres:5432/pixelpivot
+      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-dev_secret_token_change_me}
+    healthcheck:
+      disable: true
     depends_on:
-      - pixelpivot-batch-api
-
-  test-postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: pixelpivot
-      POSTGRES_PASSWORD: pixelpivot
-      POSTGRES_DB: pixelpivot_test
-    ports:
-      - "5433:5432"
-    tmpfs:
-      - /var/lib/postgresql/data   # ephemeral, fast
+      postgres:
+        condition: service_healthy
+      pixelpivot-batch-api:
+        condition: service_healthy
 
 volumes:
-  sqlitedata:
+  postgres_data:

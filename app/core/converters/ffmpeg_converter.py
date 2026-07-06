@@ -28,7 +28,7 @@ from ..ffmpeg import FFmpegProcess
 from ..logger import get_logger
 from ..telemetry import TelemetryMonitor, aggregate_telemetry
 from ..utils import quality_to_jxl_distance
-from .base import BaseConverter, _win32_safe_path, ConvertResult, BatchResult
+from .base import BaseConverter, _win32_safe_path, ConvertResult, BatchResult, register_converter
 from .ffmpeg_batch_helpers import (
     all_same_resolution,
     build_image2_args,
@@ -43,6 +43,7 @@ from .ffmpeg_batch_helpers import (
 log = get_logger(__name__)
 
 
+@register_converter("ffmpeg")
 class FFmpegConverter(BaseConverter):
     """Convert still images via FFmpeg subprocess with hybrid native-batch acceleration.
 

@@ -251,43 +251,70 @@ class BatchOrchestrator:
         except ImportError:
             log.warning("pillow-heif not installed. Probing HEIC/AVIF files may fail.")
 
-        # Resolve local binary paths for self-contained Windows execution
+        # Resolve local binary paths in a data-driven way
         import sys
-        if sys.platform == "win32":
-            ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg.exe")
-            if not os.path.exists(ffmpeg_bin):
-                # Try deeper path if the top-level doesn't exist (handle zip extracts)
-                alt_ffmpeg = str(PROJ_ROOT / "bin" / "ffmpeg" / "8.1.1-essentials_build" / "ffmpeg.exe")
-                ffmpeg_bin = alt_ffmpeg if os.path.exists(alt_ffmpeg) else "ffmpeg"
-
-            magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick.exe")
-            if not os.path.exists(magick_bin):
-                magick_bin = "magick"
-
-            cavif_bin = str(PROJ_ROOT / "bin" / "cavif" / "cavif.exe")
-            if not os.path.exists(cavif_bin):
-                cavif_bin = "cavif"
-        else:
-            ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg")
-            if not os.path.exists(ffmpeg_bin):
-                ffmpeg_bin = "ffmpeg"
-
-            magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick")
-            if not os.path.exists(magick_bin):
-                magick_bin = "magick"
-
-            cavif_bin = str(PROJ_ROOT / "bin" / "cavif" / "cavif")
-            if not os.path.exists(cavif_bin):
-                cavif_bin = "cavif"
-
-
-        self.converters = {
-            "magick": MagickConverter(magick_path=magick_bin),
-            "ffmpeg": FFmpegConverter(ffmpeg_path=ffmpeg_bin),
-            "vips":   VipsConverter(),
-            "sharp":  SharpConverter(port=8765),
-            "cavif":  CavifConverter(cavif_path=cavif_bin),
+        is_win = sys.platform == "win32"
+        ext = ".exe" if is_win else ""
+        
+        tool_candidates = {
+            "ffmpeg": [
+                Path("bin") / "ffmpeg" / f"ffmpeg{ext}",
+                Path("bin") / "ffmpeg" / "8.1.1-essentials_build" / f"ffmpeg{ext}",
+            ],
+            "magick": [
+                Path("bin") / "magick" / f"magick{ext}",
+            ],
+            "cavif": [
+                Path("bin") / "cavif" / f"cavif{ext}",
+            ],
         }
+        
+        resolved_bins = {}
+        for tool, candidates in tool_candidates.items():
+            resolved = None
+            for cand in candidates:
+                full_path = PROJ_ROOT / cand
+                if full_path.exists():
+                    resolved = str(full_path)
+                    break
+            if resolved is None:
+                resolved = tool  # Fallback to system PATH
+            resolved_bins[tool] = resolved
+
+        ffmpeg_bin = resolved_bins["ffmpeg"]
+        magick_bin = resolved_bins["magick"]
+        cavif_bin = resolved_bins["cavif"]
+
+
+        # Dynamically discover and instantiate all registered converters using reflection (inspect)
+        import inspect
+        from ..core.converters.base import get_converter_registry
+        
+        config = {
+            "ffmpeg_path": ffmpeg_bin,
+            "magick_path": magick_bin,
+            "cavif_path": cavif_bin,
+            "port": 8765,
+        }
+        
+        self.converters = {}
+        for name, registry_cls in get_converter_registry().items():
+            # Support mock patching in tests by resolving via globals() first
+            cls_name = registry_cls.__name__
+            cls = globals().get(cls_name, registry_cls)
+            
+            # If the class has been mocked, it might not have an __init__ signature we can inspect,
+            # or the mock class itself might not require configuration.
+            try:
+                sig = inspect.signature(cls.__init__)
+                kwargs = {}
+                for param in sig.parameters.values():
+                    if param.name in config:
+                        kwargs[param.name] = config[param.name]
+            except Exception:
+                kwargs = {}
+                
+            self.converters[name] = cls(**kwargs)
     def _preflight_resources(self, target_dir: str) -> None:
         """Validate available memory and disk space before batch execution.
 
@@ -376,264 +403,76 @@ class BatchOrchestrator:
             dims = list(ex.map(bind_context(_safe_probe), paths))
         return dict(zip(paths, dims))
 
-    def execute_batch(self, run_id: int, request: BatchRequest) -> None:
-        """Execute a batch job across multiple (category, tool, format) combinations.
-
-        Scans source directory, probes image dimensions and heuristic quality for each
-        (category, tool, format) cell, invokes the appropriate converter, aggregates
-        metrics, and writes batch_summary to database on completion.
-
-        Args:
-            run_id: Unique batch identifier (references batch_runs row).
-            request: BatchRequest with source_dir, target_dir, formats, tools, categories.
-        """
-        start_time = time.time()
-        ctrl = self.run_controls.setdefault(run_id, RunControl())
+    def _scan_and_preflight(self, request: BatchRequest) -> tuple[List[str], Dict[str, int]]:
+        """Scan source directory and run preflight resource checks."""
+        input_paths = DirectoryScanner.scan(request.source_dir, request.input_files)
+        if getattr(request, "sample", None) is not None:
+            input_paths = input_paths[:request.sample]
         
-        # State variables shared across execution and finalization phases
-        all_success_count = 0
-        all_failure_count = 0
-        total_bytes_written = 0
-        all_errors = []
-        all_telemetry_summaries = []
-        analytics_records: List[dict] = []
-        input_paths = []
-        executed_cells: List[MatrixCell] = []
-        total_conversions = 0
-        cancelled = False
-        failed_during_run = False
-        failure_reason = None
-
-        input_sizes: Dict[str, int] = {}
-
-        try:
-            # 1. Scan source_dir using DirectoryScanner
-            input_paths = DirectoryScanner.scan(request.source_dir, request.input_files)
-            if getattr(request, "sample", None) is not None:
-                input_paths = input_paths[:request.sample]
-            for p in input_paths:
-                try:
-                    input_sizes[p] = os.path.getsize(p)
-                except OSError:
-                    input_sizes[p] = 0
-            
-            # Pre-flight resource validation check
-            self._preflight_resources(request.target_dir)
-            
-            if not input_paths:
-                if request.input_files is not None:
-                    err_msg = f"No images found in {request.source_dir} after filtering specific files."
-                else:
-                    err_msg = f"No images found in {request.source_dir} after 3 scan attempts — check the path is reachable and contains supported files."
-                raise ValueError(err_msg)
-
-            # Per-batch circuit-breaker isolation (issue 49x): converters are
-            # long-lived singletons shared across batches. Reset every breaker at
-            # the start of each run so poison-pill files from a prior batch cannot
-            # bleed into this one and quarantine healthy files during the cooldown.
-            # Guarded: a converter without the BaseConverter breaker (e.g. a test
-            # stub) simply has no state to reset.
-            for converter in self.converters.values():
-                set_run = getattr(converter, "_set_active_run_id", None)
-                if callable(set_run):
-                    set_run(run_id)
-                reset = getattr(converter, "_reset_failures", None)
-                if callable(reset):
-                    reset()
-
-            # Matrix Configuration
-            categories = request.category if isinstance(request.category, list) else [request.category]
-            tools = request.tool if isinstance(request.tool, list) else [request.tool]
-            formats = request.target_format if isinstance(request.target_format, list) else [request.target_format]
-            
-            plan = plan_matrix(categories, tools, formats)
-            multi_category = len(categories) > 1
-            total_conversions = len(input_paths) * len(plan)
-            
-            self.progress[run_id] = {
-                "cells_done": 0,
-                "cells_total": len(plan),
-                "current_cell": None,
-                "ok": 0,
-                "fail": 0,
-                "started_at": start_time,
-            }
-            
-            log.info(f"Starting Matrix Batch: {len(input_paths)} images * {len(plan)} cells = {total_conversions} conversions")
-            
-            dim_cache = self._probe_all_dimensions(input_paths)
-
-            # Filter unreadable and massive images upfront via the shared guard
-            # (single source of truth, also used by the calibration runner).
-            from .image_guards import partition_images
-            input_paths, rejected = partition_images(input_paths, dim_cache)
-            # Route rejects to the DLQ once (files moved a single time), then
-            # accrue one failure per matrix cell they would have run in.
-            for rej in quarantine_rejected(rejected, request.target_dir):
-                log.error(rej["error"])
-                all_failure_count += len(plan)
-                for _ in plan:
-                    all_errors.append(rej)
-
-            from concurrent.futures import ThreadPoolExecutor
-            probe_workers = min(32, (os.cpu_count() or 4) * 4)
-
-            cells_processed = 0
-            abort_matrix = False
-
-            for cell in plan:
-                if abort_matrix:
-                    break
-                ctrl.wait_if_paused()
-                if ctrl.cancelled:
-                    cancelled = True
-                    break
+        input_sizes = {}
+        for p in input_paths:
+            try:
+                input_sizes[p] = os.path.getsize(p)
+            except OSError:
+                input_sizes[p] = 0
                 
-                self.progress[run_id]["current_cell"] = f"{cell.category}/{cell.tool}/{cell.target_format}"
-                
-                t_name = cell.tool
-                cat = cell.category
-                fmt = cell.target_format
+        self._preflight_resources(request.target_dir)
+        
+        if not input_paths:
+            if request.input_files is not None:
+                err_msg = f"No images found in {request.source_dir} after filtering specific files."
+            else:
+                err_msg = f"No images found in {request.source_dir} after 3 scan attempts — check the path is reachable and contains supported files."
+            raise ValueError(err_msg)
+            
+        return input_paths, input_sizes
 
-                converter = self.converters.get(t_name)
-                if converter:
-                    set_run = getattr(converter, "_set_active_run_id", None)
-                    if callable(set_run):
-                        set_run(run_id)
-                if not converter:
-                    # Skip an unregistered tool's cell so sibling cells still run
-                    # (partial success). If NO cell executes, the post-loop guard
-                    # fails the whole batch.
-                    err_msg = f"Unsupported tool: {t_name}"
-                    log.error(err_msg)
-                    all_failure_count += len(input_paths)
-                    all_errors.append({"path": "N/A", "error": err_msg})
-                    continue
-                
-                if converter.is_broken:
-                    err_msg = f"Quarantined: {t_name} circuit breaker tripped — not attempted."
-                    log.error(f"Aborting sub-batch: {t_name} is marked as BROKEN. Quarantining {len(input_paths)} files.")
-                    all_failure_count += len(input_paths)
-                    for _p in input_paths:
-                        all_errors.append({"path": _p, "error": err_msg, "quarantined": True})
-                    continue
+    def _reset_converters(self, run_id: int) -> None:
+        """Reset circuit breakers on all converters for the start of a run."""
+        for converter in self.converters.values():
+            set_run = getattr(converter, "_set_active_run_id", None)
+            if callable(set_run):
+                set_run(run_id)
+            reset = getattr(converter, "_reset_failures", None)
+            if callable(reset):
+                reset()
 
-                if DISK_RECHECK_EVERY_CELLS > 0 and cells_processed > 0 and cells_processed % DISK_RECHECK_EVERY_CELLS == 0:
-                    try:
-                        self._check_free_disk(request.target_dir)
-                    except ValueError as e:
-                        log.error(f"Mid-run check failed: {e}")
-                        abort_matrix = True
-                        break
+    def _prepare_image_plan(
+        self, input_paths: List[str], plan: List[MatrixCell], target_dir: str
+    ) -> tuple[List[str], Dict[str, tuple[int, int]], int, List[Dict]]:
+        """Probe dimensions, partition unreadable/huge images, and quarantine rejects."""
+        dim_cache = self._probe_all_dimensions(input_paths)
+        
+        from .image_guards import partition_images
+        active_paths, rejected = partition_images(input_paths, dim_cache)
+        
+        failure_count = len(rejected) * len(plan)
+        rejects_errors = []
+        for rej in quarantine_rejected(rejected, target_dir):
+            log.error(rej["error"])
+            rejects_errors.append(rej)
+            
+        return active_paths, dim_cache, failure_count, rejects_errors
 
-                log.info(f"Processing Matrix Cell: [{cat}] [{t_name}] [{fmt}]")
-                
-                # Probe qualities for this combination
-                from ..core.tracing import bind_context
-                with ThreadPoolExecutor(max_workers=probe_workers) as ex:
-                    qualities = list(ex.map(bind_context(lambda p: self._probe_quality(p, cat, t_name, fmt, dim_cache.get(p))), input_paths))
-
-                suffix = suffix_for(cell, multi_category=multi_category)
-
-                result = converter.convert_batch(
-                    input_paths,
-                    request.target_dir,
-                    fmt,
-                    qualities,
-                    run_id=run_id,
-                    suffix=suffix,
-                    dimensions=dim_cache
-                )
-                if isinstance(result, dict):
-                    from app.core.converters.base import BatchResult
-                    tool_val = result.get("tool")
-                    result = BatchResult(
-                        success_count=result.get("success_count", 0),
-                        failure_count=result.get("failure_count", 0),
-                        duration_ms=result.get("duration_ms", 0.0),
-                        telemetry=result.get("telemetry", {}),
-                        errors=result.get("errors", []),
-                        bytes_written=result.get("bytes_written", 0),
-                    )
-                    if tool_val:
-                        result.tool = tool_val
-                
-                # Optional per-file cross-tool fallback (env-gated, off by
-                # default). Retry each failed file on the configured alternate
-                # tool before it is counted as a failure / quarantined.
-                fb_tool = cross_tool_fallback_tool()
-                if fb_tool and fb_tool != t_name and result.errors:
-                    q_by_path = dict(zip(input_paths, qualities))
-                    recovered, result.errors = apply_cross_tool_fallback(
-                        result.errors,
-                        lambda p: self._fallback_retry_one(
-                            p, fb_tool, request.target_dir, fmt,
-                            q_by_path.get(p, default_quality_for(fb_tool, fmt)),
-                            suffix, run_id,
-                        ),
-                    )
-                    if recovered:
-                        n = len(recovered)
-                        result.success_count += n
-                        result.failure_count = max(0, result.failure_count - n)
-                        log.info("cross-tool fallback via %s recovered %d file(s)", fb_tool, n)
-
-                # Quarantine failed files to DLQ
-                quarantined_errors = []
-                for err in result.errors:
-                    if err.get("path"):
-                        rec = quarantine_to_dlq(err["path"], request.target_dir, reason=err.get("error", "conversion failed"))
-                        quarantined_errors.append({
-                            "path": rec["path"],
-                            "error": rec["reason"],
-                            "dlq": True
-                        })
-                        log.warning("file quarantined to DLQ", extra={"subprocess": {"path": rec["path"], "reason": rec["reason"]}})
-                    else:
-                        quarantined_errors.append(err)
-
-                all_success_count += result.success_count
-                all_failure_count += result.failure_count
-                total_bytes_written += result.bytes_written
-                all_errors.extend(quarantined_errors)
-                if result.telemetry:
-                    all_telemetry_summaries.append(result.telemetry)
-                    
-                cells_processed += 1
-                progress_dict = self.progress[run_id]
-                progress_dict["cells_done"] = cells_processed
-                progress_dict["ok"] = all_success_count
-                progress_dict["fail"] = all_failure_count
-                
-                executed_cells.append(cell)
-
-                # Per-conversion analytics for the heuristic feedback loop. A path
-                # succeeded if it is not among this cell's error paths.
-                actual_tool = getattr(result, "tool", None) or t_name
-                error_paths = {e.get("path") for e in result.errors if e.get("path")}
-                for img_path, q in zip(input_paths, qualities):
-                    analytics_records.append({
-                        "path": img_path, "category": cat, "format": fmt, "tool": actual_tool,
-                        "quality": q, "success": img_path not in error_paths,
-                    })
-
-            # Nothing ran at all (every tool unregistered, all images unreadable)
-            # while failures accrued → the batch failed; raise so the except
-            # handler marks it 'failed'. Exception: a fully-quarantined batch
-            # (broken converter) is a handled outcome — fall through so its
-            # per-file quarantine errors are still persisted via save_errors.
-            if not executed_cells and all_failure_count > 0:
-                if not any(e.get("quarantined") for e in all_errors):
-                    raise ValueError("Batch produced no executed cells (all tools unsupported or all images unreadable).")
-
-        except Exception as e:
-            log.error(f"Batch execution failed for run {run_id}: {e}")
-            failed_during_run = True
-            failure_reason = str(e)
-
-        # 4. Finalize stage (OUTSIDE the execution try/except!)
-        # Any error during metrics collection or summary logging must be handled
-        # gracefully without marking a successful batch as failed.
+    def _finalize_batch_run(
+        self,
+        run_id: int,
+        start_time: float,
+        cancelled: bool,
+        failed_during_run: bool,
+        failure_reason: Optional[str],
+        input_paths: List[str],
+        executed_cells: List[MatrixCell],
+        total_bytes_written: int,
+        all_telemetry_summaries: List[Dict],
+        input_sizes: Dict[str, int],
+        all_success_count: int,
+        all_failure_count: int,
+        total_conversions: int,
+        all_errors: List[Dict],
+        analytics_records: List[Dict]
+    ) -> None:
+        """Perform batch run finalization (db saving, metrics logging, cleanup)."""
         try:
             if cancelled:
                 def _mark_cancelled():
@@ -651,7 +490,6 @@ class BatchOrchestrator:
                 return
 
             if failed_during_run:
-                # Mark as failed if we failed during scanning, preflight or converter execution
                 def _fail():
                     with get_connection() as conn:
                         self.repo.update_status(conn, run_id, "failed")
@@ -666,7 +504,6 @@ class BatchOrchestrator:
                         log.warning(f"save_errors dropped {len(errs_to_save)} rows: {err}")
                 return
 
-            # Compute and save metrics summary using MetricsCollector
             duration_ms = (time.time() - start_time) * 1000
             metrics = MetricsCollector.collect(
                  input_paths=input_paths,
@@ -677,9 +514,6 @@ class BatchOrchestrator:
                  input_sizes=input_sizes
              )
 
-            # A batch that produced zero successful conversions while accruing
-            # failures (e.g. every tool unregistered, all images unreadable) is a
-            # failure, not a silent "completed". Partial success stays "completed".
             final_status = "failed" if all_success_count == 0 and all_failure_count > 0 else "completed"
 
             def _save_summary():
@@ -715,8 +549,6 @@ class BatchOrchestrator:
                 except Exception as err:
                     log.warning(f"save_errors dropped {len(all_errors)} rows: {err}")
 
-            # Best-effort: persist per-conversion analytics so the heuristic
-            # generators can learn from real batch runs. Never fails the batch.
             if analytics_records:
                 try:
                     from ..core.db.repositories.conversions import record_conversions
@@ -730,6 +562,231 @@ class BatchOrchestrator:
         finally:
             self.run_controls.pop(run_id, None)
             self.progress.pop(run_id, None)
+
+    def execute_batch(self, run_id: int, request: BatchRequest) -> None:
+        """Execute a batch job across multiple (category, tool, format) combinations.
+
+        Scans source directory, probes image dimensions and heuristic quality for each
+        (category, tool, format) cell, invokes the appropriate converter, aggregates
+        metrics, and writes batch_summary to database on completion.
+
+        Args:
+            run_id: Unique batch identifier (references batch_runs row).
+            request: BatchRequest with source_dir, target_dir, formats, tools, categories.
+        """
+        start_time = time.time()
+        ctrl = self.run_controls.setdefault(run_id, RunControl())
+        
+        all_success_count = 0
+        all_failure_count = 0
+        total_bytes_written = 0
+        all_errors = []
+        all_telemetry_summaries = []
+        analytics_records: List[dict] = []
+        input_paths = []
+        executed_cells: List[MatrixCell] = []
+        total_conversions = 0
+        cancelled = False
+        failed_during_run = False
+        failure_reason = None
+
+        input_sizes: Dict[str, int] = {}
+
+        try:
+            # 1. Scan and preflight
+            input_paths, input_sizes = self._scan_and_preflight(request)
+            
+            # 2. Reset converters
+            self._reset_converters(run_id)
+
+            # Matrix Configuration
+            categories = request.category if isinstance(request.category, list) else [request.category]
+            tools = request.tool if isinstance(request.tool, list) else [request.tool]
+            formats = request.target_format if isinstance(request.target_format, list) else [request.target_format]
+            
+            plan = plan_matrix(categories, tools, formats)
+            multi_category = len(categories) > 1
+            total_conversions = len(input_paths) * len(plan)
+            
+            self.progress[run_id] = {
+                "cells_done": 0,
+                "cells_total": len(plan),
+                "current_cell": None,
+                "ok": 0,
+                "fail": 0,
+                "started_at": start_time,
+            }
+            
+            log.info(f"Starting Matrix Batch: {len(input_paths)} images * {len(plan)} cells = {total_conversions} conversions")
+            
+            # 3. Prepare image plan
+            active_paths, dim_cache, fail_count, rejects_errs = self._prepare_image_plan(
+                input_paths, plan, request.target_dir
+            )
+            all_failure_count += fail_count
+            all_errors.extend(rejects_errs)
+
+            # 4. Matrix Execution Loop
+            from concurrent.futures import ThreadPoolExecutor
+            probe_workers = min(32, (os.cpu_count() or 4) * 4)
+
+            cells_processed = 0
+            abort_matrix = False
+
+            for cell in plan:
+                if abort_matrix:
+                    break
+                ctrl.wait_if_paused()
+                if ctrl.cancelled:
+                    cancelled = True
+                    break
+                
+                self.progress[run_id]["current_cell"] = f"{cell.category}/{cell.tool}/{cell.target_format}"
+                
+                t_name = cell.tool
+                cat = cell.category
+                fmt = cell.target_format
+
+                converter = self.converters.get(t_name)
+                if converter:
+                    set_run = getattr(converter, "_set_active_run_id", None)
+                    if callable(set_run):
+                        set_run(run_id)
+                if not converter:
+                    err_msg = f"Unsupported tool: {t_name}"
+                    log.error(err_msg)
+                    all_failure_count += len(active_paths)
+                    all_errors.append({"path": "N/A", "error": err_msg})
+                    continue
+                
+                if converter.is_broken:
+                    err_msg = f"Quarantined: {t_name} circuit breaker tripped — not attempted."
+                    log.error(f"Aborting sub-batch: {t_name} is marked as BROKEN. Quarantining {len(active_paths)} files.")
+                    all_failure_count += len(active_paths)
+                    for _p in active_paths:
+                        all_errors.append({"path": _p, "error": err_msg, "quarantined": True})
+                    continue
+
+                if DISK_RECHECK_EVERY_CELLS > 0 and cells_processed > 0 and cells_processed % DISK_RECHECK_EVERY_CELLS == 0:
+                    try:
+                        self._check_free_disk(request.target_dir)
+                    except ValueError as e:
+                        log.error(f"Mid-run check failed: {e}")
+                        abort_matrix = True
+                        break
+
+                log.info(f"Processing Matrix Cell: [{cat}] [{t_name}] [{fmt}]")
+                
+                # Probe qualities for this combination
+                from ..core.tracing import bind_context
+                with ThreadPoolExecutor(max_workers=probe_workers) as ex:
+                    qualities = list(ex.map(bind_context(lambda p: self._probe_quality(p, cat, t_name, fmt, dim_cache.get(p))), active_paths))
+
+                suffix = suffix_for(cell, multi_category=multi_category)
+
+                result = converter.convert_batch(
+                    active_paths,
+                    request.target_dir,
+                    fmt,
+                    qualities,
+                    run_id=run_id,
+                    suffix=suffix,
+                    dimensions=dim_cache
+                )
+                if isinstance(result, dict):
+                    from app.core.converters.base import BatchResult
+                    tool_val = result.get("tool")
+                    result = BatchResult(
+                        success_count=result.get("success_count", 0),
+                        failure_count=result.get("failure_count", 0),
+                        duration_ms=result.get("duration_ms", 0.0),
+                        telemetry=result.get("telemetry", {}),
+                        errors=result.get("errors", []),
+                        bytes_written=result.get("bytes_written", 0),
+                    )
+                    if tool_val:
+                        result.tool = tool_val
+                
+                fb_tool = cross_tool_fallback_tool()
+                if fb_tool and fb_tool != t_name and result.errors:
+                    q_by_path = dict(zip(active_paths, qualities))
+                    recovered, result.errors = apply_cross_tool_fallback(
+                        result.errors,
+                        lambda p: self._fallback_retry_one(
+                            p, fb_tool, request.target_dir, fmt,
+                            q_by_path.get(p, default_quality_for(fb_tool, fmt)),
+                            suffix, run_id,
+                        ),
+                    )
+                    if recovered:
+                        n = len(recovered)
+                        result.success_count += n
+                        result.failure_count = max(0, result.failure_count - n)
+                        log.info("cross-tool fallback via %s recovered %d file(s)", fb_tool, n)
+
+                quarantined_errors = []
+                for err in result.errors:
+                    if err.get("path"):
+                        rec = quarantine_to_dlq(err["path"], request.target_dir, reason=err.get("error", "conversion failed"))
+                        quarantined_errors.append({
+                            "path": rec["path"],
+                            "error": rec["reason"],
+                            "dlq": True
+                        })
+                        log.warning("file quarantined to DLQ", extra={"subprocess": {"path": rec["path"], "reason": rec["reason"]}})
+                    else:
+                        quarantined_errors.append(err)
+
+                all_success_count += result.success_count
+                all_failure_count += result.failure_count
+                total_bytes_written += result.bytes_written
+                all_errors.extend(quarantined_errors)
+                if result.telemetry:
+                    all_telemetry_summaries.append(result.telemetry)
+                    
+                cells_processed += 1
+                progress_dict = self.progress[run_id]
+                progress_dict["cells_done"] = cells_processed
+                progress_dict["ok"] = all_success_count
+                progress_dict["fail"] = all_failure_count
+                
+                executed_cells.append(cell)
+
+                actual_tool = getattr(result, "tool", None) or t_name
+                error_paths = {e.get("path") for e in result.errors if e.get("path")}
+                for img_path, q in zip(active_paths, qualities):
+                    analytics_records.append({
+                        "path": img_path, "category": cat, "format": fmt, "tool": actual_tool,
+                        "quality": q, "success": img_path not in error_paths,
+                    })
+
+            if not executed_cells and all_failure_count > 0:
+                if not any(e.get("quarantined") for e in all_errors):
+                    raise ValueError("Batch produced no executed cells (all tools unsupported or all images unreadable).")
+
+        except Exception as e:
+            log.error(f"Batch execution failed for run {run_id}: {e}")
+            failed_during_run = True
+            failure_reason = str(e)
+
+        # 5. Finalize run
+        self._finalize_batch_run(
+            run_id=run_id,
+            start_time=start_time,
+            cancelled=cancelled,
+            failed_during_run=failed_during_run,
+            failure_reason=failure_reason,
+            input_paths=input_paths,
+            executed_cells=executed_cells,
+            total_bytes_written=total_bytes_written,
+            all_telemetry_summaries=all_telemetry_summaries,
+            input_sizes=input_sizes,
+            all_success_count=all_success_count,
+            all_failure_count=all_failure_count,
+            total_conversions=total_conversions,
+            all_errors=all_errors,
+            analytics_records=analytics_records
+        )
 
 
 def _emit_job_metrics(final_status, executed_cells_tools, formats, duration_s, savings_pct):

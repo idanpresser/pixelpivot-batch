@@ -6,6 +6,7 @@ detection and upserts images (by filename+category) to the images table.
 
 import hashlib
 import sqlite3
+from ..connection import DBConnection
 from pathlib import Path
 from typing import Optional
 from PIL import Image as PILImage
@@ -15,7 +16,7 @@ from ...logger import get_logger
 log = get_logger(__name__)
 
 def register_image(
-    conn: sqlite3.Connection,
+    conn: DBConnection,
     filepath: str,
     category: str,
     arrival_time: str = None,
@@ -28,7 +29,7 @@ def register_image(
     Uses SQLite UPSERT on conflict (filename, category).
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         filepath: Path to the image file.
         category: Category identifier for grouping (e.g. 'screenshots').
         arrival_time: Optional ISO timestamp (or "HH:MM" short form, expanded
@@ -99,11 +100,11 @@ def register_image(
     finally:
         cur.close()
 
-def get_image_by_id(conn: sqlite3.Connection, image_id: int) -> Optional[dict]:
+def get_image_by_id(conn: DBConnection, image_id: int) -> Optional[dict]:
     """Fetch a single images row by id.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         image_id: images.id to retrieve.
 
     Returns:

@@ -37,7 +37,7 @@ def test_cli_validation_flow(tmp_path, monkeypatch):
         main(["convert", "-s", str(src_dir), "-t", str(dst_dir), "--dry-run"])
         
         assert exit_code == 0
-        assert mock_check_binary.call_count == 2
+        assert mock_check_binary.call_count == 3
         mock_check_pyvips.assert_called_once()
         mock_check_sharp.assert_called_once()
 

@@ -6,6 +6,7 @@ associated metrics rows on success.
 """
 
 import sqlite3
+from ..connection import DBConnection
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -29,7 +30,7 @@ _CONVERSIONS_SCHEMA = {
 }
 
 def insert_conversion(
-    conn: sqlite3.Connection, data: dict, auto_commit: bool = True
+    conn: DBConnection, data: dict, auto_commit: bool = True
 ) -> int:
     """Insert or update a conversions row and create a metrics row on success.
 
@@ -38,7 +39,7 @@ def insert_conversion(
     creates an associated metrics row if not already present.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         data: dict with conversion fields. Keys not in _CONVERSIONS_SCHEMA are
             ignored. All values are coerced to their schema type.
         auto_commit: If True, commits the transaction on success.
@@ -116,7 +117,7 @@ def insert_conversion(
         cur.close()
 
 def insert_conversions_batch(
-    conn: sqlite3.Connection, records: List[dict], auto_commit: bool = True
+    conn: DBConnection, records: List[dict], auto_commit: bool = True
 ) -> int:
     """Insert or update multiple conversions rows and create metrics rows.
 
@@ -124,7 +125,7 @@ def insert_conversions_batch(
     (image_id, format, tool). Creates metrics rows for successful conversions.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         records: list[dict] with conversion fields (see insert_conversion).
         auto_commit: If True, commits the transaction on success.
 
@@ -195,7 +196,7 @@ def insert_conversions_batch(
     return len(payloads)
 
 def record_conversions(
-    conn: sqlite3.Connection, records: List[dict], auto_commit: bool = False
+    conn: DBConnection, records: List[dict], auto_commit: bool = False
 ) -> int:
     """Persist per-conversion analytics to populate heuristic feedback loop.
 
@@ -204,7 +205,7 @@ def record_conversions(
     loop so heuristic generators have live conversion data.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         records: list[dict], each with keys: path (str), category (str),
             format (str), tool (str), quality (float), success (bool).
         auto_commit: If True, commits the transaction on completion.
@@ -240,11 +241,11 @@ def record_conversions(
     return written
 
 
-def get_existing_conversion(conn: sqlite3.Connection, image_id: int, tool: str, fmt: str):
+def get_existing_conversion(conn: DBConnection, image_id: int, tool: str, fmt: str):
     """Fetch the most recent conversions row for (image_id, tool, format).
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         image_id: images.id to filter by.
         tool: conversions.tool to filter by.
         fmt: conversions.format to filter by.
@@ -267,11 +268,11 @@ def get_existing_conversion(conn: sqlite3.Connection, image_id: int, tool: str, 
     finally:
         cur.close()
 
-def is_benchmarked(conn: sqlite3.Connection, image_id: int, tool: str, fmt: str) -> bool:
+def is_benchmarked(conn: DBConnection, image_id: int, tool: str, fmt: str) -> bool:
     """Return True if a conversion exists for (image_id, tool, format).
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
         image_id: images.id to check.
         tool: conversions.tool to check.
         fmt: conversions.format to check.
@@ -281,11 +282,11 @@ def is_benchmarked(conn: sqlite3.Connection, image_id: int, tool: str, fmt: str)
     """
     return get_existing_conversion(conn, image_id, tool, fmt) is not None
 
-def remove_failed_images(conn: sqlite3.Connection) -> int:
+def remove_failed_images(conn: DBConnection) -> int:
     """Delete all conversions rows where success=0.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
 
     Returns:
         int: The number of conversions rows deleted.
@@ -299,11 +300,11 @@ def remove_failed_images(conn: sqlite3.Connection) -> int:
     finally:
         cur.close()
 
-def get_conversion_count(conn: sqlite3.Connection) -> int:
+def get_conversion_count(conn: DBConnection) -> int:
     """Return the total number of successful conversions in the database.
 
     Args:
-        conn: sqlite3.Connection for database access.
+        conn: DBConnection for database access.
 
     Returns:
         int: Count of conversions rows where success=1.

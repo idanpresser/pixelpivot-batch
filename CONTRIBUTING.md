@@ -51,6 +51,33 @@ architecture notes — every design constraint there is load-bearing.
 
 ---
 
+## Concurrency & Converter Safety
+
+The converter layer is **not thread-safe** for concurrent batch execution. Before writing concurrency-related code, understand the current limitations:
+
+### Known Issues (E12 Runtime Audit)
+
+- **Breaker state corruption** (`bd-qk1.1`): `BaseConverter._mark_failure()` and `_reset_failures()` mutate `state["consecutive_failures"]` outside the lock. Under ThreadPoolExecutor batch workloads, counter mutations race and produce lost updates.
+  
+- **Cross-run breaker interference** (`bd-qk1.3`): `_reset_failures()` wipes the global `None`-keyed breaker state, causing concurrent batches to share breaker state. Runs are not isolated.
+
+- **Process-global calibration flag** (`bd-qk1.2`): `config.CALIBRATION_ENABLED` is set by a worker thread and never reset. Once any calibration run executes, all subsequent normal batches silently write calibration rows.
+
+### Do Not (Until E12 is Resolved)
+
+- **Do not** spawn multiple `ThreadPoolExecutor` pools on the same converter singletons
+- **Do not** run multiple concurrent batches with the same orchestrator instance
+- **Do not** assume `config.CALIBRATION_ENABLED` is per-batch; it is process-global
+
+### Recommended Practice
+
+- Use the DB-poll queue manager (default) to serialize batches
+- Keep `PIXELPIVOT_MAX_CONCURRENT_BATCHES = 1`
+- Restart the API process after calibration
+- See [E12 beads](https://github.com/gastownhall/beads) for fix status and detailed reproduction steps
+
+---
+
 ## Development workflow
 
 ### 1. Pick or file an issue

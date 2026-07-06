@@ -45,3 +45,27 @@ def test_non_sqlite_error_is_passthrough():
     with pytest.raises(PgOperationalError):
         pg()
     assert calls["n"] == 1  # postgres no-op contract
+
+
+def test_retries_on_postgres_errors():
+    import psycopg
+    from psycopg import errors as pg_errors
+
+    for err_cls in (
+        psycopg.OperationalError,
+        pg_errors.SerializationFailure,
+        pg_errors.DeadlockDetected,
+        pg_errors.LockNotAvailable,
+    ):
+        calls = {"n": 0}
+
+        @with_db_retry(max_retries=3, initial_delay=0.0)
+        def flaky():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise err_cls("mock error")
+            return "ok"
+
+        assert flaky() == "ok"
+        assert calls["n"] == 3
+

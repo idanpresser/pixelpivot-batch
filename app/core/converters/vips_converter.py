@@ -2,7 +2,7 @@
 
 import time
 from typing import Dict, Any, List, Optional, Union
-from .base import BaseConverter, ConvertResult
+from .base import BaseConverter, ConvertResult, register_converter
 from ..telemetry import TelemetryMonitor
 from ..logger import get_logger
 from ..utils import get_pyvips, quality_to_jxl_distance
@@ -10,6 +10,7 @@ from ..utils import get_pyvips, quality_to_jxl_distance
 log = get_logger(__name__)
 
 
+@register_converter("vips")
 class VipsConverter(BaseConverter):
     """Convert still images via in-process pyvips library (libvips Python binding).
 

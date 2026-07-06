@@ -42,3 +42,18 @@ def test_commit_and_rollback(tmp_path, monkeypatch):
         cur = c.cursor()
         cur.execute("SELECT COUNT(*) AS n FROM batch_runs")
         assert cur.fetchone()["n"] == 0   # rolled back
+
+
+def test_literal_qmark_in_sql_query():
+    from unittest.mock import MagicMock
+    from app.core.db.connection import _CompatCursor
+    
+    mock_dbapi_cursor = MagicMock()
+    cur = _CompatCursor(mock_dbapi_cursor, "format")
+    
+    sql = "SELECT * FROM batch_runs WHERE source_dir = ? AND target_dir = 'abc?' AND comment = 'is it ?' -- maybe? /* or ? */"
+    cur.execute(sql, ("src",))
+    
+    expected_sql = "SELECT * FROM batch_runs WHERE source_dir = %s AND target_dir = 'abc?' AND comment = 'is it ?' -- maybe? /* or ? */"
+    mock_dbapi_cursor.execute.assert_called_once_with(expected_sql, ("src",))
+

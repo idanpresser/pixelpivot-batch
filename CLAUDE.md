@@ -80,3 +80,93 @@ Key tables:
 - The batch orchestrator writes to `batch_summary` only after the full batch completes; there is no per-image DB row in the batch path.
 - Hot folder handler debounces 5 seconds after the last file write before firing a batch.
 - Global constants (timeouts, thresholds, meta-score weights) live in `app/core/config.py`.
+
+## Known Issues & Gotchas
+
+**Status**: Identified in E12 runtime audit (2026-07-06). See individual beads for detailed reproduction, acceptance criteria, and workarounds.
+
+### Concurrency & Breaker State
+
+**Issue: Torn breaker counter under ThreadPoolExecutor batch** (`bd-qk1.1`)
+- `BaseConverter._mark_failure()` and `_reset_failures()` do read-modify-write on `state["consecutive_failures"]` outside the lock.
+- Under concurrent batch workloads (multiple workers probing same converter), counter mutations race → lost updates.
+- **Impact**: Converter breaker trips/resets unpredictably; healthy converters may be marked broken or vice versa.
+- **Current state**: `_bypass_breaker` mask during batch suppresses the broken state, but counter corruption leaks out after.
+
+**Issue: Cross-run breaker interference via global state reset** (`bd-qk1.3`)
+- `_reset_failures()` wipes the global `None`-keyed breaker state whenever an active run_id is set.
+- Concurrent batches (run A + run B) share breaker state via the `None`-priority getters.
+- **Impact**: Run A's failures can clear the breaker that run B reads; runs are not isolated.
+- **Dependency**: Blocked on `bd-qk1.1` (lock fix); isolation requires proper mutual exclusion first.
+
+**Issue: Magick recover chunk asymmetric breaker save/restore** (`bd-qk1.4`)
+- `_recover_chunk_per_file()` saves breaker fields via getters (global-`None` priority) but restores via setters (write run_id state).
+- Read side and write side target different dict keys → breaker state corruption under concurrent activity.
+- **Dependency**: Blocked on `bd-qk1.1`.
+
+**Issue: CALIBRATION_ENABLED global flag set by worker, never reset** (`bd-qk1.2`)
+- `queue_manager.py` sets `config.CALIBRATION_ENABLED = True` from a worker thread during calibration.
+- Flag is never restored to its prior value.
+- **Impact**: Once any calibration run executes, all subsequent *normal* batch runs silently write calibration/analytics rows (the record_* gate stays open).
+- **Current state**: Process-global state leak; affects all subsequent batches in the same process lifetime.
+- **Workaround**: Restart the API process after running calibration if you want normal batch behavior.
+
+### Converter Batch Lifecycle
+
+**Issue: Magick no-suffix path counts success without verifying output** (`bd-qk1.5`)
+- When `suffix=""`, mogrify success (rc==0) increments `success_count` for every input *without* checking the output file exists.
+- mogrify can return 0 while silently skipping an unreadable file → phantom success, no bytes written.
+- Suffix path (with rename) does verify; no-suffix path does not.
+- **Impact**: Data integrity; batch reports success for files that were never converted.
+
+**Issue: FFmpegProcess lifecycle nits** (`bd-qk1.12`)
+- Supervisor loop ends with unbounded `proc.wait()` after `kill_process_tree()` — can hang if reaping fails.
+- Exception between `spawn()` and `run()/unregister()` orphans Popen in registry until shutdown `terminate_all()`.
+- Reader threads joined with `timeout=1.0`; slow `on_progress` callback leaks daemon threads (cosmetic, bounded).
+- Hot-folder handler: if `run_coroutine_threadsafe()` raises synchronously (loop stopped during shutdown), handler stays wedged.
+
+### Hot Folder Semantics
+
+**Issue: Trigger failure leaves orphaned 'running' DB row** (`bd-qk1.6`)
+- `create_run()` inserts with default `status='running'` before `execute_batch()` is dispatched.
+- Broad `except Exception: log.error()` swallows dispatch failures; row stuck in `running` forever.
+- Restart's `reap_stale_running()` transitions it to `interrupted` (terminal), not `failed` or re-queued.
+- **Impact**: Orphaned row; error not surfaced to any caller.
+- **Workaround**: Check DB for stale `running` rows on a long-lived hot folder.
+
+**Issue: Readiness passes on stalled write + TOCTOU partial conversion** (`bd-qk1.10`)
+- Readiness check: "stable" = two consecutive equal-size polls. A paused network copy (write stall) reads identical size twice → declared ready → mid-write conversion.
+- TOCTOU: readiness scans dir, then glob re-scans; file created in that window bypasses readiness checks.
+- **Impact**: Hot-folder can convert partially-written files on networked/slow volumes.
+- **Workaround**: Avoid hot-folder on NFS/SMB with high latency. Use exclusive-open probing (pending fix).
+
+**Issue: processed_files set grows unbounded (memory leak)** (`bd-qk1.11`)
+- Every processed `(path, mtime, size)` key retained forever on a long-lived watcher.
+- **Impact**: Memory growth over hours/days of hot-folder operation.
+- **Workaround**: Restart the API process periodically if hot-folder is long-lived.
+
+### Shutdown & Crash Recovery
+
+**Issue: In-flight batch job lost on crash-restart** (`bd-qk1.8`)
+- `claim_next_queued()` commits `status='running'` before worker adds to `_running_jobs`.
+- On process crash, `reap_stale_running()` sets those rows to `interrupted` (terminal), **not** `queued`.
+- **Impact**: Active batch at crash-time is abandoned; queued jobs survive but the running one is lost.
+- **Product decision needed**: Is no-resume intentional ("don't auto-resume partial work") or a bug?
+- **Current state**: Documented as a limitation until decision.
+
+**Issue: Cancellation granularity: converter chunks ignore ctrl.cancel** (`bd-qk1.9`)
+- `RunControl.cancel()` is checked only at matrix-cell boundaries.
+- `FFmpegConverter.convert_batch()` (image2/multimap chunk) and `MagickConverter.convert_batch()` (mogrify chunk) have **no internal cancel check**.
+- One large chunk runs to its full scaled timeout, ignoring shutdown signal.
+- SIGTERM grace-join times out; chunk killed mid-way (partial outputs).
+- **Impact**: Graceful shutdown does not gracefully interrupt a large batch chunk.
+
+### Resource Management
+
+**Issue: RAM chunk-sizing model omits encoder working set (OOM risk)** (`bd-qk1.7`)
+- `chunk_sizing.py` assumes 4 B/px (raw RGBA only).
+- `base.py` worker cap assumes 12 B/px (3× encoder intermediate buffers).
+- Image2/multimap chunk sizing omits the encoder working set → large uniform batches size chunks ~3× too big.
+- **Impact**: Potential OOM past `CHUNK_RAM_BUDGET_FRACTION` on large uniform batches.
+- **Nuance**: image2 demuxer decodes sequentially (peak ~1 frame not N), so the model is conservative there. Real gap is per-frame 4 vs 12 and the multimap path (opens N inputs).
+- **Also**: `base.py:636-662` samples available RAM point-in-time; stale under concurrent runs/probes.

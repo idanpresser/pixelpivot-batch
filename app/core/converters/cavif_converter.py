@@ -2,8 +2,9 @@
 
 import os
 from typing import List, Union, Optional
-from .base import BaseConverter, ConvertResult
+from .base import BaseConverter, ConvertResult, register_converter
 
+@register_converter("cavif")
 class CavifConverter(BaseConverter):
     """Convert still images to AVIF via the cavif CLI utility."""
 

@@ -81,11 +81,12 @@ def check_sharp_install() -> ToolStatus:
     return ToolStatus("sharp_install", ok=True, detail=f"found Node ({node_cmd}) and sharp module")
 
 
-def check_all(ffmpeg_path: str, magick_path: str, sharp_port: int = 8765) -> list[ToolStatus]:
+def check_all(ffmpeg_path: str, magick_path: str, cavif_path: str = "cavif", sharp_port: int = 8765) -> list[ToolStatus]:
     """Probe all tools and return their statuses in display order."""
     return [
         check_binary("magick", magick_path),
         check_binary("ffmpeg", ffmpeg_path),
+        check_binary("cavif", cavif_path),
         check_pyvips(),
         check_sharp_install(),
         check_sharp_daemon(sharp_port),

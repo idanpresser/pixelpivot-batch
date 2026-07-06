@@ -122,7 +122,7 @@ def main(argv=None):
 
     p_cal = sub.add_parser("calibrate", help="Serial SSIM calibration; regenerates the heuristic table.")
     p_cal.add_argument("--source", "-s", required=True, help="Directory of sample images.")
-    p_cal.add_argument("--tools", default="magick,ffmpeg,vips,sharp", help="Comma-separated tools.")
+    p_cal.add_argument("--tools", default="magick,ffmpeg,vips,sharp,cavif", help="Comma-separated tools.")
     p_cal.add_argument("--formats", default="webp,avif,jxl", help="Comma-separated target formats.")
     p_cal.add_argument("--categories", default="general", help="Comma-separated categories.")
     p_cal.add_argument("--sample", type=int, default=30, help="Max images per matrix cell.")
@@ -156,32 +156,36 @@ def _run_convert(source: str, target: str, dry_run: bool) -> None:
     print("==================================================")
     print("      PixelPivot Environment Validation CLI       ")
     print("==================================================")
-    
+
     validation_passed = True
-    
+
     # 1. Check Paths
     if not check_paths(source, target):
         validation_passed = False
-        
+
     # 2. Check Native Binaries
     ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg.exe")
     if not os.path.exists(ffmpeg_bin):
         alt_ffmpeg = str(PROJ_ROOT / "bin" / "ffmpeg" / "8.1.1-essentials_build" / "ffmpeg.exe")
         if os.path.exists(alt_ffmpeg):
             ffmpeg_bin = alt_ffmpeg
-            
+
     magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick.exe")
-    
+    _cavif_ext = ".exe" if sys.platform == "win32" else ""
+    cavif_bin = str(PROJ_ROOT / "bin" / "cavif" / f"cavif{_cavif_ext}")
+
     if not check_binary("FFmpeg", ffmpeg_bin):
         validation_passed = False
-        
+
     if not check_binary("ImageMagick", magick_bin):
         validation_passed = False
-        
+
+    check_binary("cavif", cavif_bin)
+
     # 3. Check pyvips
     if not check_pyvips():
         validation_passed = False
-        
+
     # 4. Check Sharp Installation & Daemon
     check_sharp_install()
     check_sharp_daemon()
@@ -261,28 +265,32 @@ def _run_doctor() -> None:
     print("==================================================")
     print("      PixelPivot System Doctor / Validation       ")
     print("==================================================")
-    
+
     validation_passed = True
-    
+
     # 1. Check Native Binaries
     ffmpeg_bin = str(PROJ_ROOT / "bin" / "ffmpeg" / "ffmpeg.exe")
     if not os.path.exists(ffmpeg_bin):
         alt_ffmpeg = str(PROJ_ROOT / "bin" / "ffmpeg" / "8.1.1-essentials_build" / "ffmpeg.exe")
         if os.path.exists(alt_ffmpeg):
             ffmpeg_bin = alt_ffmpeg
-            
+
     magick_bin = str(PROJ_ROOT / "bin" / "magick" / "magick.exe")
-    
+    _cavif_ext = ".exe" if sys.platform == "win32" else ""
+    cavif_bin = str(PROJ_ROOT / "bin" / "cavif" / f"cavif{_cavif_ext}")
+
     if not check_binary("FFmpeg", ffmpeg_bin):
         validation_passed = False
-        
+
     if not check_binary("ImageMagick", magick_bin):
         validation_passed = False
-        
+
+    check_binary("cavif", cavif_bin)
+
     # 2. Check pyvips
     if not check_pyvips():
         validation_passed = False
-        
+
     # 3. Check Sharp Installation & Daemon
     check_sharp_install()
     check_sharp_daemon()
