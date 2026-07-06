@@ -36,8 +36,9 @@ def create_screen(state, api, supervisor) -> Screen:
         settings = state.settings or {}
         ffmpeg_path = settings.get("tools", {}).get("ffmpeg", "") or "ffmpeg"
         magick_path = settings.get("tools", {}).get("magick", "") or "magick"
+        cavif_path = settings.get("tools", {}).get("cavif", "") or "cavif"
 
-        statuses = toolcheck.check_all(ffmpeg_path=ffmpeg_path, magick_path=magick_path)
+        statuses = toolcheck.check_all(ffmpeg_path=ffmpeg_path, magick_path=magick_path, cavif_path=cavif_path)
         hint = "\n[s] start sharp  [x] stop sharp  [r] restart sharp"
         return tools_table(statuses) + hint
 

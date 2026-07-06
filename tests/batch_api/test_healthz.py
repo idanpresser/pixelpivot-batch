@@ -24,13 +24,14 @@ class _FakeOrch:
             "magick": _FakeConv(magick_path="magick"),
             "ffmpeg": _FakeConv(ffmpeg_path="ffmpeg"),
             "sharp": _FakeConv(port=8765),
+            "cavif": _FakeConv(cavif_path="cavif"),
         }
 
 
 def test_readiness_checks_returns_named_probes():
     checks = health.readiness_checks(_FakeOrch())
     names = {c.name for c in checks}
-    assert {"db", "storage", "magick", "ffmpeg", "sharp"} <= names
+    assert {"db", "storage", "magick", "ffmpeg", "sharp", "cavif"} <= names
 
 
 def test_readiness_db_failure_named(monkeypatch):

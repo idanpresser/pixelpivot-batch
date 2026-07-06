@@ -56,7 +56,7 @@ def render_run_panel(client: APIClient):
             with c1:
                 target_formats = st.multiselect("FORMAT", ["webp", "avif", "jxl"], default=defaults.get("target_format", ["webp"]))
             with c2:
-                tools = st.multiselect("ENGINE", ["magick", "ffmpeg", "vips", "sharp"], default=defaults.get("tool", ["magick"]))
+                tools = st.multiselect("ENGINE", ["magick", "ffmpeg", "vips", "sharp", "cavif"], default=defaults.get("tool", ["magick"]))
             with c3:
                 categories = st.multiselect("CATEGORY", ["general", "highRes", "web", "uiSharp", "lowContrst", "edgeCase"], default=defaults.get("category", ["general"]))
             

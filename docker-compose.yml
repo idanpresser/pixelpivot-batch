@@ -27,7 +27,7 @@ services:
     container_name: pixelpivot_batch_api
     command: ["uvicorn", "app.batch_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     volumes:
       - .:/app
       - /app/services/sharp-daemon/node_modules        # preserve image contents over the host mount
@@ -44,9 +44,9 @@ services:
       start_period: 10s
     environment:
       - IS_DOCKER=true
-      - PIXELPIVOT_DB_URL=postgresql://pixelpivot:pixelpivot@postgres:5432/pixelpivot
+      - PIXELPIVOT_DB_URL=postgresql+psycopg://pixelpivot:pixelpivot@postgres:5432/pixelpivot
       - PIXELPIVOT_ALLOW_PUBLIC=1
-      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-}
+      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-dev_secret_token_change_me}
 
   # Standalone Batch GUI
   pixelpivot-batch-gui:
@@ -56,10 +56,10 @@ services:
     container_name: pixelpivot_batch_gui
     command: ["python", "-m", "streamlit", "run", "app/web/batch_gui/main.py", "--server.port=8503"]
     ports:
-      - "127.0.0.1:8503:8503"
+      - "8503:8503"
     environment:
       - BATCH_API_URL=http://pixelpivot-batch-api:8000/api/v1
-      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-}
+      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-dev_secret_token_change_me}
     depends_on:
       pixelpivot-batch-api:
         condition: service_healthy
@@ -81,8 +81,10 @@ services:
       - /app/services/sharp-daemon/node_modules
     environment:
       - IS_DOCKER=true
-      - PIXELPIVOT_DB_URL=postgresql://pixelpivot:pixelpivot@postgres:5432/pixelpivot
-      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-}
+      - PIXELPIVOT_DB_URL=postgresql+psycopg://pixelpivot:pixelpivot@postgres:5432/pixelpivot
+      - PIXELPIVOT_API_TOKEN=${PIXELPIVOT_API_TOKEN:-dev_secret_token_change_me}
+    healthcheck:
+      disable: true
     depends_on:
       postgres:
         condition: service_healthy

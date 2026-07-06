@@ -20,7 +20,7 @@ def test_tools_screen_renders_health_statuses():
         screen = create_screen(state, api=None, supervisor=None)
         text = screen.container.content.text()
         
-        mock_check.assert_called_once_with(ffmpeg_path="custom-ffmpeg", magick_path="custom-magick")
+        mock_check.assert_called_once_with(ffmpeg_path="custom-ffmpeg", magick_path="custom-magick", cavif_path="cavif")
         
         assert "magick" in text
         assert "ffmpeg" in text

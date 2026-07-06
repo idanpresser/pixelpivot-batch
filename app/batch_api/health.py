@@ -58,6 +58,7 @@ def readiness_checks(orchestrator) -> List[Check]:
     convs = getattr(orchestrator, "converters", {})
     magick_path = getattr(convs.get("magick"), "magick_path", "magick")
     ffmpeg_path = getattr(convs.get("ffmpeg"), "ffmpeg_path", "ffmpeg")
+    cavif_path = getattr(convs.get("cavif"), "cavif_path", "cavif")
     sharp_port = getattr(convs.get("sharp"), "port", 8765)
 
     def _from_status(name, status):
@@ -68,5 +69,6 @@ def readiness_checks(orchestrator) -> List[Check]:
         _check_storage(),
         _from_status("magick", toolcheck.check_binary("magick", magick_path)),
         _from_status("ffmpeg", toolcheck.check_binary("ffmpeg", ffmpeg_path)),
+        _from_status("cavif", toolcheck.check_binary("cavif", cavif_path)),
         _from_status("sharp", toolcheck.check_sharp_daemon(sharp_port)),
     ]
