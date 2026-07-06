@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **Circuit Breaker Concurrency**: Replaced `threading.Lock` with `threading.RLock` in `BaseConverter` and synchronized all reads and mutations of circuit breaker state (e.g. `consecutive_failures`, `is_broken`, `broken_since`) under `_breaker_lock`. This prevents race conditions and torn failure counts during concurrent worker execution in the `ThreadPoolExecutor` batch path.
 
 ### Removed
 - **GPU / NVENC backend.** `FFmpegNvencConverter`, the `Tool.ffmpeg_nvenc`
