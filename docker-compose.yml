@@ -25,6 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: pixelpivot_batch_api
+    init: true
     command: ["uvicorn", "app.batch_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
@@ -55,6 +56,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: pixelpivot_batch_gui
+    init: true
     command: ["python", "-m", "streamlit", "run", "app/web/batch_gui/main.py", "--server.port=8503"]
     ports:
       - "8503:8503"
@@ -78,6 +80,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: pixelpivot_cli
+    init: true
     command: ["tail", "-f", "/dev/null"]   # keep alive
     volumes:
       - .:/app

@@ -220,8 +220,8 @@ def init_db(conn: Any = None) -> None:
 
 def _verify_integrity(conn: Any) -> None:
     """Performs integrity check. sqlite-specific PRAGMA or standard postgres validation."""
-    from .connection import get_engine
-    dialect = get_engine().dialect.name
+    from .connection import get_connection_dialect
+    dialect = get_connection_dialect(conn)
     if not dialect.startswith("sqlite"):
         cur = conn.cursor()
         try:
@@ -257,8 +257,8 @@ def _get_table_columns(cur: Any, table_name: str, dialect: str) -> list[str]:
 
 
 def _create_tables(conn: Any) -> None:
-    from .connection import get_engine
-    dialect = get_engine().dialect.name
+    from .connection import get_connection_dialect
+    dialect = get_connection_dialect(conn)
     ddl = _ddl_for(dialect)
     log.info(f"Initialising {dialect} schema...")
     cur = conn.cursor()

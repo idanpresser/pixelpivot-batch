@@ -48,12 +48,17 @@ _engines: dict[str, "Engine"] = {}
 
 
 def _db_url() -> str:
-    """Resolve the SQLAlchemy URL: explicit PIXELPIVOT_DB_URL wins, else sqlite at get_db_path()."""
+    """Resolve the SQLAlchemy URL: explicit PIXELPIVOT_DB_URL wins,
+    else postgresql if running inside Docker, else sqlite at get_db_path().
+    """
     import os
     url = os.getenv("PIXELPIVOT_DB_URL")
     if url:
         return url
+    if os.getenv("IS_DOCKER") == "true":
+        return "postgresql+psycopg://pixelpivot:pixelpivot@postgres:5432/pixelpivot"
     return f"sqlite:///{get_db_path()}"
+
 
 
 def get_engine() -> Engine:
@@ -155,6 +160,36 @@ def get_db_path() -> Path:
     if db_url and db_url.startswith("sqlite:///"):
         return Path(db_url.replace("sqlite:///", ""))
     return SQLITE_DB_PATH
+
+
+def get_connection_dialect(conn: Any) -> str:
+    """Determine the database dialect (sqlite or postgres) from the connection object."""
+    raw = getattr(conn, "_raw", conn)
+    cls_name = raw.__class__.__name__
+    
+    # If it is a Mock or MagicMock, fall back to the global engine dialect
+    if "Mock" in cls_name or "MagicMock" in cls_name:
+        from .connection import get_engine
+        return get_engine().dialect.name
+        
+    module_name = raw.__class__.__module__.lower()
+    class_name = raw.__class__.__name__.lower()
+    if "sqlite" in module_name or "sqlite" in class_name:
+        return "sqlite"
+    if "psycopg" in module_name or "psycopg" in class_name:
+        return "postgresql"
+    if "sqlite" in str(raw).lower():
+        return "sqlite"
+    if "psycopg" in str(raw).lower():
+        return "postgresql"
+        
+    # Check dialect of get_engine() as final fallback
+    try:
+        from .connection import get_engine
+        return get_engine().dialect.name
+    except Exception:
+        return "sqlite"
+
 
 
 def _replace_qmark_with_format(sql: str) -> str:
