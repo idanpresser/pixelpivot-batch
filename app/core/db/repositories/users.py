@@ -76,9 +76,9 @@ def count_users() -> int:
         with get_connection() as conn:
             cur = conn.cursor()
             try:
-                cur.execute("SELECT COUNT(*) FROM users")
+                cur.execute("SELECT COUNT(*) AS cnt FROM users")
                 row = cur.fetchone()
-                return row[0] if row else 0
+                return row["cnt"] if row else 0
             finally:
                 cur.close()
     except Exception as e:

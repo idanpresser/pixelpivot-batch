@@ -253,7 +253,7 @@ def _get_table_columns(cur: Any, table_name: str, dialect: str) -> list[str]:
             "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
             (table_name.lower(),)
         )
-        return [row[0] for row in cur.fetchall()]
+        return [row["column_name"] for row in cur.fetchall()]
 
 
 def _create_tables(conn: Any) -> None:

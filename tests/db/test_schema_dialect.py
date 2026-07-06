@@ -43,13 +43,13 @@ def test_pg_schema_migration_path(monkeypatch):
         table_name = params[0] if params else ""
         
         if table_name == "batch_runs":
-            return [("source_dir",), ("target_dir",)]
+            return [{"column_name": "source_dir"}, {"column_name": "target_dir"}]
         elif table_name == "batch_errors":
-            return [("id",), ("batch_id",)]
+            return [{"column_name": "id"}, {"column_name": "batch_id"}]
         elif table_name == "batch_summary":
-            return [("gpu_peak_pct",), ("vram_peak_mb",)]
+            return [{"column_name": "gpu_peak_pct"}, {"column_name": "vram_peak_mb"}]
         elif table_name == "batch_telemetry":
-            return [("gpu_pct",), ("vram_mb",)]
+            return [{"column_name": "gpu_pct"}, {"column_name": "vram_mb"}]
         return []
         
     mock_cur.fetchall.side_effect = mock_fetchall
