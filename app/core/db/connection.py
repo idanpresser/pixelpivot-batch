@@ -386,7 +386,7 @@ def get_connection() -> Iterator[Any]:
         if paramstyle != "qmark":
             try:
                 from psycopg.rows import dict_row
-                raw.cursor_factory = dict_row  # type: ignore[attr-defined]
+                raw.row_factory = dict_row  # type: ignore[attr-defined]
             except Exception:
                 pass
         c = _CompatConnection(raw, paramstyle)
