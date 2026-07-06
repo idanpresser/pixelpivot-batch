@@ -63,7 +63,7 @@ def _generate_svg_chart(points: List[Tuple[float, float]], title: str, y_label: 
         max_y = min_y + 10.0 if is_pct else min_y + 10.0
     
     if is_pct:
-        max_y = min(100.0, max(max_y, 10.0))
+        max_y = max(max_y, 10.0)
         min_y = 0.0
     else:
         min_y = max(0.0, min_y - (max_y - min_y) * 0.1)
@@ -184,12 +184,12 @@ def _scan_files_and_query_db(
             source_stems[item.stem] = item
 
     # Inventory all target files
+    tgt_accessible = tgt_path.exists()
     tgt_files = {}
-    if tgt_path.exists():
+    if tgt_accessible:
         for item in tgt_path.glob("**/*"):
             if item.is_file() and item.suffix.lower() in {".webp", ".avif", ".jxl", ".png", ".jpeg"}:
                 tgt_files[item.name] = item
-
     # Get DB registered conversions for these source files
     db_conversions = {}
     if source_stems:
@@ -222,7 +222,7 @@ def _scan_files_and_query_db(
 
     # Reconcile files and build details list
     reconciled_details = []
-    errors = []
+    errors = [] if tgt_accessible else [{"path": "N/A", "error": f"Target directory not accessible from this context: {target_dir}. File-vs-disk reconciliation skipped; showing DB records only.", "is_dlq": False}]
 
     # Get explicitly recorded errors for this run (if run_id provided)
     run_db_errors = {}
@@ -318,9 +318,16 @@ def _scan_files_and_query_db(
                     else:
                         # Output file not found on disk
                         if db_rec and db_rec.get("success"):
-                            # DB says success, but physical output is missing
+                            if not tgt_accessible:
+                                # Target dir inaccessible from this context (e.g. Docker path on host)
+                                # Cannot verify file existence; skip to avoid bulk false positives
+                                continue
+                            tracked_size = db_rec.get("output_size_bytes") or 0
                             status = "warning"
-                            warning_msg = "Database marks success, but output file is missing from target directory."
+                            if tracked_size > 0:
+                                warning_msg = f"Database marks success (output was {_format_size(tracked_size)}), but file is now missing from target directory."
+                            else:
+                                warning_msg = "Database marks success, but output file is missing from target directory. (Output size not recorded — analytics-only record.)"
                         elif db_rec and not db_rec.get("success"):
                             # DB says failure, output file is naturally missing
                             status = "failed"
