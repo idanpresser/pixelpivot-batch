@@ -16,8 +16,8 @@ FROM python:3.14-slim
 # libheif-dev for AVIF, libvips-dev for Sharp/Vips, ffmpeg for FFmpeg tools
 RUN apt-get update && apt-get install -y \
     imagemagick \
-    libheif-dev \
-    libvips-dev \
+    libheif1 \
+    libvips42 \
     libvips-tools \
     ffmpeg \
     curl \
@@ -37,7 +37,7 @@ WORKDIR /app
 
 # Install Python dependencies
 COPY pyproject.toml .
-RUN pip install --no-cache-dir ".[dev,gui,postgres]"
+RUN pip install --no-cache-dir ".[gui,postgres]"
 
 # Copy Node.js dependencies from builder
 COPY --from=node-builder /app/services/sharp-daemon/node_modules ./services/sharp-daemon/node_modules

@@ -1,26 +1,29 @@
 #!/bin/bash
 # PixelPivot Air-Gap Export Script
 
-EXPORT_DIR="out/airgap_bundle"
+set -euo pipefail
+
+EXPORT_DIR="${1:-out/airgap_bundle}"
 mkdir -p "$EXPORT_DIR"
 
-echo "🚀 [PIXELPIVOT] Exporting images for air-gapped deployment..."
+echo "[PIXELPIVOT] Exporting images for air-gapped deployment..."
+echo "  Output dir: $EXPORT_DIR"
 
-# 1. API Image
-echo "📦 Exporting API engine..."
-docker save pixelpivot_batch-pixelpivot-batch-api:latest | gzip > "$EXPORT_DIR/pixelpivot-api.tar.gz"
+# All 3 app images share identical base layers — save together so layers
+# are written once instead of three times (~1 GB vs ~3 GB).
+echo "  Exporting app images (combined)..."
+docker save \
+    pixelpivot_batch-pixelpivot-batch-api:latest \
+    pixelpivot_batch-pixelpivot-batch-gui:latest \
+    pixelpivot_batch-pixelpivot-cli:latest \
+    | gzip > "$EXPORT_DIR/pixelpivot-app.tar.gz"
 
-# 2. GUI Image
-echo "📦 Exporting GUI terminal..."
-docker save pixelpivot_batch-pixelpivot-batch-gui:latest | gzip > "$EXPORT_DIR/pixelpivot-gui.tar.gz"
+echo "  Exporting postgres:16..."
+docker save postgres:16 | gzip > "$EXPORT_DIR/postgres.tar.gz"
 
-# 3. CLI Image
-echo "📦 Exporting CLI runner..."
-docker save pixelpivot_batch-pixelpivot-cli:latest | gzip > "$EXPORT_DIR/pixelpivot-cli.tar.gz"
-
-# 4. Cleanup
-echo "✅ Export complete! Files are in $EXPORT_DIR"
-echo "To load on the target machine:"
-echo "   docker load < pixelpivot-api.tar.gz"
-echo "   docker load < pixelpivot-gui.tar.gz"
-echo "   docker load < pixelpivot-cli.tar.gz"
+echo "Export complete. Files in $EXPORT_DIR:"
+ls -lh "$EXPORT_DIR"/*.tar.gz
+echo ""
+echo "Load on target machine:"
+echo "   docker load < pixelpivot-app.tar.gz   # loads all 3 app images"
+echo "   docker load < postgres.tar.gz"

@@ -30,13 +30,28 @@ data/
 **/node_modules/
 services/sharp-daemon/node_modules/
 
-# Ignore heavy testing assets and samples
+# Ignore test code and heavy testing assets
+tests/
 test_pics/
 image_samples/
 converted_images/
 corrupt_or_failed/
 dummy_out/
 test_results_snippet.txt
+MagicMock/
+
+# Ignore docs, scripts, task tracking — not app code
+docs/
+tasks/
+scripts/
+tools/
+air_gapped_guide.md
+codebase_review_report.json
+*.md
+
+# Ignore IDE / AI assistant state
+.claude/
+.remember/
 
 # Ignore vendored binaries and offline installers
 bin/
