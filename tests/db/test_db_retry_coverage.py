@@ -48,6 +48,7 @@ def test_non_sqlite_error_is_passthrough():
 
 
 def test_retries_on_postgres_errors():
+    pytest.importorskip("psycopg")
     import psycopg
     from psycopg import errors as pg_errors
 
