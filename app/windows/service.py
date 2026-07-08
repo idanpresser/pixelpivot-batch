@@ -74,14 +74,44 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
     def _start_children(self) -> None:
         log = _log_dir()
         log.mkdir(parents=True, exist_ok=True)
+        
+        is_frozen = getattr(sys, "frozen", False)
         exe = sys.executable
+        
+        if is_frozen:
+            project_root = Path(sys.executable).parent
+        else:
+            project_root = Path(__file__).parent.parent.parent
+            if Path(exe).name.lower() == "pythonservice.exe":
+                # Resolve pythonservice.exe to the virtualenv python interpreter
+                parent = Path(exe).parent
+                candidates = [
+                    parent / "Scripts" / "python.exe",
+                    parent / "python.exe",
+                    parent.parent / "Scripts" / "python.exe",
+                    parent.parent / "python.exe",
+                ]
+                for c in candidates:
+                    if c.exists():
+                        exe = str(c)
+                        break
+                else:
+                    exe = "python"
+        
         env = {**os.environ, "PIXELPIVOT_SERVICE_MODE": "1"}
 
         for mode, stem in (("api", "service_api"), ("gui", "service_gui")):
             stdout = open(log / f"{stem}_stdout.log", "a", encoding="utf-8", buffering=1)
             stderr = open(log / f"{stem}_stderr.log", "a", encoding="utf-8", buffering=1)
+            
+            cmd = [exe]
+            if not is_frozen:
+                cmd.append(str(project_root / "app" / "windows" / "service_main.py"))
+            cmd.extend(["--mode", mode])
+            
             proc = subprocess.Popen(
-                [exe, "--mode", mode],
+                cmd,
+                cwd=str(project_root),
                 env=env,
                 stdout=stdout,
                 stderr=stderr,
