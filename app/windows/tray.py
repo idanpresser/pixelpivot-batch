@@ -713,7 +713,7 @@ class PixelPivotTray(QSystemTrayIcon):
             health   = cache.get("health")
             active   = [j for j in jobs if j.get("status") in ("running", "paused")]
             if health is not None:
-                api_status = "API ready" if health.get("ready") else "API not ready"
+                api_status = "API ready" if (health.get("ready") or health.get("status") == "ready") else "API not ready"
             else:
                 api_status = "API unreachable"
             status = api_status
