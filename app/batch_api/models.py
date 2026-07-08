@@ -22,7 +22,8 @@ def _resolve_path(v: str) -> str:
     """Validate and resolve a filesystem path.
 
     Converts relative paths to absolute, enforces non-empty, and optionally
-    checks containment within PIXELPIVOT_ALLOWED_ROOT if set.
+    checks containment within PIXELPIVOT_ALLOWED_ROOT if set. Handles mapped
+    and subst drives on Windows to find their real UNC or physical paths.
 
     Args:
         v: Path string to validate.
@@ -34,8 +35,46 @@ def _resolve_path(v: str) -> str:
         ValueError: On empty, invalid, or escaped paths.
     """
     import os
+    import sys
     if not v or not v.strip():
         raise ValueError("Path must not be empty.")
+
+    # Discover real path of mapped drive letters or subst drives on Windows
+    if sys.platform == "win32" and len(v) >= 2 and v[1] == ":":
+        drive = v[:2].upper()
+        rest = v[2:]
+        resolved_drive = None
+        
+        # 1. Resolve network mapped drive to UNC path using win32wnet
+        try:
+            import win32wnet
+            unc = win32wnet.WNetGetConnection(drive)
+            if unc:
+                resolved_drive = unc.rstrip('\\')
+        except Exception:
+            pass
+            
+        # 2. Resolve subst drive using QueryDosDeviceW via ctypes
+        if not resolved_drive:
+            try:
+                import ctypes
+                buf = ctypes.create_unicode_buffer(1024)
+                if ctypes.windll.kernel32.QueryDosDeviceW(drive, buf, 1024) != 0:
+                    target = buf.value
+                    if target.startswith("\\??\\"):
+                        resolved_drive = target[4:].rstrip('\\')
+                    elif "LanmanRedirector" in target:
+                        parts = target.split('\\')
+                        for idx, part in enumerate(parts):
+                            if part.startswith(';') and drive in part:
+                                resolved_drive = '\\' + '\\'.join(parts[idx+1:])
+                                break
+            except Exception:
+                pass
+                
+        if resolved_drive:
+            v = resolved_drive + rest
+
     try:
         normalized = v.replace('\\', '/')
         if normalized.startswith('~'):
