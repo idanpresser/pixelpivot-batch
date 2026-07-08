@@ -59,6 +59,12 @@ Streamlit GUI (port 8503)
 ### Heuristic Quality System
 `HeuristicInterpolator` (`app/core/heuristic_interpolator.py`) loads `app/core/heuristic_table.json` (schema `category → format → tool → {a, b, n, mp_min, mp_max}`, table `version` 2.0.0) and evaluates a fitted log-linear curve `quality = a + b·log10(megapixels)` at the image's exact megapixel count. The result is clamped to the curve's observed `[mp_min, mp_max]` (no extrapolation) and to the encoder's valid native range (`config.quality_range_for`). The canonical generator `app/core/heuristic.generate_heuristic_table` fits one curve per `(category, format, tool)` over raw per-image `(megapixels, quality)` samples via least squares (`fit_log_linear`), dropping any cell with fewer than `config.HEURISTIC_MIN_SAMPLES` points (the interpolator then falls back via `config.default_quality_for`). `tools/generate_heuristic_data.generate_cli` is a thin wrapper over that single generator. The shipped `heuristic_table.json` ships without priors (just the version); regenerate it from a populated analytics DB.
 
+**Continuous learning (2026-07-08):** A sidecar layer (`app/core/adjustment.py`, `heuristic_adjust.json`) enables live adaptation without offline calibration. Two mechanisms:
+1. **Steady-state verification:** 1% of batch outputs are SSIM-scored vs originals; error is fed to a leaky-integrator that nudges a per-cell offset (`offset += k·err·sign − λ·offset`). Offset is applied on top of the canonical curve during interpolation (`q = curve(mp) + offset[cell]`). This allows the heuristic to drift with encoder changes or content mix shifts. Gated by `PIXELPIVOT_ONLINE_LEARNING`.
+2. **Cold-start bootstrap:** New categories (missing `heuristic_table[cat][fmt][tool]`) trigger inline calibration of the first ~100 images; winning encodes reused as outputs. The SSIM-measured samples fit a fresh canonical curve, which is reloaded. Remaining images convert normally with the warm curve. Gated by `PIXELPIVOT_BOOTSTRAP_ENABLED`.
+
+Critical fix (circular dependency): `generate_heuristic_table` now fits only from `WHERE calib_method='ssim'` (calibration/bootstrap samples), not from live-batch conversions. Live batches write predicted quality without the flag so they don't corrupt the canonical fit. The nudge sidecar handles live drift instead. See `docs/superpowers/specs/2026-07-08-continuous-learning-design.md` for full design.
+
 ### Database
 SQLite 3 with WAL mode enabled. Connection management in `app/core/db/connection.py`. Schema initialized via `app/core/db/schema.py` — call `init_db()` on startup.
 
@@ -109,7 +115,7 @@ Key tables:
 - Flag is never restored to its prior value.
 - **Impact**: Once any calibration run executes, all subsequent *normal* batch runs silently write calibration/analytics rows (the record_* gate stays open).
 - **Current state**: Process-global state leak; affects all subsequent batches in the same process lifetime.
-- **Workaround**: Restart the API process after running calibration if you want normal batch behavior.
+- **Fix (2026-07-08)**: Continuous learning sidecar layer eliminates the need for the global flag. `CALIBRATION_ENABLED` is deprecated; analytics writes are now gated per-batch via the `analytics_records` mechanism in `orchestrator.py:_finalize_batch_run`, with the sidecar adjustments managed independently. No more per-process state.
 
 ### Converter Batch Lifecycle
 
