@@ -285,10 +285,12 @@ Disabled by default; set PIXELPIVOT_ONLINE_LEARNING=true to activate."""
 VERIFY_SAMPLE_RATE = float(os.getenv("PIXELPIVOT_VERIFY_SAMPLE_RATE", "0.01"))
 """Fraction of outputs sampled for post-batch SSIM verification (0.0..1.0).
 0.01 = 1%% of outputs verified."""
+assert 0.0 <= VERIFY_SAMPLE_RATE <= 1.0, f"VERIFY_SAMPLE_RATE must be in [0.0, 1.0], got {VERIFY_SAMPLE_RATE}"
 
 VERIFY_MAX_PER_CELL = int(os.getenv("PIXELPIVOT_VERIFY_MAX_PER_CELL", "50"))
 """Cap on verification samples collected per (category, format, tool) cell
 to limit database growth under high throughput."""
+assert VERIFY_MAX_PER_CELL > 0, f"VERIFY_MAX_PER_CELL must be positive, got {VERIFY_MAX_PER_CELL}"
 
 VERIFY_MIN_FOR_NUDGE = int(os.getenv("PIXELPIVOT_VERIFY_MIN_FOR_NUDGE", "3"))
 """Minimum verified samples needed before a nudge adjustment fires.
@@ -297,10 +299,12 @@ Prevents reactivity to noise from small samples."""
 NUDGE_GAIN_K = float(os.getenv("PIXELPIVOT_NUDGE_GAIN_K", "10.0"))
 """Gain multiplier for nudge update rule: offset += K * error.
 Higher = faster convergence but risk of overshoot."""
+assert NUDGE_GAIN_K > 0, f"NUDGE_GAIN_K must be positive, got {NUDGE_GAIN_K}"
 
 NUDGE_LEAK_LAMBDA = float(os.getenv("PIXELPIVOT_NUDGE_LEAK_LAMBDA", "0.1"))
 """Exponential decay on nudge persistence: offset_new = (1-lambda) * offset_old + delta.
 Higher = faster fade of old nudges; lower = longer memory."""
+assert 0.0 <= NUDGE_LEAK_LAMBDA <= 1.0, f"NUDGE_LEAK_LAMBDA must be in [0.0, 1.0], got {NUDGE_LEAK_LAMBDA}"
 
 NUDGE_MAX_OFFSET = float(os.getenv("PIXELPIVOT_NUDGE_MAX_OFFSET", "10.0"))
 """Clamp nudge adjustments to [-max_offset, +max_offset] to prevent runaway drift."""
