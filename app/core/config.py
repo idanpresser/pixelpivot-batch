@@ -24,6 +24,7 @@ Magick batch:        Command-line length limits for mogrify.
 """
 
 import os
+from pathlib import Path
 
 from .paths import APP_ROOT
 
@@ -270,6 +271,63 @@ CALIBRATION_ENABLED = os.getenv("PIXELPIVOT_CALIBRATION_ENABLED", "false").lower
 CALIBRATION_SSIM_TOLERANCE = 0.005
 MAX_CALIBRATION_ITERS = 10
 TARGET_SSIM = 0.98
+
+
+# ---------------------------------------------------------------------------
+# Continuous Learning: Online Adaptation
+# ---------------------------------------------------------------------------
+ONLINE_LEARNING_ENABLED = os.getenv("PIXELPIVOT_ONLINE_LEARNING", "false").lower() in (
+    "true", "1", "yes"
+)
+"""Enable online verification and nudge adaptation of quality interpolation.
+Disabled by default; set PIXELPIVOT_ONLINE_LEARNING=true to activate."""
+
+VERIFY_SAMPLE_RATE = float(os.getenv("PIXELPIVOT_VERIFY_SAMPLE_RATE", "0.01"))
+"""Fraction of outputs sampled for post-batch SSIM verification (0.0..1.0).
+0.01 = 1%% of outputs verified."""
+
+VERIFY_MAX_PER_CELL = int(os.getenv("PIXELPIVOT_VERIFY_MAX_PER_CELL", "50"))
+"""Cap on verification samples collected per (category, format, tool) cell
+to limit database growth under high throughput."""
+
+VERIFY_MIN_FOR_NUDGE = int(os.getenv("PIXELPIVOT_VERIFY_MIN_FOR_NUDGE", "3"))
+"""Minimum verified samples needed before a nudge adjustment fires.
+Prevents reactivity to noise from small samples."""
+
+NUDGE_GAIN_K = float(os.getenv("PIXELPIVOT_NUDGE_GAIN_K", "10.0"))
+"""Gain multiplier for nudge update rule: offset += K * error.
+Higher = faster convergence but risk of overshoot."""
+
+NUDGE_LEAK_LAMBDA = float(os.getenv("PIXELPIVOT_NUDGE_LEAK_LAMBDA", "0.1"))
+"""Exponential decay on nudge persistence: offset_new = (1-lambda) * offset_old + delta.
+Higher = faster fade of old nudges; lower = longer memory."""
+
+NUDGE_MAX_OFFSET = float(os.getenv("PIXELPIVOT_NUDGE_MAX_OFFSET", "10.0"))
+"""Clamp nudge adjustments to [-max_offset, +max_offset] to prevent runaway drift."""
+
+
+# ---------------------------------------------------------------------------
+# Cold-Start Bootstrap
+# ---------------------------------------------------------------------------
+BOOTSTRAP_ENABLED = os.getenv("PIXELPIVOT_BOOTSTRAP_ENABLED", "true").lower() in (
+    "true", "1", "yes"
+)
+"""Enable cold-start bootstrap: sample diverse images to seed quality curves
+before any user data arrives. Enabled by default."""
+
+BOOTSTRAP_SAMPLE_N = int(os.getenv("PIXELPIVOT_BOOTSTRAP_SAMPLE_N", "100"))
+"""Number of diverse images to sample during cold-start bootstrap per (category, format, tool)."""
+
+
+# ---------------------------------------------------------------------------
+# Sidecar Path
+# ---------------------------------------------------------------------------
+HEURISTIC_ADJUST_PATH = Path(os.getenv(
+    "PIXELPIVOT_HEURISTIC_ADJUST_PATH",
+    str(HEURISTIC_TABLE_PATH.parent / "heuristic_adjust.json")
+))
+"""Path to sidecar adjustment file for nudge offsets and online learning state.
+Defaults to heuristic_adjust.json in the same directory as heuristic_table.json."""
 
 
 # --- FFmpeg batch conversion (Task: ffmpeg-multi-image-batching) ---
