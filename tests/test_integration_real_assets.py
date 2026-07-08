@@ -21,8 +21,8 @@ async def test_full_pipeline_with_real_assets(real_images_dir, tmp_path):
     
     # Copy a few real images
     images_to_test = [
-        "highRes_0055_4B91E53B4F08F2912ED97EF166C3EFE3C.jpg",
-        "lowContrst_0510_23030E51A4400884518F3B044251A27C2.png"
+        "web_0027_F9C419D4DC784074A1D903251BFF44B15.jpg",
+        "uiSharp_0458_A8B80A86F6D17FACB62730FA0E16A4783.png"
     ]
     
     for img_name in images_to_test:

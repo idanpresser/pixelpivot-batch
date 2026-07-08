@@ -237,6 +237,12 @@ def _run_calibrate(args) -> None:
     from app.core import config
     config.CALIBRATION_ENABLED = True
 
+    # Ensure the schema exists. The API path inits on startup (main.py); the CLI
+    # calibrate path bypasses the API, so bootstrap here or create_run() hits
+    # "no such table: batch_runs" on a fresh DB. Idempotent.
+    from app.core.db.schema import init_db
+    init_db()
+
     from app.batch_api.calibration_runner import run_calibration
 
     def _split(s):
