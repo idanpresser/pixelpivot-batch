@@ -331,8 +331,11 @@ class SettingsDialog(QDialog):
             "queue_poll_s":                      self._poll.value(),
             "metrics_enabled":                   self._metrics.isChecked(),
         })
-        self._settings.save(self._data)
-        self.accept()
+        try:
+            self._settings.save(self._data)
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "Save Error", f"Failed to save settings to disk:\n{e}")
 
 
 # ---------------------------------------------------------------------------
@@ -570,7 +573,13 @@ class LogWindow(QDialog):
     def _log_files(self) -> list[Path]:
         if not self._log_dir.exists():
             return []
-        return sorted(self._log_dir.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+        files = []
+        for p in self._log_dir.glob("*.log"):
+            try:
+                files.append((p, p.stat().st_mtime))
+            except (FileNotFoundError, OSError):
+                pass
+        return [item[0] for item in sorted(files, key=lambda x: x[1], reverse=True)]
 
     def _populate_combo(self) -> None:
         cur = self._combo.currentText()
