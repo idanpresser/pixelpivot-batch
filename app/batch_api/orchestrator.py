@@ -655,6 +655,9 @@ class BatchOrchestrator:
             cells_processed = 0
             abort_matrix = False
 
+            failed_attempts: dict[str, list] = {}
+            success_attempts: dict[str, list] = {}
+
             for cell in plan:
                 if abort_matrix:
                     break
@@ -760,23 +763,29 @@ class BatchOrchestrator:
                         result.failure_count = max(0, result.failure_count - n)
                         log.info("cross-tool fallback via %s recovered %d file(s)", fb_tool, n)
 
-                quarantined_errors = []
+                failed_this_cell = set()
+                cell_errors = []
                 for err in result.errors:
-                    if err.get("path"):
-                        rec = quarantine_to_dlq(err["path"], request.target_dir, reason=err.get("error", "conversion failed"))
-                        quarantined_errors.append({
-                            "path": rec["path"],
-                            "error": rec["reason"],
-                            "dlq": True
+                    p = err.get("path")
+                    if p:
+                        failed_this_cell.add(p)
+                        failed_attempts.setdefault(p, []).append(err)
+                        cell_errors.append({
+                            "path": p,
+                            "error": err.get("error") or err.get("reason") or "conversion failed",
+                            "dlq": False
                         })
-                        log.warning("file quarantined to DLQ", extra={"subprocess": {"path": rec["path"], "reason": rec["reason"]}})
                     else:
-                        quarantined_errors.append(err)
+                        cell_errors.append(err)
+
+                for p in active_paths:
+                    if p not in failed_this_cell:
+                        success_attempts.setdefault(p, []).append(cell)
 
                 all_success_count += result.success_count
                 all_failure_count += result.failure_count
                 total_bytes_written += result.bytes_written
-                all_errors.extend(quarantined_errors)
+                all_errors.extend(cell_errors)
                 if result.telemetry:
                     all_telemetry_summaries.append(result.telemetry)
                     
@@ -795,6 +804,29 @@ class BatchOrchestrator:
                         "path": img_path, "category": cat, "format": fmt, "tool": actual_tool,
                         "quality": q, "success": img_path not in error_paths,
                     })
+
+            # Post-loop DLQ quarantine processing
+            quarantined_paths = {}
+            for p in active_paths:
+                if p in failed_attempts and not success_attempts.get(p):
+                    first_err = failed_attempts[p][0]
+                    reason = first_err.get("error") or first_err.get("reason") or "conversion failed"
+                    rec = quarantine_to_dlq(p, request.target_dir, reason)
+                    quarantined_paths[p] = rec["path"]
+                    log.warning("file quarantined to DLQ", extra={"subprocess": {"path": rec["path"], "reason": rec["reason"]}})
+
+            # Update paths and dlq flags in all_errors
+            for err in all_errors:
+                p = err.get("path")
+                if p in quarantined_paths:
+                    err["path"] = quarantined_paths[p]
+                    err["dlq"] = True
+
+            # Update paths in analytics_records
+            for rec in analytics_records:
+                p = rec.get("path")
+                if p in quarantined_paths:
+                    rec["path"] = quarantined_paths[p]
 
             if not executed_cells and all_failure_count > 0:
                 if not any(e.get("quarantined") for e in all_errors):
