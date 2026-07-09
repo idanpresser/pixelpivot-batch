@@ -260,5 +260,36 @@ def test_fetch_pileup_prevention(make_tray, monkeypatch, qtbot):
     qtbot.waitUntil(lambda: len(get_state_calls) == 2, timeout=2000)
 
 
+def test_first_running_tick_shows_checking(make_tray):
+    t = make_tray("stopped")
+    
+    res_first = {
+        "state": "running",
+        "health": None,
+        "jobs": [],
+        "hfs": [],
+    }
+    t._apply_fetched_state(res_first)
+    assert "checking..." in t._act_status.text()
+    
+    res_second = {
+        "state": "running",
+        "health": {"ready": True},
+        "jobs": [],
+        "hfs": [],
+    }
+    t._apply_fetched_state(res_second)
+    assert "API ready" in t._act_status.text()
+    
+    res_third = {
+        "state": "running",
+        "health": None,
+        "jobs": [],
+        "hfs": [],
+    }
+    t._apply_fetched_state(res_third)
+    assert "API unreachable" in t._act_status.text()
+
+
 
 

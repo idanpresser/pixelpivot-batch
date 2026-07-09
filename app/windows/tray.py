@@ -672,6 +672,7 @@ class PixelPivotTray(QSystemTrayIcon):
         self._refresh_pending = False
         self._fetch_generation = 0
         self._last_applied_generation = 0
+        self._has_fetched_data = False
 
         menu = QMenu()
 
@@ -803,15 +804,22 @@ class PixelPivotTray(QSystemTrayIcon):
             health   = res.get("health")
             active   = [j for j in jobs if j.get("status") in ("running", "paused")]
             if health is not None:
+                self._has_fetched_data = True
                 api_status = "API ready" if (health.get("ready") or health.get("status") == "ready") else "API not ready"
+                self._rebuild_batch_menu(jobs[:6])
+                self._rebuild_hf_menu(hfs)
             else:
-                api_status = "API unreachable"
+                if self._has_fetched_data:
+                    api_status = "API unreachable"
+                    self._rebuild_batch_menu(jobs[:6])
+                    self._rebuild_hf_menu(hfs)
+                else:
+                    api_status = "checking..."
             status = api_status
-            if active:
+            if active and self._has_fetched_data:
                 status += f"  |  {len(active)} active job(s)"
-            self._rebuild_batch_menu(jobs[:6])
-            self._rebuild_hf_menu(hfs)
         else:
+            self._has_fetched_data = False
             status = state
             self._rebuild_batch_menu([])
             self._rebuild_hf_menu([])
