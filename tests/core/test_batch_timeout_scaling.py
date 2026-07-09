@@ -38,7 +38,9 @@ class _FakeMonitor:
 def test_mogrify_batch_timeout_scales_with_chunk_size(tmp_path, monkeypatch):
     """The native mogrify batch command's communicate() timeout scales with the
     number of files in the chunk, not a flat per-file constant."""
+    import os
     captured = {}
+    out_dir = tmp_path / "out"
 
     class _FakeProc:
         def __init__(self, *a, **k):
@@ -48,6 +50,12 @@ def test_mogrify_batch_timeout_scales_with_chunk_size(tmp_path, monkeypatch):
         def __exit__(self, *a): return False
         def communicate(self, timeout=None):
             captured["timeout"] = timeout
+            # bd-qk1.5: produce the expected no-suffix outputs so the batch path
+            # counts success without falling back to per-file convert (which
+            # would overwrite the captured batch timeout with a per-file one).
+            os.makedirs(out_dir, exist_ok=True)
+            for i in range(5):
+                (out_dir / f"img_{i}.webp").write_bytes(b"webpdata")
             return ("", "")
 
     monkeypatch.setattr("app.core.converters.magick_converter.TelemetryMonitor", _FakeMonitor)
@@ -63,7 +71,7 @@ def test_mogrify_batch_timeout_scales_with_chunk_size(tmp_path, monkeypatch):
         files.append(str(p))
     dims = {f: (100, 100) for f in files}
 
-    conv.convert_batch(files, str(tmp_path / "out"), "webp", [80.0] * n, dimensions=dims)
+    conv.convert_batch(files, str(out_dir), "webp", [80.0] * n, dimensions=dims)
 
     assert captured.get("timeout") == batch_subprocess_timeout(n), (
         f"mogrify communicate timeout {captured.get('timeout')} != "

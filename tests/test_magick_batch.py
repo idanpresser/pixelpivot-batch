@@ -1,3 +1,4 @@
+import os
 import pytest
 from unittest.mock import MagicMock, patch
 from app.core.converters.magick_converter import MagickConverter
@@ -6,11 +7,20 @@ from app.core.converters.magick_converter import MagickConverter
 def converter():
     return MagickConverter(magick_path="magick")
 
-def test_magick_batch_grouping(converter):
+def test_magick_batch_grouping(converter, tmp_path):
     input_paths = ["a.jpg", "b.jpg", "c.jpg", "d.jpg"]
     # Grouping by quality: a and c get 80, b and d get 90
     qualities = [80, 90, 80, 90]
-    output_dir = "out"
+    output_dir = str(tmp_path / "out")
+
+    def _write_outputs(*_a, **_k):
+        # Simulate mogrify producing the expected no-suffix outputs so the
+        # bd-qk1.5 output-verification counts these as real successes.
+        os.makedirs(output_dir, exist_ok=True)
+        for stem in ("a", "b", "c", "d"):
+            with open(os.path.join(output_dir, f"{stem}.webp"), "wb") as fh:
+                fh.write(b"webpdata")
+        return ("", "")
 
     with patch("app.core.converters.magick_converter.get_resolution_bucket_from_path", return_value="medium"), \
          patch("app.core.converters.magick_converter.subprocess.Popen") as mock_popen:
@@ -18,7 +28,7 @@ def test_magick_batch_grouping(converter):
         mock_proc = mock_popen.return_value.__enter__.return_value
         mock_proc.pid = 123
         mock_proc.returncode = 0
-        mock_proc.communicate.return_value = ("", "")
+        mock_proc.communicate.side_effect = _write_outputs
 
         # Mock TelemetryMonitor. monitor.stop() must return a real dict — the
         # aggregator does max(float, sample[key]) and MagicMock won't compare.
@@ -39,7 +49,7 @@ def test_magick_batch_grouping(converter):
             cmd = args[0]
             assert "mogrify" in cmd or "magick" in cmd
             assert "-path" in cmd
-            assert "out" in cmd
+            assert output_dir in cmd
             assert "-format" in cmd
             assert "webp" in cmd
             assert "-quality" in cmd
