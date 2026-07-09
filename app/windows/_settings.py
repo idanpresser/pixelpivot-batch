@@ -5,6 +5,7 @@ No Qt or service dependencies — safe to import from either exe.
 from __future__ import annotations
 
 from typing import Any
+from pathlib import Path
 
 SETTINGS_DEFAULTS: dict[str, Any] = {
     "concurrent_encodes_scaling_factor": 2.0,
@@ -31,3 +32,14 @@ SETTINGS_ENV_MAP: dict[str, str] = {
     "metrics_enabled":                   "PIXELPIVOT_METRICS_ENABLED",
     "queue_poll_s":                      "PIXELPIVOT_QUEUE_POLL_S",
 }
+
+
+def resolve_data_dir() -> Path:
+    import os
+    import sys
+    data_env = os.environ.get("PIXELPIVOT_DATA_DIR")
+    if data_env:
+        return Path(data_env)
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent / "data"
+    return Path(__file__).parent.parent.parent / "data"

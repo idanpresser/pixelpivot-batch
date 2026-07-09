@@ -29,12 +29,8 @@ SERVICE_DESC = "High-throughput image conversion API and web GUI server."
 
 
 def _log_dir() -> Path:
-    data_env = os.environ.get("PIXELPIVOT_DATA_DIR")
-    if data_env:
-        return Path(data_env) / "logs"
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent / "data" / "logs"
-    return Path(__file__).parent.parent.parent / "data" / "logs"
+    from app.windows._settings import resolve_data_dir
+    return resolve_data_dir() / "logs"
 
 
 class PixelPivotService(win32serviceutil.ServiceFramework):

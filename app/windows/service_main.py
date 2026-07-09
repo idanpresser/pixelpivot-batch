@@ -60,12 +60,8 @@ def _run_gui() -> None:
 def _apply_saved_settings() -> None:
     """Load data/pixelpivot_config.json and set env vars for child processes."""
     from pathlib import Path
-    from app.windows._settings import SETTINGS_ENV_MAP
-
-    if getattr(sys, "frozen", False):
-        cfg_path = Path(sys.executable).parent / "data" / "pixelpivot_config.json"
-    else:
-        cfg_path = Path(__file__).parent.parent.parent / "data" / "pixelpivot_config.json"
+    from app.windows._settings import resolve_data_dir, SETTINGS_ENV_MAP
+    cfg_path = resolve_data_dir() / "pixelpivot_config.json"
 
     if not cfg_path.exists():
         return

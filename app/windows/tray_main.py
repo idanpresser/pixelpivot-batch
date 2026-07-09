@@ -22,8 +22,9 @@ def main() -> None:
         if not (exe_dir / "PixelPivotService.exe").exists():
             exe_dir = root_dir / "dist" / "pixelpivot_service"
 
+    from app.windows._settings import resolve_data_dir
     service_exe = exe_dir / "PixelPivotService.exe"
-    log_dir = exe_dir / "data" / "logs"
+    log_dir = resolve_data_dir() / "logs"
 
     _tray = PixelPivotTray(app, service_exe, log_dir)
     sys.exit(app.exec())

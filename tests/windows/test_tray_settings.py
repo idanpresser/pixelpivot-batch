@@ -98,7 +98,8 @@ def test_service_main_malformed_config_logs_warning(monkeypatch):
     mock_path.exists.return_value = True
     mock_path.read_text.return_value = "{ corrupt json"
     
-    monkeypatch.setattr("pathlib.Path", lambda *args: mock_path)
+    mock_path.__truediv__.return_value = mock_path
+    monkeypatch.setattr("app.windows._settings.resolve_data_dir", lambda: mock_path)
     
     warning_msgs = []
     import sys
@@ -116,3 +117,16 @@ def test_service_main_malformed_config_logs_warning(monkeypatch):
     
     assert len(stderr_writes) > 0
     assert any("Failed to parse settings file" in w for w in stderr_writes)
+
+
+def test_resolve_data_dir(monkeypatch):
+    from app.windows._settings import resolve_data_dir
+    from pathlib import Path
+    
+    monkeypatch.delenv("PIXELPIVOT_DATA_DIR", raising=False)
+    default_dir = resolve_data_dir()
+    assert default_dir.name == "data"
+    
+    monkeypatch.setenv("PIXELPIVOT_DATA_DIR", "C:/custom_data_dir")
+    custom_dir = resolve_data_dir()
+    assert custom_dir == Path("C:/custom_data_dir")
