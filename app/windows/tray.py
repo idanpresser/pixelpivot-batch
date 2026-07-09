@@ -149,7 +149,10 @@ class _Settings:
 
     def save(self, data: dict[str, Any]) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(data, indent=2))
+        import os
+        tmp_path = self._path.with_name(self._path.name + ".tmp")
+        tmp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        os.replace(tmp_path, self._path)
 
 
 # ---------------------------------------------------------------------------

@@ -71,7 +71,13 @@ def _apply_saved_settings() -> None:
         return
     try:
         cfg = json.loads(cfg_path.read_text())
-    except Exception:
+    except Exception as e:
+        sys.stderr.write(f"WARNING: Failed to parse settings file {cfg_path}: {e}\n")
+        try:
+            import servicemanager
+            servicemanager.LogWarningMsg(f"Failed to parse settings file {cfg_path}: {e}")
+        except Exception:
+            pass
         return
 
     for key, env_var in SETTINGS_ENV_MAP.items():
