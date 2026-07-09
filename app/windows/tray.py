@@ -27,7 +27,7 @@ if sys.platform != "win32":
     raise ImportError("app.windows.tray requires Windows")
 
 from PySide6.QtCore import Qt, QTimer, QRunnable, QThreadPool, QObject, Signal
-from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -582,15 +582,18 @@ class LogWindow(QDialog):
         return [item[0] for item in sorted(files, key=lambda x: x[1], reverse=True)]
 
     def _populate_combo(self) -> None:
-        cur = self._combo.currentText()
-        self._combo.blockSignals(True)
-        self._combo.clear()
-        for f in self._log_files():
-            self._combo.addItem(f.name)
-        idx = self._combo.findText(cur)
-        self._combo.setCurrentIndex(max(0, idx))
-        self._combo.blockSignals(False)
-        self._switch_log(self._combo.currentText())
+        files = [f.name for f in self._log_files()]
+        current_items = [self._combo.itemText(i) for i in range(self._combo.count())]
+        if files != current_items:
+            cur = self._combo.currentText()
+            self._combo.blockSignals(True)
+            self._combo.clear()
+            self._combo.addItems(files)
+            idx = self._combo.findText(cur)
+            self._combo.setCurrentIndex(max(0, idx))
+            self._combo.blockSignals(False)
+            if idx == -1:
+                self._switch_log(self._combo.currentText())
 
     def _switch_log(self, name: str) -> None:
         self._text.clear()
@@ -598,6 +601,7 @@ class LogWindow(QDialog):
         self._refresh()
 
     def _refresh(self) -> None:
+        self._populate_combo()
         name = self._combo.currentText()
         if not name:
             return
@@ -606,11 +610,17 @@ class LogWindow(QDialog):
             return
         pos = self._pos.get(name, 0)
         try:
+            size = path.stat().st_size
+            if size < pos:
+                pos = 0
+                self._text.clear()
+
             with open(path, "r", encoding="utf-8", errors="replace") as fh:
                 fh.seek(pos)
                 chunk = fh.read(self._READ_CHUNK)
                 if chunk:
-                    self._text.appendPlainText(chunk.rstrip("\n"))
+                    self._text.moveCursor(QTextCursor.MoveOperation.End)
+                    self._text.insertPlainText(chunk)
                     self._pos[name] = fh.tell()
                     sb = self._text.verticalScrollBar()
                     sb.setValue(sb.maximum())
