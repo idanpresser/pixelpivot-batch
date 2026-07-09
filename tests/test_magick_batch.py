@@ -47,6 +47,33 @@ def test_magick_batch_grouping(converter):
             qs = [args[0][cmd.index("-quality") + 1] for args, _ in mock_popen.call_args_list]
             assert set(qs) == {"80", "90"}
 
+def test_magick_no_suffix_missing_output_counts_failure(converter, tmp_path):
+    # bd-qk1.5: mogrify can return rc==0 while silently skipping an unreadable
+    # file (no output written). The no-suffix path must verify the output exists
+    # before counting success; a missing output routes to per-file fallback and,
+    # if that also fails, is reported as a failure — not phantom success.
+    input_paths = [str(tmp_path / "a.jpg")]
+    qualities = [80]
+    output_dir = str(tmp_path / "out")
+
+    with patch("app.core.converters.magick_converter.get_resolution_bucket_from_path", return_value="medium"), \
+         patch("app.core.converters.magick_converter.subprocess.Popen") as mock_popen, \
+         patch("app.core.converters.magick_converter.TelemetryMonitor") as mock_tm:
+        mock_proc = mock_popen.return_value.__enter__.return_value
+        mock_proc.pid = 123
+        mock_proc.returncode = 0  # mogrify reports success...
+        mock_proc.communicate.return_value = ("", "")
+        mock_tm.return_value.stop.return_value = {"cpu_avg": 0.0, "cpu_peak": 0.0, "ram_peak": 0.0}
+        # ...but no output file is produced, and the per-file fallback also fails.
+        converter.convert = MagicMock(return_value={"success": False, "error": "unreadable"})
+
+        result = converter.convert_batch(input_paths, output_dir, "webp", qualities)
+
+        assert result["success_count"] == 0
+        assert result["failure_count"] == 1
+        assert len(result["errors"]) >= 1
+
+
 def test_magick_batch_partial_failure(converter):
     input_paths = ["a.jpg", "b.jpg"]
     qualities = [80, 80]
