@@ -371,10 +371,15 @@ class MagickConverter(BaseConverter):
             Tuple of (ok_count, fail_count, errors, telemetry_samples, tripped, bytes_written),
             where tripped indicates whether the circuit breaker was triggered.
         """
+        # Set the active run FIRST so the save snapshot and the restore below
+        # address the same per-run breaker state key. Reading the getters before
+        # setting run_id captured the entry thread's state (typically the global
+        # None state) while the restore wrote the run_id state — an asymmetric
+        # save/restore that corrupted the batch run's breaker fields (bd-qk1.4).
+        self._set_active_run_id(run_id)
         saved_failures = self.consecutive_failures
         saved_broken = self.is_broken
         saved_broken_since = self.broken_since
-        self._set_active_run_id(run_id)
         self._bypass_breaker = True
         
         ok = 0
