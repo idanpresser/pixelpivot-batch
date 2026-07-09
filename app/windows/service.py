@@ -130,6 +130,7 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
                         f"(rc={proc.returncode}); stopping service."
                     )
                     win32event.SetEvent(self._stop_event)
+                    self._terminate_children()
                     return
 
     def _terminate_children(self) -> None:
