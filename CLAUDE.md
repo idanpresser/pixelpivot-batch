@@ -103,7 +103,7 @@ Key tables:
 - `_reset_failures()` wipes the global `None`-keyed breaker state whenever an active run_id is set.
 - Concurrent batches (run A + run B) share breaker state via the `None`-priority getters.
 - **Impact**: Run A's failures can clear the breaker that run B reads; runs are not isolated.
-- **Dependency**: Blocked on `bd-qk1.1` (lock fix); isolation requires proper mutual exclusion first.
+- **Fixed (2026-07-09)**: `consecutive_failures`/`is_broken`/`broken_since` getters now read only the active run's state (no global-`None` priority peek), and `_reset_failures()` resets only the active run's state (no global-`None` wipe). Each run_id is fully isolated via its own `_breaker_states` key; `run_id=None` remains the default context for non-batch `convert()` calls. Regression tests: `tests/core/test_circuit_breaker_isolation.py::test_isolated_run_ignores_global_none_breaker` and `::test_reset_in_run_does_not_wipe_other_run_state`.
 
 **Issue: Magick recover chunk asymmetric breaker save/restore** (`bd-qk1.4`)
 - `_recover_chunk_per_file()` saves breaker fields via getters (global-`None` priority) but restores via setters (write run_id state).
