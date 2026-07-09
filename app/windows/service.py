@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import time
+import threading
 from pathlib import Path
 
 if sys.platform != "win32":
@@ -43,6 +44,7 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
         super().__init__(args)
         self._stop_event = win32event.CreateEvent(None, 0, 0, None)
         self._procs: list[subprocess.Popen] = []
+        self._procs_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # SCM entry points
@@ -51,7 +53,6 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
     def SvcStop(self) -> None:
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         win32event.SetEvent(self._stop_event)
-        self._terminate_children()
 
     def SvcDoRun(self) -> None:
         servicemanager.LogMsg(
@@ -61,6 +62,7 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
         )
         self._start_children()
         self._monitor_until_stop()
+        self._terminate_children()
         servicemanager.LogMsg(
             servicemanager.EVENTLOG_INFORMATION_TYPE,
             servicemanager.PYS_SERVICE_STOPPED,
@@ -116,31 +118,38 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
                 stdout=stdout,
                 stderr=stderr,
             )
-            self._procs.append(proc)
+            with self._procs_lock:
+                self._procs.append(proc)
 
     def _monitor_until_stop(self) -> None:
         while True:
             rc = win32event.WaitForSingleObject(self._stop_event, 5000)
             if rc == win32event.WAIT_OBJECT_0:
                 break
-            for proc in self._procs:
+            with self._procs_lock:
+                procs_copy = list(self._procs)
+            for proc in procs_copy:
                 if proc.poll() is not None:
+                    # Double-check if the stop event was set in the meantime
+                    if win32event.WaitForSingleObject(self._stop_event, 0) == win32event.WAIT_OBJECT_0:
+                        break
                     servicemanager.LogErrorMsg(
                         f"PixelPivot child PID {proc.pid} exited unexpectedly "
                         f"(rc={proc.returncode}); stopping service."
                     )
                     win32event.SetEvent(self._stop_event)
-                    self._terminate_children()
                     return
 
     def _terminate_children(self) -> None:
-        for proc in reversed(self._procs):
+        with self._procs_lock:
+            procs = list(self._procs)
+        for proc in reversed(procs):
             try:
                 proc.terminate()
             except OSError:
                 pass
         deadline = time.monotonic() + 15.0
-        for proc in self._procs:
+        for proc in procs:
             remaining = max(0.1, deadline - time.monotonic())
             try:
                 proc.wait(timeout=remaining)
@@ -149,4 +158,5 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
                     proc.kill()
                 except OSError:
                     pass
-        self._procs.clear()
+        with self._procs_lock:
+            self._procs.clear()
