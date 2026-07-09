@@ -241,5 +241,24 @@ def test_svc_actions_report_other_errors(make_tray, monkeypatch):
     assert len(critical_dialogs) == 1
 
 
+def test_fetch_pileup_prevention(make_tray, monkeypatch, qtbot):
+    from PySide6.QtCore import QThreadPool
+    t = make_tray("stopped")
+    
+    get_state_calls = []
+    def mock_get_state():
+        get_state_calls.append(1)
+        return "stopped"
+    monkeypatch.setattr(tray_mod.scm, "get_state", mock_get_state)
+    
+    t._fetch_in_flight = False
+    t._refresh_pending = False
+    
+    t._run_state_fetch()
+    t._run_state_fetch()
+    
+    qtbot.waitUntil(lambda: len(get_state_calls) == 2, timeout=2000)
+
+
 
 

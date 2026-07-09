@@ -668,6 +668,10 @@ class PixelPivotTray(QSystemTrayIcon):
         self._settings    = _Settings(log_dir.parent)   # data/ dir
         self._api_cache: dict[str, Any] = {}             # written by background thread
         self._active_workers: set[ApiWorker] = set()
+        self._fetch_in_flight = False
+        self._refresh_pending = False
+        self._fetch_generation = 0
+        self._last_applied_generation = 0
 
         menu = QMenu()
 
@@ -729,6 +733,16 @@ class PixelPivotTray(QSystemTrayIcon):
         self._run_state_fetch()
 
     def _run_state_fetch(self) -> None:
+        if self._fetch_in_flight:
+            self._refresh_pending = True
+            return
+
+        self._fetch_in_flight = True
+        self._refresh_pending = False
+
+        self._fetch_generation += 1
+        gen = self._fetch_generation
+
         def fetch():
             try:
                 state = scm.get_state()
@@ -755,9 +769,19 @@ class PixelPivotTray(QSystemTrayIcon):
 
         def on_done(res):
             self._active_workers.discard(worker)
+            self._fetch_in_flight = False
+
             if isinstance(res, Exception):
+                if self._refresh_pending:
+                    self._run_state_fetch()
                 return
-            self._apply_fetched_state(res)
+
+            if gen > self._last_applied_generation:
+                self._last_applied_generation = gen
+                self._apply_fetched_state(res)
+
+            if self._refresh_pending:
+                self._run_state_fetch()
 
         worker.signals.finished.connect(on_done)
         QThreadPool.globalInstance().start(worker)
