@@ -3,6 +3,61 @@ import time
 import pytest
 from app.core.converters.base import BaseConverter
 
+
+class _RunStateConverter(BaseConverter):
+    """Minimal converter to exercise per-run breaker state in isolation."""
+
+    def get_name(self) -> str:
+        return "run_state"
+
+    def supported_formats(self) -> list[str]:
+        return ["webp"]
+
+    def convert(self, *args, **kwargs):
+        return {"success": True, "telemetry": {}}
+
+
+def test_isolated_run_ignores_global_none_breaker():
+    """qk1.3: a breaker tripped in the global (run_id=None) context must NOT
+    leak into an isolated run. Run B never failed, so it must read healthy."""
+    conv = _RunStateConverter()
+    conv.failure_threshold = 3
+
+    # Global/default context (run_id=None) trips the breaker.
+    conv._set_active_run_id(None)
+    for _ in range(3):
+        conv._mark_failure()
+    assert conv.is_broken is True
+
+    # Run B starts; it has its own run_id and never failed.
+    conv._set_active_run_id(2)
+    assert conv.is_broken is False, "Global None breaker leaked into isolated run B"
+    assert conv.consecutive_failures == 0, "Global None failure count leaked into run B"
+
+
+def test_reset_in_run_does_not_wipe_other_run_state():
+    """qk1.3: run A recovering (reset) must not clear the breaker that run B
+    reads. Runs must be mutually isolated via their own state keys."""
+    conv = _RunStateConverter()
+    conv.failure_threshold = 3
+
+    # Run B trips its own breaker.
+    conv._set_active_run_id(2)
+    for _ in range(3):
+        conv._mark_failure()
+    assert conv.is_broken is True
+
+    # Run A independently fails then recovers.
+    conv._set_active_run_id(1)
+    for _ in range(3):
+        conv._mark_failure()
+    conv._reset_failures()
+
+    # Run B must still be broken — run A's reset must not have cleared it.
+    conv._set_active_run_id(2)
+    assert conv.is_broken is True, "Run A reset cleared run B breaker (cross-run interference)"
+    assert conv.consecutive_failures == 3
+
 class DummyBreakerConverter(BaseConverter):
     def __init__(self):
         super().__init__()
