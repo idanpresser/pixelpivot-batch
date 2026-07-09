@@ -205,5 +205,41 @@ def test_scm_query_is_async(qapp, monkeypatch):
     QThreadPool.globalInstance().waitForDone()
 
 
+def test_svc_actions_tolerate_uac_decline(make_tray, monkeypatch):
+    import pywintypes
+    def raise_uac_cancel(*args, **kwargs):
+        raise pywintypes.error(1223, "ShellExecuteEx", "The operation was canceled by the user.")
+        
+    t = make_tray("stopped")
+    monkeypatch.setattr(tray_mod.elevation, "elevate", raise_uac_cancel)
+    monkeypatch.setattr(tray_mod.elevation, "is_admin", lambda: False)
+    
+    critical_dialogs = []
+    monkeypatch.setattr(tray_mod.QMessageBox, "critical", lambda *args: critical_dialogs.append(args))
+    
+    t._svc_start()
+    t._svc_stop()
+    t._svc_install()
+    t._svc_uninstall()
+    
+    assert len(critical_dialogs) == 0
+
+
+def test_svc_actions_report_other_errors(make_tray, monkeypatch):
+    import pywintypes
+    def raise_access_denied(*args, **kwargs):
+        raise pywintypes.error(5, "ShellExecuteEx", "Access is denied.")
+        
+    t = make_tray("stopped")
+    monkeypatch.setattr(tray_mod.elevation, "elevate", raise_access_denied)
+    monkeypatch.setattr(tray_mod.elevation, "is_admin", lambda: False)
+    
+    critical_dialogs = []
+    monkeypatch.setattr(tray_mod.QMessageBox, "critical", lambda *args: critical_dialogs.append(args))
+    
+    t._svc_start()
+    assert len(critical_dialogs) == 1
+
+
 
 

@@ -871,6 +871,8 @@ class PixelPivotTray(QSystemTrayIcon):
             else:
                 elevation.elevate(str(self._service_exe), "start")
         except Exception as e:
+            if getattr(e, "winerror", None) == 1223:
+                return
             QMessageBox.critical(None, "Service Error", f"Failed to start service:\n{e}")
 
     def _svc_stop(self) -> None:
@@ -880,18 +882,24 @@ class PixelPivotTray(QSystemTrayIcon):
             else:
                 elevation.elevate(str(self._service_exe), "stop")
         except Exception as e:
+            if getattr(e, "winerror", None) == 1223:
+                return
             QMessageBox.critical(None, "Service Error", f"Failed to stop service:\n{e}")
 
     def _svc_install(self) -> None:
         try:
             elevation.elevate(str(self._service_exe), "--startup", "auto", "install")
         except Exception as e:
+            if getattr(e, "winerror", None) == 1223:
+                return
             QMessageBox.critical(None, "Service Error", f"Failed to install service:\n{e}")
 
     def _svc_uninstall(self) -> None:
         try:
             elevation.elevate(str(self._service_exe), "remove")
         except Exception as e:
+            if getattr(e, "winerror", None) == 1223:
+                return
             QMessageBox.critical(None, "Service Error", f"Failed to uninstall service:\n{e}")
 
     # ------------------------------------------------------------------

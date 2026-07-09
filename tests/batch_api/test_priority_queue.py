@@ -1,9 +1,20 @@
 # tests/batch_api/test_priority_queue.py
 import time
+import pytest
 from app.core.db.connection import get_connection
 from app.core.db.schema import init_db
 from app.core.db.repositories.batch import BatchRepository
 from app.batch_api.queue_manager import BatchQueueManager
+
+
+@pytest.fixture(autouse=True)
+def isolated_db(tmp_path, monkeypatch):
+    db_path = tmp_path / "priority_queue.db"
+    import app.core.db.connection as connection
+    monkeypatch.setenv("PIXELPIVOT_DB_PATH", str(db_path))
+    connection.reset_engine_cache()
+    from app.core.db.schema import init_db
+    init_db()
 
 
 class _RecordingOrch:
@@ -22,7 +33,6 @@ def _enqueue(priority):
 
 
 def test_worker_executes_high_priority_before_low():
-    init_db()
     orch = _RecordingOrch()
     # Drain leftovers so ordering is deterministic.
     BatchRepository()  # noqa: ensure import side effects
@@ -39,7 +49,6 @@ def test_worker_executes_high_priority_before_low():
 
 
 def test_submit_batch_sets_queued_status():
-    init_db()
     orch = _RecordingOrch()
     repo = BatchRepository()
     with get_connection() as conn:
@@ -55,11 +64,8 @@ def test_submit_batch_sets_queued_status():
 
 
 def test_api_submit_is_high_priority(monkeypatch):
-    from app.core.db.schema import init_db
-    from app.core.db.connection import get_connection
     from app.core.db.repositories.batch import BatchRepository
     from app.core.config import PRIORITY_HIGH
-    init_db()
     seen = {}
     repo = BatchRepository()
     orig = repo.create_run
@@ -77,4 +83,3 @@ def test_api_submit_is_high_priority(monkeypatch):
             "tool": ["ffmpeg"], "category": ["general"], "trigger_type": "api",
         })
     assert seen.get("priority") == PRIORITY_HIGH
-
