@@ -26,8 +26,8 @@ from typing import Any
 if sys.platform != "win32":
     raise ImportError("app.windows.tray requires Windows")
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtCore import Qt, QTimer, QRunnable, QThreadPool, QObject, Signal
+from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -618,9 +618,25 @@ class LogWindow(QDialog):
             pass
 
 
-# ---------------------------------------------------------------------------
-# System tray
-# ---------------------------------------------------------------------------
+class WorkerSignals(QObject):
+    finished = Signal(object)
+
+
+class ApiWorker(QRunnable):
+    def __init__(self, fn, *args, **kwargs):
+        super().__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
+
+    def run(self):
+        try:
+            res = self.fn(*self.args, **self.kwargs)
+            self.signals.finished.emit(res)
+        except Exception as e:
+            self.signals.finished.emit(e)
+
 
 class PixelPivotTray(QSystemTrayIcon):
     def __init__(
@@ -737,6 +753,20 @@ class PixelPivotTray(QSystemTrayIcon):
             "hfs":    _api.hotfolders(),
         }
 
+    def _run_async(self, fn: Any, callback: Any) -> None:
+        trigger_action = self.sender()
+        if isinstance(trigger_action, QAction):
+            trigger_action.setEnabled(False)
+
+        def on_done(res: Any) -> None:
+            if isinstance(trigger_action, QAction):
+                trigger_action.setEnabled(True)
+            callback(res)
+
+        worker = ApiWorker(fn)
+        worker.signals.finished.connect(on_done)
+        QThreadPool.globalInstance().start(worker)
+
     # ------------------------------------------------------------------
     # Dynamic submenus
     # ------------------------------------------------------------------
@@ -824,51 +854,81 @@ class PixelPivotTray(QSystemTrayIcon):
     # ------------------------------------------------------------------
 
     def _batch_control(self, run_id: int, action: str) -> None:
-        if _api.batch_control(run_id, action) is None:
-            QMessageBox.warning(None, "Error", f"Failed to {action} batch #{run_id}.")
-        self._update_state()
+        def work():
+            return _api.batch_control(run_id, action)
+
+        def on_done(res):
+            if res is None or isinstance(res, Exception):
+                QMessageBox.warning(None, "Error", f"Failed to {action} batch #{run_id}.")
+            self._update_state()
+
+        self._run_async(work, on_done)
 
     def _batch_restart(self, run_id: int) -> None:
-        if _api.batch_restart(run_id) is None:
-            QMessageBox.warning(None, "Error", f"Failed to restart batch #{run_id}.")
-        else:
-            self.showMessage("PixelPivot", f"Batch #{run_id} queued for restart.",
-                             QSystemTrayIcon.MessageIcon.Information, 3000)
-        self._update_state()
+        def work():
+            return _api.batch_restart(run_id)
+
+        def on_done(res):
+            if res is None or isinstance(res, Exception):
+                QMessageBox.warning(None, "Error", f"Failed to restart batch #{run_id}.")
+            else:
+                self.showMessage("PixelPivot", f"Batch #{run_id} queued for restart.",
+                                 QSystemTrayIcon.MessageIcon.Information, 3000)
+            self._update_state()
+
+        self._run_async(work, on_done)
 
     def _show_start_batch(self) -> None:
         dlg = StartBatchDialog()
         if dlg.exec() == QDialog.DialogCode.Accepted and dlg.payload:
-            result = _api.batch_start(dlg.payload)
-            if result:
-                self.showMessage("PixelPivot", f"Batch #{result.get('run_id', '?')} queued.",
-                                 QSystemTrayIcon.MessageIcon.Information, 3000)
-            else:
-                QMessageBox.warning(None, "Error", "Failed to start batch. Is the service running?")
-            self._update_state()
+            payload = dlg.payload
+            def work():
+                return _api.batch_start(payload)
+
+            def on_done(res):
+                if res and not isinstance(res, Exception):
+                    self.showMessage("PixelPivot", f"Batch #{res.get('run_id', '?')} queued.",
+                                     QSystemTrayIcon.MessageIcon.Information, 3000)
+                else:
+                    QMessageBox.warning(None, "Error", "Failed to start batch. Is the service running?")
+                self._update_state()
+
+            self._run_async(work, on_done)
 
     # ------------------------------------------------------------------
     # Hot folder operations
     # ------------------------------------------------------------------
 
     def _hf_unregister(self, watcher_id: Any) -> None:
-        if _api.hotfolder_delete(watcher_id) is None:
-            QMessageBox.warning(None, "Error", f"Failed to unregister watcher {watcher_id}.")
-        else:
-            self.showMessage("PixelPivot", "Hot folder unregistered.",
-                             QSystemTrayIcon.MessageIcon.Information, 2000)
-        self._update_state()
+        def work():
+            return _api.hotfolder_delete(watcher_id)
+
+        def on_done(res):
+            if res is None or isinstance(res, Exception):
+                QMessageBox.warning(None, "Error", f"Failed to unregister watcher {watcher_id}.")
+            else:
+                self.showMessage("PixelPivot", "Hot folder unregistered.",
+                                 QSystemTrayIcon.MessageIcon.Information, 2000)
+            self._update_state()
+
+        self._run_async(work, on_done)
 
     def _show_register_hf(self) -> None:
         dlg = RegisterHotFolderDialog()
         if dlg.exec() == QDialog.DialogCode.Accepted and dlg.payload:
-            result = _api.hotfolder_register(dlg.payload)
-            if result:
-                self.showMessage("PixelPivot", "Hot folder registered.",
-                                 QSystemTrayIcon.MessageIcon.Information, 2000)
-            else:
-                QMessageBox.warning(None, "Error", "Failed to register. Is the service running?")
-            self._update_state()
+            payload = dlg.payload
+            def work():
+                return _api.hotfolder_register(payload)
+
+            def on_done(res):
+                if res and not isinstance(res, Exception):
+                    self.showMessage("PixelPivot", "Hot folder registered.",
+                                     QSystemTrayIcon.MessageIcon.Information, 2000)
+                else:
+                    QMessageBox.warning(None, "Error", "Failed to register. Is the service running?")
+                self._update_state()
+
+            self._run_async(work, on_done)
 
     # ------------------------------------------------------------------
     # Calibration
@@ -877,12 +937,18 @@ class PixelPivotTray(QSystemTrayIcon):
     def _show_calibrate(self) -> None:
         dlg = CalibrateDialog()
         if dlg.exec() == QDialog.DialogCode.Accepted and dlg.payload:
-            result = _api.calibrate(dlg.payload)
-            if result:
-                self.showMessage("PixelPivot", "Calibration run queued.",
-                                 QSystemTrayIcon.MessageIcon.Information, 3000)
-            else:
-                QMessageBox.warning(None, "Error", "Failed to start calibration. Is the service running?")
+            payload = dlg.payload
+            def work():
+                return _api.calibrate(payload)
+
+            def on_done(res):
+                if res and not isinstance(res, Exception):
+                    self.showMessage("PixelPivot", "Calibration run queued.",
+                                     QSystemTrayIcon.MessageIcon.Information, 3000)
+                else:
+                    QMessageBox.warning(None, "Error", "Failed to start calibration. Is the service running?")
+
+            self._run_async(work, on_done)
 
     # ------------------------------------------------------------------
     # Settings & logs

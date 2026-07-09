@@ -111,12 +111,15 @@ def test_rebuild_hf_menu_lists_watcher_and_register(make_tray):
 
 
 def test_batch_control_calls_api(make_tray, monkeypatch):
+    from PySide6.QtCore import QThreadPool
     t = make_tray("running")
     calls = []
     monkeypatch.setattr(tray_mod._api, "batch_control", lambda rid, act: calls.append((rid, act)) or {"ok": True})
     monkeypatch.setattr(tray_mod.PixelPivotTray, "_update_state", lambda self: None)
     t._batch_control(5, "pause")
+    QThreadPool.globalInstance().waitForDone()
     assert calls == [(5, "pause")]
+
 
 
 def test_svc_install_elevate_args(make_tray, monkeypatch):
@@ -126,4 +129,32 @@ def test_svc_install_elevate_args(make_tray, monkeypatch):
     t._svc_install()
     assert len(elevate_calls) == 1
     assert elevate_calls[0][1:] == ("--startup", "auto", "install")
+
+
+def test_batch_control_is_async(make_tray, monkeypatch):
+    import threading
+    import time
+    t = make_tray("running")
+    
+    api_started = threading.Event()
+    api_continue = threading.Event()
+    
+    def slow_batch_control(rid, act):
+        api_started.set()
+        api_continue.wait(timeout=2)
+        return {"ok": True}
+        
+    monkeypatch.setattr(tray_mod._api, "batch_control", slow_batch_control)
+    monkeypatch.setattr(tray_mod.PixelPivotTray, "_update_state", lambda self: None)
+    
+    start_time = time.monotonic()
+    t._batch_control(5, "pause")
+    elapsed = time.monotonic() - start_time
+    
+    api_continue.set()
+    
+    assert elapsed < 0.2
+    assert api_started.wait(timeout=1.0) is True
+
+
 
