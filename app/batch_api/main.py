@@ -134,8 +134,17 @@ from app.core import tracing
 
 @app.middleware("http")
 async def trace_id_middleware(request, call_next):
-    tracing.new_trace_id("req-")
-    return await call_next(request)
+    x_trace_id = request.headers.get("X-Trace-Id")
+    if x_trace_id:
+        tracing.set_trace_id(x_trace_id)
+    else:
+        tracing.new_trace_id("req-")
+    
+    response = await call_next(request)
+    tid = tracing.get_trace_id()
+    if tid:
+        response.headers["X-Trace-Id"] = tid
+    return response
 
 @app.middleware("http")
 async def api_token_auth_middleware(request, call_next):

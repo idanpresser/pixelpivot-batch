@@ -1,8 +1,9 @@
 """Trace identity: one id per logical request, propagated across threads.
 
 A ContextVar holds the current trace_id. Entry points (API/hotfolder/CLI)
-call new_trace_id(prefix). A logging filter injects it onto every record and
-fallback-generates a `system-` id when unset, so no record ever lacks trace.id.
+call new_trace_id(prefix) or set_trace_id(tid) from incoming X-Trace-Id headers.
+A logging filter injects it onto every record and fallback-generates a `system-`
+id when unset, so no record ever lacks trace.id.
 """
 import contextvars
 import logging

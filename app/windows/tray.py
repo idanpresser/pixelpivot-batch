@@ -20,6 +20,8 @@ import threading
 import urllib.error
 import urllib.request
 import webbrowser
+import contextvars
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +78,9 @@ def _make_icon(color: str = "#2563eb") -> QIcon:
     return QIcon(px)
 
 
+_current_trace_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_trace_id", default=None)
+
+
 # ---------------------------------------------------------------------------
 # API client  (stdlib only — no requests dep in tray exe)
 # ---------------------------------------------------------------------------
@@ -88,6 +93,9 @@ class _Api:
     def _req(self, method: str, url: str, body: Any = None) -> Any:
         data    = json.dumps(body).encode() if body is not None else None
         headers = {"Content-Type": "application/json"} if data else {}
+        tid     = _current_trace_id.get()
+        if tid:
+            headers["X-Trace-Id"] = tid
         req     = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=self.TIMEOUT) as resp:
@@ -835,7 +843,20 @@ class PixelPivotTray(QSystemTrayIcon):
         if isinstance(trigger_action, QAction):
             trigger_action.setEnabled(False)
 
-        worker = ApiWorker(fn)
+        # Generate tray-<uuid> trace ID for the user action
+        tid = f"tray-{uuid.uuid4().hex}"
+
+        def wrapped_fn(*args, **kwargs):
+            token = _current_trace_id.set(tid)
+            try:
+                import sys
+                sys.stderr.write(f"[{tid}] User action triggered async work\n")
+                sys.stderr.flush()
+                return fn(*args, **kwargs)
+            finally:
+                _current_trace_id.reset(token)
+
+        worker = ApiWorker(wrapped_fn)
         self._active_workers.add(worker)
 
         def on_done(res: Any) -> None:
