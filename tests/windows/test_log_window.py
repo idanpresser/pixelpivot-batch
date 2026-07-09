@@ -100,3 +100,42 @@ def test_log_window_no_spurious_newlines(qtbot, tmp_path):
     assert dlg._text.toPlainText() == "line1line2"
     
     dlg.close()
+
+
+def test_log_window_timer_stopped_on_close(qtbot, tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    
+    log_file = log_dir / "service.log"
+    log_file.write_text("log", encoding="utf-8")
+    
+    dlg = LogWindow(log_dir)
+    qtbot.addWidget(dlg)
+    
+    assert dlg._timer.isActive() is True
+    dlg.close()
+    assert dlg._timer.isActive() is False
+
+
+def test_tray_show_logs_lifecycle(qtbot, tmp_path, qapp):
+    from PySide6.QtWidgets import QSystemTrayIcon
+    if not QSystemTrayIcon.isSystemTrayAvailable():
+        pytest.skip("no system tray on this session")
+        
+    from app.windows.tray import PixelPivotTray
+    
+    t = PixelPivotTray(qapp, tmp_path / "svc.exe", tmp_path / "logs")
+    assert t._log_window is None
+    
+    t._show_logs()
+    assert t._log_window is not None
+    assert t._log_window.isVisible() is True
+    
+    win = t._log_window
+    win.close()
+    
+    qtbot.waitUntil(lambda: t._log_window is None, timeout=2000)
+    t._poll_timer.stop()
+    from PySide6.QtCore import QThreadPool
+    QThreadPool.globalInstance().waitForDone()
+

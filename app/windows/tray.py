@@ -549,6 +549,7 @@ class LogWindow(QDialog):
 
     def __init__(self, log_dir: Path, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowTitle("PixelPivot — Service Logs")
         self.resize(860, 520)
         self._log_dir = log_dir
@@ -626,6 +627,10 @@ class LogWindow(QDialog):
                     sb.setValue(sb.maximum())
         except OSError:
             pass
+
+    def closeEvent(self, event: Any) -> None:
+        self._timer.stop()
+        super().closeEvent(event)
 
 
 class WorkerSignals(QObject):
@@ -998,9 +1003,13 @@ class PixelPivotTray(QSystemTrayIcon):
         SettingsDialog(self._settings).exec()
 
     def _show_logs(self) -> None:
-        if self._log_window is None or not self._log_window.isVisible():
+        if self._log_window is None:
             self._log_window = LogWindow(self._log_dir)
+            self._log_window.destroyed.connect(self._reset_log_window)
             self._log_window.show()
         else:
             self._log_window.raise_()
             self._log_window.activateWindow()
+
+    def _reset_log_window(self) -> None:
+        self._log_window = None
