@@ -22,17 +22,33 @@ from app.windows import tray as tray_mod
 @pytest.fixture
 def make_tray(qapp, qtbot, tmp_path, monkeypatch):
     """Build a PixelPivotTray with a patched SCM state and no network poll."""
+    from PySide6.QtCore import QThreadPool
     if not QSystemTrayIcon.isSystemTrayAvailable():
         pytest.skip("no system tray on this session")
 
-    monkeypatch.setattr(tray_mod.PixelPivotTray, "_fetch_api", lambda self: None)
+    # We mock _api calls to return dummy data so they don't touch the network
+    monkeypatch.setattr(tray_mod._api, "health", lambda: {"status": "ready", "ready": True})
+    monkeypatch.setattr(tray_mod._api, "batch_history", lambda: [])
+    monkeypatch.setattr(tray_mod._api, "hotfolders", lambda: [])
+
+    trays = []
 
     def _build(state="stopped"):
         monkeypatch.setattr(tray_mod.scm, "get_state", lambda: state)
         t = tray_mod.PixelPivotTray(qapp, tmp_path / "svc.exe", tmp_path / "logs")
+        def check():
+            txt = t._act_status.text()
+            print(f"DEBUG BUILD: state={state}, txt={txt}")
+            return state in txt or (state == "running" and "API" in txt)
+        qtbot.waitUntil(check, timeout=5000)
+        trays.append(t)
         return t
 
     yield _build
+
+    for t in trays:
+        t._poll_timer.stop()
+    QThreadPool.globalInstance().waitForDone()
 
 
 def _action_texts(menu):
@@ -155,6 +171,39 @@ def test_batch_control_is_async(make_tray, monkeypatch):
     
     assert elapsed < 0.2
     assert api_started.wait(timeout=1.0) is True
+
+
+def test_scm_query_is_async(qapp, monkeypatch):
+    import threading
+    import time
+    from PySide6.QtCore import QThreadPool
+    
+    scm_started = threading.Event()
+    scm_continue = threading.Event()
+    
+    def slow_get_state():
+        scm_started.set()
+        scm_continue.wait(timeout=2)
+        return "running"
+        
+    monkeypatch.setattr(tray_mod.scm, "get_state", slow_get_state)
+    
+    # We mock _api calls as well
+    monkeypatch.setattr(tray_mod._api, "health", lambda: {"status": "ready", "ready": True})
+    monkeypatch.setattr(tray_mod._api, "batch_history", lambda: [])
+    monkeypatch.setattr(tray_mod._api, "hotfolders", lambda: [])
+    
+    start_time = time.monotonic()
+    t = tray_mod.PixelPivotTray(qapp, Path("C:/dummy.exe"), Path("C:/logs"))
+    elapsed = time.monotonic() - start_time
+    
+    # Check that constructor returns immediately
+    assert elapsed < 0.2
+    
+    assert scm_started.wait(timeout=1.0) is True
+    scm_continue.set()
+    QThreadPool.globalInstance().waitForDone()
+
 
 
 

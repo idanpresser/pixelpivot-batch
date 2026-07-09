@@ -652,6 +652,7 @@ class PixelPivotTray(QSystemTrayIcon):
         self._log_window: LogWindow | None = None
         self._settings    = _Settings(log_dir.parent)   # data/ dir
         self._api_cache: dict[str, Any] = {}             # written by background thread
+        self._active_workers: set[ApiWorker] = set()
 
         menu = QMenu()
 
@@ -710,7 +711,44 @@ class PixelPivotTray(QSystemTrayIcon):
     # ------------------------------------------------------------------
 
     def _update_state(self) -> None:
-        state     = scm.get_state()
+        self._run_state_fetch()
+
+    def _run_state_fetch(self) -> None:
+        def fetch():
+            try:
+                state = scm.get_state()
+            except Exception:
+                state = "unknown"
+
+            res = {
+                "state": state,
+                "health": None,
+                "jobs": [],
+                "hfs": [],
+            }
+            if state == "running":
+                try:
+                    res["health"] = _api.health()
+                    res["jobs"] = _api.batch_history() or []
+                    res["hfs"] = _api.hotfolders() or []
+                except Exception:
+                    pass
+            return res
+
+        worker = ApiWorker(fetch)
+        self._active_workers.add(worker)
+
+        def on_done(res):
+            self._active_workers.discard(worker)
+            if isinstance(res, Exception):
+                return
+            self._apply_fetched_state(res)
+
+        worker.signals.finished.connect(on_done)
+        QThreadPool.globalInstance().start(worker)
+
+    def _apply_fetched_state(self, res: dict[str, Any]) -> None:
+        state     = res["state"]
         running   = state == "running"
         installed = state != "not_installed"
         busy      = state in ("starting", "stopping")
@@ -721,12 +759,9 @@ class PixelPivotTray(QSystemTrayIcon):
         self._act_uninstall.setEnabled(installed and not running and not busy)
 
         if running:
-            # Kick off background API refresh; UI reads stale cache from last tick.
-            threading.Thread(target=self._fetch_api, daemon=True).start()
-            cache    = self._api_cache
-            jobs     = cache.get("jobs", [])
-            hfs      = cache.get("hfs", [])
-            health   = cache.get("health")
+            jobs     = res.get("jobs", [])
+            hfs      = res.get("hfs", [])
+            health   = res.get("health")
             active   = [j for j in jobs if j.get("status") in ("running", "paused")]
             if health is not None:
                 api_status = "API ready" if (health.get("ready") or health.get("status") == "ready") else "API not ready"
@@ -745,25 +780,20 @@ class PixelPivotTray(QSystemTrayIcon):
         self._act_status.setText(f"Status: {status}")
         self.setToolTip(f"PixelPivot — {status}")
 
-    def _fetch_api(self) -> None:
-        """Background thread: refresh API cache. CPython dict assignment is atomic."""
-        self._api_cache = {
-            "health": _api.health(),
-            "jobs":   _api.batch_history(),
-            "hfs":    _api.hotfolders(),
-        }
-
     def _run_async(self, fn: Any, callback: Any) -> None:
         trigger_action = self.sender()
         if isinstance(trigger_action, QAction):
             trigger_action.setEnabled(False)
 
+        worker = ApiWorker(fn)
+        self._active_workers.add(worker)
+
         def on_done(res: Any) -> None:
+            self._active_workers.discard(worker)
             if isinstance(trigger_action, QAction):
                 trigger_action.setEnabled(True)
             callback(res)
 
-        worker = ApiWorker(fn)
         worker.signals.finished.connect(on_done)
         QThreadPool.globalInstance().start(worker)
 
