@@ -114,8 +114,7 @@ Key tables:
 - `queue_manager.py` sets `config.CALIBRATION_ENABLED = True` from a worker thread during calibration.
 - Flag is never restored to its prior value.
 - **Impact**: Once any calibration run executes, all subsequent *normal* batch runs silently write calibration/analytics rows (the record_* gate stays open).
-- **Current state**: Process-global state leak; affects all subsequent batches in the same process lifetime.
-- **Fix (2026-07-08)**: Continuous learning sidecar layer eliminates the need for the global flag. `CALIBRATION_ENABLED` is deprecated; analytics writes are now gated per-batch via the `analytics_records` mechanism in `orchestrator.py:_finalize_batch_run`, with the sidecar adjustments managed independently. No more per-process state.
+- **Fixed (2026-07-09)**: `queue_manager._worker_loop` now saves the prior `CALIBRATION_ENABLED` value, sets it `True` only around the `run_calibration` call, and restores it in a `finally`. The write-gate is scoped to the calibration run; subsequent normal batches read the prior value. Regression test: `tests/batch_api/test_calibration_flag_scope.py`.
 
 ### Converter Batch Lifecycle
 
