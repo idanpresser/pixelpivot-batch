@@ -20,6 +20,8 @@ import win32event
 import win32service
 import win32serviceutil
 import servicemanager
+import win32job
+import signal
 
 SERVICE_NAME = "PixelPivotBatchEngine"
 SERVICE_DISPLAY = "PixelPivot Batch Engine"
@@ -45,6 +47,18 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
         self._stop_event = win32event.CreateEvent(None, 0, 0, None)
         self._procs: list[subprocess.Popen] = []
         self._procs_lock = threading.Lock()
+
+        # Create Job Object to automatically terminate child processes if the service is killed
+        self._job = win32job.CreateJobObject(None, "")
+        extended_info = win32job.QueryInformationJobObject(
+            self._job, win32job.JobObjectExtendedLimitInformation
+        )
+        extended_info["BasicLimitInformation"]["LimitFlags"] |= win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        win32job.SetInformationJobObject(
+            self._job,
+            win32job.JobObjectExtendedLimitInformation,
+            extended_info,
+        )
 
     # ------------------------------------------------------------------
     # SCM entry points
@@ -117,7 +131,12 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
                 env=env,
                 stdout=stdout,
                 stderr=stderr,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             )
+            try:
+                win32job.AssignProcessToJobObject(self._job, proc._handle)
+            except Exception:
+                pass
             with self._procs_lock:
                 self._procs.append(proc)
 
@@ -143,20 +162,27 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
     def _terminate_children(self) -> None:
         with self._procs_lock:
             procs = list(self._procs)
+        
+        # 1. Send CTRL_BREAK_EVENT to all process groups
         for proc in reversed(procs):
             try:
-                proc.terminate()
+                os.kill(proc.pid, signal.CTRL_BREAK_EVENT)
             except OSError:
                 pass
-        deadline = time.monotonic() + 15.0
+        
+        # 2. Wait up to grace period for graceful shutdown
+        grace_s = float(os.environ.get("PIXELPIVOT_SHUTDOWN_GRACE_S", "30.0"))
+        deadline = time.monotonic() + grace_s
         for proc in procs:
             remaining = max(0.1, deadline - time.monotonic())
             try:
                 proc.wait(timeout=remaining)
             except subprocess.TimeoutExpired:
+                # 3. Fallback to hard kill
                 try:
                     proc.kill()
                 except OSError:
                     pass
+        
         with self._procs_lock:
             self._procs.clear()
