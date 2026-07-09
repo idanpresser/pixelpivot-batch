@@ -73,6 +73,8 @@ dev = [
     "pytest-asyncio>=0.23",
     "respx>=0.21",
     "wand>=0.6",
+    "pyinstaller>=6.11",
+    "pytest-qt>=4.4",
 ]
 # Optional Streamlit GUI (app/web/batch_gui). Not a runtime dependency of the
 # headless backend and excluded from the frozen air-gap build; install with
@@ -82,6 +84,12 @@ gui = [
 ]
 postgres = [
     "psycopg[binary]>=3.1",
+]
+# Windows service + system tray (PixelPivotService.exe + PixelPivotTray.exe).
+# pywin32 replaces NSSM; PySide6 provides the system tray control panel.
+windows = [
+    "pywin32>=306",
+    "PySide6>=6.7",
 ]
 
 [project.urls]

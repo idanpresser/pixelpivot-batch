@@ -809,7 +809,7 @@ class PixelPivotTray(QSystemTrayIcon):
 
     def _svc_install(self) -> None:
         try:
-            elevation.elevate(str(self._service_exe), "install", "auto")
+            elevation.elevate(str(self._service_exe), "--startup", "auto", "install")
         except Exception as e:
             QMessageBox.critical(None, "Service Error", f"Failed to install service:\n{e}")
 
