@@ -19,9 +19,10 @@ from pathlib import Path
 
 def test_canonical_table_path_is_interpolator_path():
     from app.core import heuristic as heuristic_mod
-    from app.core.config import HEURISTIC_TABLE_PATH
+    from app.core.paths import resolve_data_dir
+    from app.core.config import get_heuristic_table_path
 
-    assert Path(heuristic_mod.OUTPUT_TABLE_PATH) == Path(HEURISTIC_TABLE_PATH)
+    assert Path(heuristic_mod.OUTPUT_TABLE_PATH) == resolve_data_dir() / "heuristic_table.json"
 
 
 def test_single_generator_entrypoint():
