@@ -138,20 +138,27 @@ class BatchQueueManager:
                         from .run_control import RunControl
                         from .calibration_runner import run_calibration
                         from app.core import config
+                        # Scope the calibration write-gate to this run only so
+                        # subsequent normal batches don't silently record
+                        # calibration rows (bd-qk1.2).
+                        prev_calibration_enabled = config.CALIBRATION_ENABLED
                         config.CALIBRATION_ENABLED = True
-                        ctrl = self.orchestrator.run_controls.setdefault(run_id, RunControl())
-                        log.info(f"Starting calibration run_id={run_id}")
-                        run_calibration(
-                            request.source_dir,
-                            request.category,
-                            [t.value for t in request.tool],
-                            list(request.target_format),
-                            sample=request.sample,
-                            target_ssim=request.target_ssim,
-                            regenerate_table=request.regenerate_table,
-                            run_id=run_id,
-                            run_control=ctrl,
-                        )
+                        try:
+                            ctrl = self.orchestrator.run_controls.setdefault(run_id, RunControl())
+                            log.info(f"Starting calibration run_id={run_id}")
+                            run_calibration(
+                                request.source_dir,
+                                request.category,
+                                [t.value for t in request.tool],
+                                list(request.target_format),
+                                sample=request.sample,
+                                target_ssim=request.target_ssim,
+                                regenerate_table=request.regenerate_table,
+                                run_id=run_id,
+                                run_control=ctrl,
+                            )
+                        finally:
+                            config.CALIBRATION_ENABLED = prev_calibration_enabled
                     else:
                         log.info(f"Executing run_id={run_id} (priority={claimed['priority']}).")
                         self.orchestrator.execute_batch(run_id, request)
