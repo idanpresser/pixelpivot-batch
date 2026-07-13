@@ -221,10 +221,9 @@ class BaseConverter(ABC):
 
     @property
     def consecutive_failures(self) -> int:
+        # Per-run isolation (bd-qk1.3): read only the active run's state. The
+        # global None-keyed state is not a shared channel between runs.
         with self._breaker_lock:
-            global_failures = self._breaker_states.get(None, {}).get("consecutive_failures", 0)
-            if global_failures > 0:
-                return global_failures
             return self._get_state()["consecutive_failures"]
 
     @consecutive_failures.setter
@@ -234,9 +233,8 @@ class BaseConverter(ABC):
 
     @property
     def is_broken(self) -> bool:
+        # Per-run isolation (bd-qk1.3): a run only sees its own broken state.
         with self._breaker_lock:
-            if self._breaker_states.get(None, {}).get("is_broken"):
-                return True
             return self._get_state()["is_broken"]
 
     @is_broken.setter
@@ -246,10 +244,8 @@ class BaseConverter(ABC):
 
     @property
     def broken_since(self) -> Optional[float]:
+        # Per-run isolation (bd-qk1.3): cooldown timing is per-run, not global.
         with self._breaker_lock:
-            global_broken_since = self._breaker_states.get(None, {}).get("broken_since")
-            if global_broken_since is not None:
-                return global_broken_since
             return self._get_state()["broken_since"]
 
     @broken_since.setter
@@ -294,18 +290,13 @@ class BaseConverter(ABC):
                     log.error(f"  [CIRCUIT BREAKER] {self.get_name()} is now marked as BROKEN after {state['consecutive_failures']} failures.")
 
     def _reset_failures(self):
+        # Per-run isolation (bd-qk1.3): reset only the active run's state. Wiping
+        # the global None state here let one run clear another run's breaker.
         with self._breaker_lock:
             state = self._get_state()
             state["consecutive_failures"] = 0
             state["is_broken"] = False
             state["broken_since"] = None
-            # Reset default/global state as well to prevent cross-test/bleed leftovers
-            if self._get_active_run_id() is not None:
-                global_state = self._breaker_states.get(None)
-                if global_state:
-                    global_state["consecutive_failures"] = 0
-                    global_state["is_broken"] = False
-                    global_state["broken_since"] = None
 
     def _account_native_batch(self, *, failed: bool) -> None:
         """Drive the circuit breaker from one native-batch chunk's net outcome."""
