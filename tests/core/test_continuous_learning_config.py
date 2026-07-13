@@ -75,5 +75,6 @@ def test_heuristic_adjust_path_is_path():
 
 
 def test_heuristic_adjust_path_parent_is_heuristic_table_parent():
-    """Verify heuristic adjust path is in the same directory as heuristic table."""
-    assert config.HEURISTIC_ADJUST_PATH.parent == config.HEURISTIC_TABLE_PATH.parent
+    """Verify heuristic adjust path is in the data directory."""
+    from app.core.paths import resolve_data_dir
+    assert config.HEURISTIC_ADJUST_PATH.parent == resolve_data_dir()
