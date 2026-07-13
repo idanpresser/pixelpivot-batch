@@ -6,7 +6,10 @@ Wang et al. SSIM with OpenCV. Standard SSIM scale, so config.TARGET_SSIM stays
 meaningful. No native binary, no subprocess.
 """
 
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 import numpy as np
 import pyvips
 
