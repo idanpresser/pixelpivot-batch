@@ -38,6 +38,27 @@ def resolve_proj_root() -> Path:
 PROJ_ROOT = resolve_proj_root()
 APP_ROOT = PROJ_ROOT / "app"
 
+
+def resolve_data_dir() -> Path:
+    """Resolve standard data directory (DB, logs, settings, heuristic adjustments).
+
+    Priority:
+      1. PIXELPIVOT_DATA_DIR env var if set.
+      2. Frozen build on Windows: %ProgramData%/PixelPivot.
+      3. Frozen build fallback: sys.executable directory / "data".
+      4. Dev mode: PROJ_ROOT / "data".
+    """
+    data_env = os.getenv("PIXELPIVOT_DATA_DIR")
+    if data_env:
+        return Path(data_env)
+    if getattr(sys, "frozen", False):
+        pg_data = os.getenv("ProgramData")
+        if pg_data and sys.platform == "win32":
+            return Path(pg_data) / "PixelPivot"
+        return Path(sys.executable).resolve().parent / "data"
+    return PROJ_ROOT / "data"
+
+
 # 2. Main Directories
 TOOLS_DIR = PROJ_ROOT / "tools"
 
@@ -56,11 +77,7 @@ if IS_DOCKER and DB_HOST == "db":
 # 4. SQLite Connection Config
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    # Make DB path absolute relative to PROJ_ROOT to prevent CWD-dependent SQLite generation
-    # Hardened: point to 'data' directory as per implementation plan
-    db_dir = PROJ_ROOT / "data"
-    db_dir.mkdir(parents=True, exist_ok=True)
-    abs_db_path = (db_dir / "pixelpivot.db").absolute()
+    abs_db_path = (resolve_data_dir() / "pixelpivot.db").absolute()
     SQLITE_DB_PATH = abs_db_path
     DATABASE_URL = f"sqlite:///{abs_db_path.as_posix()}"
 else:
@@ -68,7 +85,7 @@ else:
     if DATABASE_URL.startswith("sqlite:///"):
         SQLITE_DB_PATH = Path(DATABASE_URL.replace("sqlite:///", ""))
     else:
-        SQLITE_DB_PATH = PROJ_ROOT / "data" / "pixelpivot.db"
+        SQLITE_DB_PATH = resolve_data_dir() / "pixelpivot.db"
 
 # Dataset paths
 DATASET_DIR = Path(os.getenv("PIXELPIVOT_DATASET_DIR", PROJ_ROOT / "dataset"))

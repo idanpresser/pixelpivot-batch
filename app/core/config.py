@@ -159,7 +159,18 @@ TELEMETRY_CHILDREN_REFRESH_S = 1.0
 # ---------------------------------------------------------------------------
 # Heuristics
 # ---------------------------------------------------------------------------
-HEURISTIC_TABLE_PATH = APP_ROOT / "core" / "heuristic_table.json"
+def get_heuristic_table_path() -> Path:
+    from .paths import resolve_data_dir, APP_ROOT
+    env_override = os.getenv("PIXELPIVOT_HEURISTIC_TABLE_PATH")
+    if env_override:
+        return Path(env_override)
+    runtime_table = resolve_data_dir() / "heuristic_table.json"
+    if runtime_table.exists():
+        return runtime_table
+    return APP_ROOT / "core" / "heuristic_table.json"
+
+
+HEURISTIC_TABLE_PATH = get_heuristic_table_path()
 
 # Semantic version stamped into a generated heuristic table and recorded on each
 # batch run (batch_runs.heuristic_version). Bump when the table's data or schema
@@ -326,12 +337,17 @@ BOOTSTRAP_SAMPLE_N = int(os.getenv("PIXELPIVOT_BOOTSTRAP_SAMPLE_N", "100"))
 # ---------------------------------------------------------------------------
 # Sidecar Path
 # ---------------------------------------------------------------------------
-HEURISTIC_ADJUST_PATH = Path(os.getenv(
-    "PIXELPIVOT_HEURISTIC_ADJUST_PATH",
-    str(HEURISTIC_TABLE_PATH.parent / "heuristic_adjust.json")
-))
+def get_heuristic_adjust_path() -> Path:
+    from .paths import resolve_data_dir
+    env_override = os.getenv("PIXELPIVOT_HEURISTIC_ADJUST_PATH")
+    if env_override:
+        return Path(env_override)
+    return resolve_data_dir() / "heuristic_adjust.json"
+
+
+HEURISTIC_ADJUST_PATH = get_heuristic_adjust_path()
 """Path to sidecar adjustment file for nudge offsets and online learning state.
-Defaults to heuristic_adjust.json in the same directory as heuristic_table.json."""
+Defaults to heuristic_adjust.json in the data directory."""
 
 
 # --- FFmpeg batch conversion (Task: ffmpeg-multi-image-batching) ---

@@ -159,7 +159,8 @@ def get_db_path() -> Path:
     db_url = os.getenv("DATABASE_URL")
     if db_url and db_url.startswith("sqlite:///"):
         return Path(db_url.replace("sqlite:///", ""))
-    return SQLITE_DB_PATH
+    from ..paths import resolve_data_dir
+    return resolve_data_dir() / "pixelpivot.db"
 
 
 def get_connection_dialect(conn: Any) -> str:

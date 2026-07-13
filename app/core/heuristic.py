@@ -16,16 +16,15 @@ from collections import defaultdict
 from pathlib import Path
 
 from .logger import get_logger
-from .paths import APP_ROOT
+from .paths import APP_ROOT, resolve_data_dir
 from .config import HEURISTIC_TABLE_PATH, HEURISTIC_TABLE_VERSION, HEURISTIC_MIN_SAMPLES
 from .db import get_connection
 
 log = get_logger(__name__)
 
-# Write the table to the exact path the engine loads (config.HEURISTIC_TABLE_PATH),
-# so a regenerated table is actually consumed by the interpolator.
-OUTPUT_TABLE_PATH = HEURISTIC_TABLE_PATH
-OUTPUT_WEIGHTS_PATH = APP_ROOT / "heuristic_weights.json"
+# Write regenerated table and weights to the data directory so they persist across upgrades
+OUTPUT_TABLE_PATH = resolve_data_dir() / "heuristic_table.json"
+OUTPUT_WEIGHTS_PATH = resolve_data_dir() / "heuristic_weights.json"
 
 
 def fit_log_linear(megapixels, qualities) -> tuple[float, float]:

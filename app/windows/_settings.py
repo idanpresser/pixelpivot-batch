@@ -35,11 +35,5 @@ SETTINGS_ENV_MAP: dict[str, str] = {
 
 
 def resolve_data_dir() -> Path:
-    import os
-    import sys
-    data_env = os.environ.get("PIXELPIVOT_DATA_DIR")
-    if data_env:
-        return Path(data_env)
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent / "data"
-    return Path(__file__).parent.parent.parent / "data"
+    from app.core.paths import resolve_data_dir as _resolve
+    return _resolve()
