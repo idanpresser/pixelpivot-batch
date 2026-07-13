@@ -142,9 +142,14 @@ def render_run_panel(client: APIClient):
                 if st.button("RESET TERMINAL", use_container_width=True):
                     del st.session_state.active_run_id
                     st.rerun()
-            elif status["status"] == "failed":
-                st.error("CRITICAL FAILURE: Job execution aborted.")
-                if st.button("CLEAR ERROR", use_container_width=True):
+            elif status["status"] in ("failed", "interrupted", "cancelled"):
+                st.error(f"RUN TERMINATED: Status is '{status['status']}'.")
+                if st.button("CLEAR TERMINAL RUN", use_container_width=True):
+                    del st.session_state.active_run_id
+                    st.rerun()
+            elif status["status"] not in ("queued", "processing", "running"):
+                st.info(f"Run ended with status: '{status['status']}'.")
+                if st.button("CLEAR RUN", use_container_width=True):
                     del st.session_state.active_run_id
                     st.rerun()
             else:

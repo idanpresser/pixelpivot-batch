@@ -15,6 +15,7 @@ them as env vars before launching child processes.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import urllib.error
@@ -93,6 +94,9 @@ class _Api:
     def _req(self, method: str, url: str, body: Any = None) -> Any:
         data    = json.dumps(body).encode() if body is not None else None
         headers = {"Content-Type": "application/json"} if data else {}
+        token   = os.getenv("PIXELPIVOT_API_TOKEN")
+        if token:
+            headers["X-API-Token"] = token
         tid     = _current_trace_id.get()
         if tid:
             headers["X-Trace-Id"] = tid
@@ -100,6 +104,16 @@ class _Api:
         try:
             with urllib.request.urlopen(req, timeout=self.TIMEOUT) as resp:
                 return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            try:
+                raw = e.read().decode("utf-8")
+                parsed = json.loads(raw)
+                if isinstance(parsed, dict):
+                    parsed["_http_code"] = e.code
+                    return parsed
+            except Exception:
+                pass
+            return {"_http_code": e.code, "detail": f"HTTP {e.code}: {e.reason}"}
         except Exception:
             return None
 
@@ -816,7 +830,14 @@ class PixelPivotTray(QSystemTrayIcon):
             active   = [j for j in jobs if j.get("status") in ("running", "paused")]
             if health is not None:
                 self._has_fetched_data = True
-                api_status = "API ready" if (health.get("ready") or health.get("status") == "ready") else "API not ready"
+                http_code = health.get("_http_code")
+                if http_code == 401:
+                    api_status = "API unauthorized (check token)"
+                elif http_code == 503 or not (health.get("ready") or health.get("status") == "ready"):
+                    detail = health.get("detail") or health.get("status") or "degraded"
+                    api_status = f"API not ready: {detail}"
+                else:
+                    api_status = "API ready"
                 self._rebuild_batch_menu(jobs[:6])
                 self._rebuild_hf_menu(hfs)
             else:
@@ -894,7 +915,7 @@ class PixelPivotTray(QSystemTrayIcon):
                 sub.addAction("Stop").triggered.connect(
                     lambda _, r=run_id: self._batch_control(r, "stop")
                 )
-            elif status in ("completed", "failed", "interrupted"):
+            elif status in ("completed", "failed", "interrupted", "cancelled"):
                 sub.addAction("Restart").triggered.connect(
                     lambda _, r=run_id: self._batch_restart(r)
                 )

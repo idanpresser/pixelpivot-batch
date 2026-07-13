@@ -137,3 +137,27 @@ def test_trace_id_propagated_in_headers(capture):
         assert req.get_header("X-trace-id") == "tray-test-12345"
     finally:
         tray_mod._current_trace_id.reset(token)
+
+
+def test_api_token_header_propagated(capture, monkeypatch):
+    monkeypatch.setenv("PIXELPIVOT_API_TOKEN", "secret-token-123")
+    api = tray_mod._Api()
+    api.health()
+    req = capture["request"]
+    assert req.get_header("X-api-token") == "secret-token-123"
+
+
+def test_httperror_returns_parsed_dict(monkeypatch):
+    import io
+    import urllib.error
+
+    def fake_urlopen(req, timeout=None):
+        err_fp = io.BytesIO(json.dumps({"ready": False, "status": "degraded"}).encode())
+        raise urllib.error.HTTPError(req.full_url, 503, "Service Unavailable", {}, err_fp)
+
+    monkeypatch.setattr(tray_mod.urllib.request, "urlopen", fake_urlopen)
+    api = tray_mod._Api()
+    res = api.health()
+    assert res["_http_code"] == 503
+    assert res["status"] == "degraded"
+
