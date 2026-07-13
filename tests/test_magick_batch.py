@@ -1,3 +1,4 @@
+import os
 import pytest
 from unittest.mock import MagicMock, patch
 from app.core.converters.magick_converter import MagickConverter
@@ -6,11 +7,20 @@ from app.core.converters.magick_converter import MagickConverter
 def converter():
     return MagickConverter(magick_path="magick")
 
-def test_magick_batch_grouping(converter):
+def test_magick_batch_grouping(converter, tmp_path):
     input_paths = ["a.jpg", "b.jpg", "c.jpg", "d.jpg"]
     # Grouping by quality: a and c get 80, b and d get 90
     qualities = [80, 90, 80, 90]
-    output_dir = "out"
+    output_dir = str(tmp_path / "out")
+
+    def _write_outputs(*_a, **_k):
+        # Simulate mogrify producing the expected no-suffix outputs so the
+        # bd-qk1.5 output-verification counts these as real successes.
+        os.makedirs(output_dir, exist_ok=True)
+        for stem in ("a", "b", "c", "d"):
+            with open(os.path.join(output_dir, f"{stem}.webp"), "wb") as fh:
+                fh.write(b"webpdata")
+        return ("", "")
 
     with patch("app.core.converters.magick_converter.get_resolution_bucket_from_path", return_value="medium"), \
          patch("app.core.converters.magick_converter.subprocess.Popen") as mock_popen:
@@ -18,7 +28,7 @@ def test_magick_batch_grouping(converter):
         mock_proc = mock_popen.return_value.__enter__.return_value
         mock_proc.pid = 123
         mock_proc.returncode = 0
-        mock_proc.communicate.return_value = ("", "")
+        mock_proc.communicate.side_effect = _write_outputs
 
         # Mock TelemetryMonitor. monitor.stop() must return a real dict — the
         # aggregator does max(float, sample[key]) and MagicMock won't compare.
@@ -39,13 +49,40 @@ def test_magick_batch_grouping(converter):
             cmd = args[0]
             assert "mogrify" in cmd or "magick" in cmd
             assert "-path" in cmd
-            assert "out" in cmd
+            assert output_dir in cmd
             assert "-format" in cmd
             assert "webp" in cmd
             assert "-quality" in cmd
             # One call should have 80, another 90
             qs = [args[0][cmd.index("-quality") + 1] for args, _ in mock_popen.call_args_list]
             assert set(qs) == {"80", "90"}
+
+def test_magick_no_suffix_missing_output_counts_failure(converter, tmp_path):
+    # bd-qk1.5: mogrify can return rc==0 while silently skipping an unreadable
+    # file (no output written). The no-suffix path must verify the output exists
+    # before counting success; a missing output routes to per-file fallback and,
+    # if that also fails, is reported as a failure — not phantom success.
+    input_paths = [str(tmp_path / "a.jpg")]
+    qualities = [80]
+    output_dir = str(tmp_path / "out")
+
+    with patch("app.core.converters.magick_converter.get_resolution_bucket_from_path", return_value="medium"), \
+         patch("app.core.converters.magick_converter.subprocess.Popen") as mock_popen, \
+         patch("app.core.converters.magick_converter.TelemetryMonitor") as mock_tm:
+        mock_proc = mock_popen.return_value.__enter__.return_value
+        mock_proc.pid = 123
+        mock_proc.returncode = 0  # mogrify reports success...
+        mock_proc.communicate.return_value = ("", "")
+        mock_tm.return_value.stop.return_value = {"cpu_avg": 0.0, "cpu_peak": 0.0, "ram_peak": 0.0}
+        # ...but no output file is produced, and the per-file fallback also fails.
+        converter.convert = MagicMock(return_value={"success": False, "error": "unreadable"})
+
+        result = converter.convert_batch(input_paths, output_dir, "webp", qualities)
+
+        assert result["success_count"] == 0
+        assert result["failure_count"] == 1
+        assert len(result["errors"]) >= 1
+
 
 def test_magick_batch_partial_failure(converter):
     input_paths = ["a.jpg", "b.jpg"]

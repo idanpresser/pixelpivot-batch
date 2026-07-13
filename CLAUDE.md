@@ -123,6 +123,7 @@ Key tables:
 - mogrify can return 0 while silently skipping an unreadable file → phantom success, no bytes written.
 - Suffix path (with rename) does verify; no-suffix path does not.
 - **Impact**: Data integrity; batch reports success for files that were never converted.
+- **Fixed (2026-07-09)**: no-suffix branch now verifies `os.path.exists(p_out) and getsize > 0` before counting success; a missing output routes to the per-file `convert()` fallback and, if that also fails, is reported as a failure. Regression test: `tests/test_magick_batch.py::test_magick_no_suffix_missing_output_counts_failure`.
 
 **Issue: FFmpegProcess lifecycle nits** (`bd-qk1.12`)
 - Supervisor loop ends with unbounded `proc.wait()` after `kill_process_tree()` — can hang if reaping fails.

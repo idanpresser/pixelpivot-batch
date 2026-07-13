@@ -309,12 +309,26 @@ class MagickConverter(BaseConverter):
                                         failure_count += 1
                                         errors.append({"path": p_in, "error": res.get("error") or f"Mogrify missed output for {p_in}"})
                             else:
-                                # No suffix, trust mogrify success directly
-                                success_count += 1
-                                try:
-                                    bytes_written += os.path.getsize(p_out)
-                                except OSError:
-                                    pass
+                                # No suffix: verify mogrify actually produced the
+                                # output before counting success (bd-qk1.5).
+                                # mogrify can return 0 while silently skipping an
+                                # unreadable file; trusting rc alone reports a
+                                # phantom success with no bytes written.
+                                if os.path.exists(p_out) and os.path.getsize(p_out) > 0:
+                                    success_count += 1
+                                    try:
+                                        bytes_written += os.path.getsize(p_out)
+                                    except OSError:
+                                        pass
+                                else:
+                                    res = self.convert(p_in, p_out, target_format, q, run_id=run_id)
+                                    if res.get("success"):
+                                        success_count += 1
+                                        bytes_written += res.get("bytes_written", 0)
+                                        summaries.append(res.get("telemetry", {}))
+                                    else:
+                                        failure_count += 1
+                                        errors.append({"path": p_in, "error": res.get("error") or f"Mogrify missed output for {p_in}"})
                         self._account_native_batch(failed=False)
                     else:
                         self._mark_failure()
