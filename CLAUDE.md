@@ -108,7 +108,7 @@ Key tables:
 **Issue: Magick recover chunk asymmetric breaker save/restore** (`bd-qk1.4`)
 - `_recover_chunk_per_file()` saves breaker fields via getters (global-`None` priority) but restores via setters (write run_id state).
 - Read side and write side target different dict keys → breaker state corruption under concurrent activity.
-- **Dependency**: Blocked on `bd-qk1.1`.
+- **Fixed (2026-07-09)**: `_recover_chunk_per_file()` now calls `_set_active_run_id(run_id)` *before* reading the save snapshot, so save and restore address the same per-run state key. Regression test: `tests/test_circuit_breaker_isolation.py::test_recover_chunk_per_file_restores_run_state_symmetrically`.
 
 **Issue: CALIBRATION_ENABLED global flag set by worker, never reset** (`bd-qk1.2`)
 - `queue_manager.py` sets `config.CALIBRATION_ENABLED = True` from a worker thread during calibration.

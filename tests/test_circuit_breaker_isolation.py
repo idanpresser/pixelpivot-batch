@@ -200,6 +200,51 @@ def test_orchestrator_broken_converter_errors_have_quarantine_marker(_orch, tmp_
         assert e.get("quarantined") is True, f"Missing quarantined flag: {e}"
 
 
+def test_recover_chunk_per_file_restores_run_state_symmetrically(tmp_path, monkeypatch):
+    """qk1.4: _recover_chunk_per_file must save and restore the SAME breaker
+    state key. It sets active run_id AFTER reading the save snapshot, so with
+    per-run isolation the save read a different (entry) run's state than the
+    restore wrote — corrupting the batch run's breaker fields.
+
+    Invariant: with no concurrent run, the run's breaker fields are identical
+    before and after recovery.
+    """
+    conv = MagickConverter(magick_path="magick")
+    monkeypatch.setattr(
+        "app.core.converters.magick_converter.TelemetryMonitor", _FakeMonitor
+    )
+
+    run_id = 5
+    # Seed the batch run's mid-flight breaker state: one prior failure recorded.
+    conv._set_active_run_id(run_id)
+    conv.consecutive_failures = 1
+    before_failures = conv.consecutive_failures
+    before_broken = conv.is_broken
+    before_broken_since = conv.broken_since
+
+    # Emulate entry from the convert_batch thread, which never set active run_id.
+    conv._set_active_run_id(None)
+
+    def failing_convert(input_path, output_path, target_format, quality, **kwargs):
+        return {"success": False, "error": "boom"}
+
+    monkeypatch.setattr(conv, "convert", failing_convert)
+
+    files = []
+    for i in range(3):
+        p = tmp_path / f"f{i}.png"
+        p.write_bytes(b"x")
+        files.append(str(p))
+
+    conv._recover_chunk_per_file(files, str(tmp_path / "out"), "webp", 80.0, "", run_id)
+
+    # The batch run's breaker fields must be exactly what they were before.
+    conv._set_active_run_id(run_id)
+    assert conv.consecutive_failures == before_failures
+    assert conv.is_broken == before_broken
+    assert conv.broken_since == before_broken_since
+
+
 def test_circuit_breaker_concurrency():
     import threading
     from concurrent.futures import ThreadPoolExecutor
