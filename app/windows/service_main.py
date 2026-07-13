@@ -116,7 +116,9 @@ def main() -> None:
         servicemanager.StartServiceCtrlDispatcher()
     else:
         # Console verbs: install / start / stop / remove / debug
-        win32serviceutil.HandleCommandLine(PixelPivotService)
+        res = win32serviceutil.HandleCommandLine(PixelPivotService)
+        if res:
+            sys.exit(res)
 
 
 if __name__ == "__main__":

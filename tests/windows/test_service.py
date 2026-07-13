@@ -136,3 +136,15 @@ def test_svc_terminate_children_graceful(monkeypatch):
         assert killed_pids == [(123, signal.CTRL_BREAK_EVENT)]
         # Verify list was cleared
         assert len(svc._procs) == 0
+
+
+def test_service_main_cmdline_error_exits_nonzero(monkeypatch):
+    from app.windows import service_main
+
+    monkeypatch.setattr("sys.argv", ["service_main.py", "install"])
+
+    with patch("win32serviceutil.HandleCommandLine", return_value=1073):
+        with pytest.raises(SystemExit) as exc_info:
+            service_main.main()
+        assert exc_info.value.code == 1073
+
