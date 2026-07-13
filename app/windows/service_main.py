@@ -23,17 +23,46 @@ import sys
 
 def _run_api() -> None:
     import uvicorn
+    import threading
 
-    uvicorn.run(
+    config = uvicorn.Config(
         "app.batch_api.main:app",
         host="0.0.0.0",
         port=8000,
         log_level="info",
     )
+    server = uvicorn.Server(config)
+
+    evt_name = os.environ.get("PIXELPIVOT_STOP_EVENT_NAME")
+    if evt_name and sys.platform == "win32":
+        def _watch_stop():
+            try:
+                import win32event
+                handle = win32event.OpenEvent(win32event.SYNCHRONIZE, False, evt_name)
+                win32event.WaitForSingleObject(handle, win32event.INFINITE)
+                server.should_exit = True
+            except Exception:
+                pass
+        threading.Thread(target=_watch_stop, daemon=True).start()
+
+    server.run()
 
 
 def _run_gui() -> None:
     from pathlib import Path
+    import threading
+
+    evt_name = os.environ.get("PIXELPIVOT_STOP_EVENT_NAME")
+    if evt_name and sys.platform == "win32":
+        def _watch_stop():
+            try:
+                import win32event
+                handle = win32event.OpenEvent(win32event.SYNCHRONIZE, False, evt_name)
+                win32event.WaitForSingleObject(handle, win32event.INFINITE)
+                sys.exit(0)
+            except Exception:
+                pass
+        threading.Thread(target=_watch_stop, daemon=True).start()
 
     # Locate the streamlit app script — must be a physical .py file.
     # In frozen --onedir builds it lands in _internal/ (sys._MEIPASS).

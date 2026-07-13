@@ -139,12 +139,36 @@ def test_batch_control_calls_api(make_tray, monkeypatch):
 
 
 def test_svc_install_elevate_args(make_tray, monkeypatch):
+    from PySide6.QtCore import QThreadPool
     t = make_tray("not_installed")
     elevate_calls = []
     monkeypatch.setattr(tray_mod.elevation, "elevate", lambda *args: elevate_calls.append(args))
     t._svc_install()
+    QThreadPool.globalInstance().waitForDone()
     assert len(elevate_calls) == 1
     assert elevate_calls[0][1:] == ("--startup", "auto", "install")
+
+
+def test_svc_actions_are_async(make_tray, monkeypatch):
+    import time
+    from PySide6.QtCore import QThreadPool
+
+    t = make_tray("stopped")
+    started = []
+
+    def slow_elevate(*args):
+        started.append(args)
+        time.sleep(0.1)
+
+    monkeypatch.setattr(tray_mod.elevation, "elevate", slow_elevate)
+
+    t_start = time.monotonic()
+    t._svc_start()
+    t_call = time.monotonic() - t_start
+    assert t_call < 0.05, "Service actions must return immediately without blocking GUI thread"
+
+    QThreadPool.globalInstance().waitForDone()
+    assert len(started) == 1
 
 
 def test_batch_control_is_async(make_tray, monkeypatch):
@@ -207,6 +231,8 @@ def test_scm_query_is_async(qapp, monkeypatch):
 
 def test_svc_actions_tolerate_uac_decline(make_tray, monkeypatch):
     import pywintypes
+    from PySide6.QtCore import QThreadPool
+    from PySide6.QtWidgets import QApplication
     def raise_uac_cancel(*args, **kwargs):
         raise pywintypes.error(1223, "ShellExecuteEx", "The operation was canceled by the user.")
         
@@ -221,12 +247,16 @@ def test_svc_actions_tolerate_uac_decline(make_tray, monkeypatch):
     t._svc_stop()
     t._svc_install()
     t._svc_uninstall()
+    QThreadPool.globalInstance().waitForDone()
+    QApplication.processEvents()
     
     assert len(critical_dialogs) == 0
 
 
 def test_svc_actions_report_other_errors(make_tray, monkeypatch):
     import pywintypes
+    from PySide6.QtCore import QThreadPool
+    from PySide6.QtWidgets import QApplication
     def raise_access_denied(*args, **kwargs):
         raise pywintypes.error(5, "ShellExecuteEx", "Access is denied.")
         
@@ -238,6 +268,8 @@ def test_svc_actions_report_other_errors(make_tray, monkeypatch):
     monkeypatch.setattr(tray_mod.QMessageBox, "critical", lambda *args: critical_dialogs.append(args))
     
     t._svc_start()
+    QThreadPool.globalInstance().waitForDone()
+    QApplication.processEvents()
     assert len(critical_dialogs) == 1
 
 

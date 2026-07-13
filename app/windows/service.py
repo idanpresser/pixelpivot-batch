@@ -41,6 +41,8 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
     def __init__(self, args: list[str]) -> None:
         super().__init__(args)
         self._stop_event = win32event.CreateEvent(None, 0, 0, None)
+        self._shutdown_named_event_name = f"PixelPivotStop_{os.getpid()}"
+        self._shutdown_named_event = win32event.CreateEvent(None, 1, 0, self._shutdown_named_event_name)
         self._procs: list[subprocess.Popen] = []
         self._procs_lock = threading.Lock()
 
@@ -110,7 +112,11 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
                 else:
                     exe = "python"
         
-        env = {**os.environ, "PIXELPIVOT_SERVICE_MODE": "1"}
+        env = {
+            **os.environ,
+            "PIXELPIVOT_SERVICE_MODE": "1",
+            "PIXELPIVOT_STOP_EVENT_NAME": self._shutdown_named_event_name,
+        }
 
         for mode, stem in (("api", "service_api"), ("gui", "service_gui")):
             stdout = open(log / f"{stem}_stdout.log", "a", encoding="utf-8", buffering=1)
@@ -159,7 +165,14 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
         with self._procs_lock:
             procs = list(self._procs)
         
-        # 1. Send CTRL_BREAK_EVENT to all process groups
+        # 1. Signal named stop event to initiate graceful shutdown in session 0
+        if getattr(self, "_shutdown_named_event", None):
+            try:
+                win32event.SetEvent(self._shutdown_named_event)
+            except Exception:
+                pass
+
+        # Also attempt CTRL_BREAK_EVENT
         for proc in reversed(procs):
             try:
                 os.kill(proc.pid, signal.CTRL_BREAK_EVENT)

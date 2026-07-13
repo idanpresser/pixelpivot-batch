@@ -921,42 +921,70 @@ class PixelPivotTray(QSystemTrayIcon):
     # ------------------------------------------------------------------
 
     def _svc_start(self) -> None:
-        try:
+        def work():
             if elevation.is_admin():
                 scm.start_service()
             else:
                 elevation.elevate(str(self._service_exe), "start")
-        except Exception as e:
-            if getattr(e, "winerror", None) == 1223:
-                return
-            QMessageBox.critical(None, "Service Error", f"Failed to start service:\n{e}")
+
+        def on_done(res):
+            if isinstance(res, Exception):
+                winerr = getattr(res, "winerror", None)
+                if winerr is None and hasattr(res, "args") and isinstance(res.args, tuple) and res.args:
+                    winerr = res.args[0]
+                if winerr == 1223:
+                    return
+                QMessageBox.critical(None, "Service Error", f"Failed to start service:\n{res}")
+
+        self._run_async(work, on_done)
 
     def _svc_stop(self) -> None:
-        try:
+        def work():
             if elevation.is_admin():
                 scm.stop_service()
             else:
                 elevation.elevate(str(self._service_exe), "stop")
-        except Exception as e:
-            if getattr(e, "winerror", None) == 1223:
-                return
-            QMessageBox.critical(None, "Service Error", f"Failed to stop service:\n{e}")
+
+        def on_done(res):
+            if isinstance(res, Exception):
+                winerr = getattr(res, "winerror", None)
+                if winerr is None and hasattr(res, "args") and isinstance(res.args, tuple) and res.args:
+                    winerr = res.args[0]
+                if winerr == 1223:
+                    return
+                QMessageBox.critical(None, "Service Error", f"Failed to stop service:\n{res}")
+
+        self._run_async(work, on_done)
 
     def _svc_install(self) -> None:
-        try:
+        def work():
             elevation.elevate(str(self._service_exe), "--startup", "auto", "install")
-        except Exception as e:
-            if getattr(e, "winerror", None) == 1223:
-                return
-            QMessageBox.critical(None, "Service Error", f"Failed to install service:\n{e}")
+
+        def on_done(res):
+            if isinstance(res, Exception):
+                winerr = getattr(res, "winerror", None)
+                if winerr is None and hasattr(res, "args") and isinstance(res.args, tuple) and res.args:
+                    winerr = res.args[0]
+                if winerr == 1223:
+                    return
+                QMessageBox.critical(None, "Service Error", f"Failed to install service:\n{res}")
+
+        self._run_async(work, on_done)
 
     def _svc_uninstall(self) -> None:
-        try:
+        def work():
             elevation.elevate(str(self._service_exe), "remove")
-        except Exception as e:
-            if getattr(e, "winerror", None) == 1223:
-                return
-            QMessageBox.critical(None, "Service Error", f"Failed to uninstall service:\n{e}")
+
+        def on_done(res):
+            if isinstance(res, Exception):
+                winerr = getattr(res, "winerror", None)
+                if winerr is None and hasattr(res, "args") and isinstance(res.args, tuple) and res.args:
+                    winerr = res.args[0]
+                if winerr == 1223:
+                    return
+                QMessageBox.critical(None, "Service Error", f"Failed to uninstall service:\n{res}")
+
+        self._run_async(work, on_done)
 
     # ------------------------------------------------------------------
     # Batch operations
