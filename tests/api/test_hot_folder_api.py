@@ -53,3 +53,27 @@ def test_register_rejects_nonexistent_source_dir():
         })
         assert resp.status_code == 400
         assert "does not exist" in resp.json()["detail"]
+
+
+def test_api_client_register_hot_folder_with_scalars(monkeypatch):
+    from app.core.api_client import APIClient
+
+    source_dir = tempfile.mkdtemp()
+    target_dir = tempfile.mkdtemp()
+    try:
+        with TestClient(app) as test_client:
+            client = APIClient("http://testserver")
+
+            def mock_post(endpoint, json=None):
+                resp = test_client.post(f"/api/v1{endpoint}", json=json)
+                resp.raise_for_status()
+                return resp.json()
+
+            monkeypatch.setattr(client, "_post", mock_post)
+
+            res = client.register_hot_folder(source_dir, target_dir, "webp", "magick", "general")
+            assert "watcher_id" in res
+    finally:
+        shutil.rmtree(source_dir)
+        shutil.rmtree(target_dir)
+

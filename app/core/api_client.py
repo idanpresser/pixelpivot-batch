@@ -153,17 +153,20 @@ class APIClient:
         self,
         source_dir: str,
         target_dir: str,
-        target_format: str,
-        tool: str,
-        category: str = "general"
+        target_format: Union[str, List[str]],
+        tool: Union[str, List[str]],
+        category: Union[str, List[str]] = "general"
     ) -> Dict[str, Any]:
         """Register a directory for automatic batch processing."""
+        tf_list = [target_format] if isinstance(target_format, str) else target_format
+        tool_list = [tool] if isinstance(tool, str) else tool
+        cat_list = [category] if isinstance(category, str) else category
         return self._post("/hotfolder/register", {
             "source_dir": source_dir,
             "target_dir": target_dir,
-            "target_format": target_format,
-            "tool": tool,
-            "category": category
+            "target_format": tf_list,
+            "tool": tool_list,
+            "category": cat_list
         })
 
     def list_hot_folders(self) -> List[Dict[str, Any]]:
