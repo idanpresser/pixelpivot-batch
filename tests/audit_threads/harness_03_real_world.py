@@ -31,7 +31,7 @@ _TMP = Path(tempfile.mkdtemp(prefix="pp_real_"))
 os.environ["PIXELPIVOT_DB_PATH"] = str(_TMP / "real.db")
 os.environ.pop("PIXELPIVOT_ALLOWED_ROOT", None)
 
-PROJ = Path(r"F:\DEV\PixelPivot_202605\pixelpivot_batch")
+PROJ = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJ))
 
 

@@ -12,7 +12,7 @@ from pathlib import Path
 
 _TMP = Path(tempfile.mkdtemp(prefix="pp_audit2_"))
 os.environ["PIXELPIVOT_DB_PATH"] = str(_TMP / "audit.db")
-PROJ = Path(r"F:\DEV\PixelPivot_202605\pixelpivot_batch")
+PROJ = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJ))
 
 from PIL import Image
@@ -26,13 +26,19 @@ def banner(s: str) -> None:
     print(f"\n=== {s} ===")
 
 
-def assert_shape(name: str, result: dict, failures: list[str]) -> None:
+def assert_shape(name: str, result: Any, failures: list[str]) -> None:
     expected_keys = {"success_count", "failure_count", "duration_ms", "errors"}
-    missing = expected_keys - set(result.keys())
-    if missing:
-        failures.append(f"C6 {name}: convert_batch result missing keys {missing}; got {list(result.keys())}")
+    if hasattr(result, "__dataclass_fields__"):
+        keys = set(result.__dataclass_fields__.keys())
+    elif hasattr(result, "keys"):
+        keys = set(result.keys())
     else:
-        print(f"C6 {name}: shape OK (keys={sorted(result.keys())})")
+        keys = set()
+    missing = expected_keys - keys
+    if missing:
+        failures.append(f"C6 {name}: convert_batch result missing keys {missing}; got {keys}")
+    else:
+        print(f"C6 {name}: shape OK (keys={sorted(keys)})")
 
 
 def main() -> int:
@@ -44,6 +50,7 @@ def main() -> int:
     target.mkdir()
     print(f"TMP={_TMP}")
 
+    from app.core.converters.base import ConvertResult
     from app.core.converters.magick_converter import MagickConverter
     from app.core.converters.vips_converter import VipsConverter
     from app.core.converters.ffmpeg_converter import FFmpegConverter
@@ -70,9 +77,9 @@ def main() -> int:
     print(f"C1 magick ABSENT: success={r.get('success')} err={(r.get('error') or '')[:160]}")
     if r.get("success"):
         failures.append("C1 magick ABSENT: should not succeed with bogus binary")
-    # Should NOT raise; should return a dict with success=False
-    if not isinstance(r, dict):
-        failures.append(f"C1 magick ABSENT: did not return a dict (got {type(r)})")
+    # Should NOT raise; should return a dict/ConvertResult with success=False
+    if not isinstance(r, (dict, ConvertResult)):
+        failures.append(f"C1 magick ABSENT: did not return a dict/ConvertResult (got {type(r)})")
 
     banner("C1 magick convert_batch (default + native)")
     out_dir = _TMP / "batch_magick"
@@ -105,23 +112,22 @@ def main() -> int:
             failures.append(f"C3 vips {fmt}: raised {e!r}")
 
     banner("C3 vips ABSENT (simulate via patch)")
-    # pyvips is loaded at import; "absent" is when libvips DLL fails to load.
-    # We can simulate by patching the module's pyvips reference.
+    # pyvips is loaded lazily; "absent" is when libvips DLL fails to load or pyvips is missing.
+    # We can simulate by patching the module's _pyvips_cache and _VIPS_AVAILABLE.
     import app.core.utils as utils_mod
-    saved = utils_mod.pyvips
+    saved_cache = utils_mod._pyvips_cache
+    saved_avail = utils_mod._VIPS_AVAILABLE
     try:
-        utils_mod.pyvips = None
-        from app.core.converters import vips_converter as vc_mod
-        saved2 = vc_mod.pyvips
-        vc_mod.pyvips = None
+        utils_mod._pyvips_cache = None
+        utils_mod._VIPS_AVAILABLE = False
         out = target / "vips_absent.webp"
         r = vc.convert(str(fixture), str(out), "webp", 80.0)
         print(f"C3 vips ABSENT: success={r.get('success')} err={(r.get('error') or '')[:160]}")
         if r.get("success"):
             failures.append("C3 vips ABSENT: should not succeed with pyvips=None")
-        vc_mod.pyvips = saved2
     finally:
-        utils_mod.pyvips = saved
+        utils_mod._pyvips_cache = saved_cache
+        utils_mod._VIPS_AVAILABLE = saved_avail
 
     # ---------------------------------------------------------------- C2 ffmpeg
     banner("C2 ffmpeg PRESENT (webp + avif)")
@@ -166,6 +172,8 @@ def main() -> int:
 
     banner("C4 sharp ABSENT (bogus port = daemon down)")
     sc_bogus = SharpConverter(port=65510)
+    sc_bogus.fallback_enabled = False
+    sc_bogus._ensure_daemon_running = lambda: None
     out = target / "sharp_absent.webp"
     try:
         r = sc_bogus.convert(str(fixture), str(out), "webp", 80.0)

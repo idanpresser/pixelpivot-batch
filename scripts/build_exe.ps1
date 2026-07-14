@@ -16,7 +16,7 @@ function Step([string]$msg) {
 # --- 1. Clean ---
 Step "Cleaning build and dist directories..."
 $buildDir = Join-Path $ProjectRoot "build\pixelpivot"
-$distDir = Join-Path $ProjectRoot "dist\pixelpivot"
+$distDir = Join-Path $ProjectRoot "dist\pixelpivot_cli"
 
 if (Test-Path $buildDir) {
     Write-Host "Removing $buildDir"
@@ -71,16 +71,16 @@ $proc = Start-Process -FilePath $exePath -ArgumentList "doctor" -NoNewWindow -Pa
 Write-Host "Doctor process exited with code $($proc.ExitCode)"
 
 if ($proc.ExitCode -ne 0) {
-    Write-Host "WARNING: smoke test returned non-zero ($($proc.ExitCode)) — external binaries may be missing in build env." -ForegroundColor Yellow
+    Write-Host "WARNING: smoke test returned non-zero ($($proc.ExitCode)) - external binaries may be missing in build env." -ForegroundColor Yellow
 } else {
     Write-Host "Smoke test PASSED!" -ForegroundColor Green
 }
 
-# ── Service binary ────────────────────────────────────────────────────────
+# == Service binary ========================================================
 Step "Building PixelPivotService.exe..."
 $serviceSpec = Join-Path $ProjectRoot "pixelpivot_service.spec"
 if (-not (Test-Path $serviceSpec)) {
-    Write-Host "pixelpivot_service.spec not found — skipping service build." -ForegroundColor Yellow
+    Write-Host "pixelpivot_service.spec not found - skipping service build." -ForegroundColor Yellow
 } else {
     & uv run pyinstaller --clean -y $serviceSpec
     if ($LASTEXITCODE -ne 0) {
@@ -93,11 +93,11 @@ if (-not (Test-Path $serviceSpec)) {
     Write-Host "PixelPivotService.exe built at $serviceExe" -ForegroundColor Green
 }
 
-# ── Tray binary ───────────────────────────────────────────────────────────
+# == Tray binary ===========================================================
 Step "Building PixelPivotTray.exe..."
 $traySpec = Join-Path $ProjectRoot "pixelpivot_tray.spec"
 if (-not (Test-Path $traySpec)) {
-    Write-Host "pixelpivot_tray.spec not found — skipping tray build." -ForegroundColor Yellow
+    Write-Host "pixelpivot_tray.spec not found - skipping tray build." -ForegroundColor Yellow
 } else {
     & uv run pyinstaller --clean -y $traySpec
     if ($LASTEXITCODE -ne 0) {
@@ -110,7 +110,7 @@ if (-not (Test-Path $traySpec)) {
     Write-Host "PixelPivotTray.exe built at $trayExe" -ForegroundColor Green
 }
 
-# ── Merge service + tray into single deployment directory ─────────────────
+# == Merge service + tray into single deployment directory =================
 Step "Merging tray into service directory..."
 $serviceDistDir = Join-Path $ProjectRoot "dist\pixelpivot_service"
 $trayDistDir    = Join-Path $ProjectRoot "dist\pixelpivot_tray"
@@ -130,10 +130,10 @@ if ((Test-Path $serviceDistDir) -and (Test-Path $trayDistDir)) {
     Remove-Item -Recurse -Force $trayDistDir
     Write-Host "Merged deployment directory: dist\PixelPivot" -ForegroundColor Green
 } else {
-    Write-Host "One or both dist dirs missing — skipping merge." -ForegroundColor Yellow
+    Write-Host "One or both dist dirs missing - skipping merge." -ForegroundColor Yellow
 }
 
-# ── (Optional) Build InnoSetup installer ──────────────────────────────────
+# == (Optional) Build InnoSetup installer ==================================
 $issFile = Join-Path $ProjectRoot "installer\pixelpivot.iss"
 $iscc    = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if ((Test-Path $issFile) -and (Test-Path $iscc)) {
@@ -143,11 +143,11 @@ if ((Test-Path $issFile) -and (Test-Path $iscc)) {
     if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
     Write-Host "Installer: dist\installer\PixelPivot-Setup-1.0.exe" -ForegroundColor Green
 } else {
-    Write-Host "Inno Setup not found or .iss missing — skipping installer build." -ForegroundColor Yellow
+    Write-Host "Inno Setup not found or .iss missing - skipping installer build." -ForegroundColor Yellow
 }
 
 Step "All builds complete."
-Write-Host "  CLI:        dist\pixelpivot\pixelpivot.exe" -ForegroundColor Cyan
+Write-Host "  CLI:        dist\pixelpivot_cli\pixelpivot.exe" -ForegroundColor Cyan
 Write-Host "  Deployment: dist\PixelPivot\   (service + tray merged)" -ForegroundColor Cyan
 Write-Host "  Installer:  dist\installer\PixelPivot-Setup-1.0.exe   (if iscc found)" -ForegroundColor Cyan
 Write-Host ""

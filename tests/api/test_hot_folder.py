@@ -62,6 +62,43 @@ def test_hot_folder_debouncer(tmp_path):
                 assert args[1] == mock_loop
 
 @pytest.mark.asyncio
+async def test_hot_folder_trigger_failure_marks_run_failed(tmp_path):
+    """qk1.6: when dispatch (execute_batch) raises, the run must not be left in
+    'running'. The handler must transition it to 'failed' so it is not orphaned
+    until the next restart reap."""
+    mock_orchestrator = MagicMock()
+    mock_orchestrator.execute_batch.side_effect = RuntimeError("dispatch boom")
+    mock_loop = asyncio.get_running_loop()
+
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+    (source_dir / "file1.png").write_text("dummy")
+
+    config = {
+        "source_dir": str(source_dir),
+        "target_dir": str(target_dir),
+        "target_format": ["webp"],
+        "tool": ["magick"],
+        "category": ["general"],
+    }
+
+    handler = HotFolderHandler(mock_orchestrator, mock_loop, config, debounce_seconds=0.1)
+    handler.repo.create_run = MagicMock(return_value=456)
+    handler.repo.update_status = MagicMock()
+
+    with patch("app.batch_api.hot_folder.get_connection") as mock_get_conn:
+        mock_get_conn.return_value.__enter__.return_value = MagicMock()
+        await handler._async_trigger_batch()
+
+    assert handler.repo.update_status.called, "update_status never called; run left 'running'"
+    call_args = handler.repo.update_status.call_args[0]
+    assert 456 in call_args, f"run_id 456 not in update_status args: {call_args}"
+    assert "failed" in call_args, f"'failed' status not written: {call_args}"
+
+
+@pytest.mark.asyncio
 async def test_hot_folder_two_waves(tmp_path):
     """
     Verify that hot folder only triggers conversion for new/changed files

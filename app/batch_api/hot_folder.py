@@ -179,6 +179,7 @@ class HotFolderHandler(FileSystemEventHandler):
             file_keys = [key for _, key in files_to_process]
 
             # 2. Create DB entry
+            run_id = None
             try:
                 db_formats = ",".join(self.config["target_format"]) if isinstance(self.config["target_format"], list) else self.config["target_format"]
                 db_tools = ",".join(self.config["tool"]) if isinstance(self.config["tool"], list) else self.config["tool"]
@@ -222,6 +223,12 @@ class HotFolderHandler(FileSystemEventHandler):
                     
             except Exception as e:
                 log.error(f"Failed to trigger hot folder batch: {e}")
+                if run_id is not None:
+                    try:
+                        with get_connection() as conn:
+                            self.repo.update_status(conn, run_id, "failed")
+                    except Exception as db_err:
+                        log.error(f"Failed to mark run {run_id} as failed: {db_err}")
         finally:
             with self.lock:
                 self._is_triggering = False

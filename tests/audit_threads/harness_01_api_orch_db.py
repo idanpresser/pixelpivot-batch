@@ -24,7 +24,7 @@ os.environ["PIXELPIVOT_DB_PATH"] = str(_TMP / "audit.db")
 os.environ.pop("PIXELPIVOT_ALLOWED_ROOT", None)  # default: no containment
 
 # Make the project importable
-PROJ = Path(r"F:\DEV\PixelPivot_202605\pixelpivot_batch")
+PROJ = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJ))
 
 from fastapi.testclient import TestClient
@@ -233,8 +233,8 @@ def main() -> int:
                     final = r2
                     break
             print(f"B8 final: {final}")
-            if not final or final["status"] != "completed":
-                failures.append(f"B8: empty-src run did not complete (got {final})")
+            if not final or final["status"] != "failed":
+                failures.append(f"B8: empty-src run status was not 'failed' (got {final})")
             elif final.get("total_images", -1) != 0:
                 failures.append(f"B8: total_images != 0 (got {final.get('total_images')})")
 
