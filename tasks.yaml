@@ -1,0 +1,105 @@
+tasks:
+  - id: "jmj.1"
+    description: "Tray action callbacks treat HTTP-error dict as failure and display error detail"
+    inputs:
+      - "app/windows/tray.py"
+    outputs:
+      - "tests/windows/test_tray_action_errors.py"
+      - "app/windows/tray.py"
+
+  - id: "jmj.2"
+    description: "GUI watcher thread calls os._exit(0) on stop event to prevent hanging service shutdown"
+    inputs:
+      - "app/windows/service_main.py"
+    outputs:
+      - "tests/windows/test_gui_stop_event.py"
+      - "app/windows/service_main.py"
+
+  - id: "jmj.5"
+    description: "Child crash causes service to stop with nonzero win32ExitCode and installer configures SCM recovery"
+    inputs:
+      - "app/windows/service.py"
+      - "installer/pixelpivot.iss"
+    outputs:
+      - "tests/windows/test_service_crash_exit.py"
+      - "app/windows/service.py"
+      - "installer/pixelpivot.iss"
+
+  - id: "jmj.6"
+    description: "Queue worker exception outside execute_batch marks run as failed with error record"
+    inputs:
+      - "app/batch_api/queue_manager.py"
+    outputs:
+      - "tests/api/test_queue_worker_exception.py"
+      - "app/batch_api/queue_manager.py"
+
+  - id: "jmj.3"
+    description: "Tray detects 401 on list endpoints, displays API unauthorized status, and adds api_token setting field"
+    inputs:
+      - "app/windows/tray.py"
+      - "app/windows/config.py"
+    outputs:
+      - "tests/windows/test_tray_auth.py"
+      - "app/windows/tray.py"
+      - "app/windows/config.py"
+
+  - id: "jmj.4"
+    description: "SvcStop sets STOP_PENDING waitHint covering configured shutdown grace period"
+    inputs:
+      - "app/windows/service.py"
+    outputs:
+      - "tests/windows/test_service_stop_waithint.py"
+      - "app/windows/service.py"
+
+  - id: "jmj.7"
+    description: "Mid-run disk full abort sets failure status and error record"
+    inputs:
+      - "app/batch_api/orchestrator.py"
+    outputs:
+      - "tests/api/test_orchestrator_disk_abort.py"
+      - "app/batch_api/orchestrator.py"
+
+  - id: "jmj.8"
+    description: "Installer uses waituntilterminated and cleans correct ProgramData directory"
+    inputs:
+      - "installer/pixelpivot.iss"
+    outputs:
+      - "installer/pixelpivot.iss"
+
+  - id: "jmj.9"
+    description: "Pass gatherUsageStats and checkUpdate flags to Streamlit GUI child in service_main.py"
+    inputs:
+      - "app/windows/service_main.py"
+    outputs:
+      - "app/windows/service_main.py"
+
+  - id: "jmj.10"
+    description: "GUI run panel treats paused status as active and continues polling"
+    inputs:
+      - "app/web/batch_gui/panels/run_panel.py"
+    outputs:
+      - "tests/web/test_run_panel_paused.py"
+      - "app/web/batch_gui/panels/run_panel.py"
+
+  - id: "jmj.11"
+    description: "Tray API timeout set to 5s for polling and menu content retained on transient errors"
+    inputs:
+      - "app/windows/tray.py"
+    outputs:
+      - "tests/windows/test_tray_timeout.py"
+      - "app/windows/tray.py"
+
+  - id: "jmj.12"
+    description: "Import Union in app/core/api_client.py"
+    inputs:
+      - "app/core/api_client.py"
+    outputs:
+      - "app/core/api_client.py"
+
+  - id: "jmj.13"
+    description: "Service child stdout/stderr log rotation at startup and monitoring loop"
+    inputs:
+      - "app/windows/service.py"
+    outputs:
+      - "tests/windows/test_service_log_rotation.py"
+      - "app/windows/service.py"
