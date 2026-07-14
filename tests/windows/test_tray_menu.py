@@ -320,6 +320,8 @@ def test_first_running_tick_shows_checking(make_tray):
         "hfs": [],
     }
     t._apply_fetched_state(res_third)
+    t._apply_fetched_state(res_third)
+    t._apply_fetched_state(res_third)
     assert "API unreachable" in t._act_status.text()
 
 

@@ -28,6 +28,24 @@ SERVICE_DISPLAY = "PixelPivot Batch Engine"
 SERVICE_DESC = "High-throughput image conversion API and web GUI server."
 
 
+def _rotate_log_file(log_path: Path, max_bytes: int = 10 * 1024 * 1024) -> None:
+    """Rotate log file if it exceeds max_bytes, preserving one backup (.log.1)."""
+    try:
+        if log_path.exists():
+            size = getattr(log_path.stat(), "st_size", 0)
+            if isinstance(size, (int, float)) and size >= max_bytes:
+                backup = log_path.with_suffix(".log.1")
+                if backup.exists():
+                    backup.unlink()
+                log_path.rename(backup)
+    except Exception:
+        try:
+            with open(log_path, "w") as f:
+                f.truncate(0)
+        except Exception:
+            pass
+
+
 def _log_dir() -> Path:
     from app.windows._settings import resolve_data_dir
     return resolve_data_dir() / "logs"
@@ -119,8 +137,12 @@ class PixelPivotService(win32serviceutil.ServiceFramework):
         }
 
         for mode, stem in (("api", "service_api"), ("gui", "service_gui")):
-            stdout = open(log / f"{stem}_stdout.log", "a", encoding="utf-8", buffering=1)
-            stderr = open(log / f"{stem}_stderr.log", "a", encoding="utf-8", buffering=1)
+            out_path = log / f"{stem}_stdout.log"
+            err_path = log / f"{stem}_stderr.log"
+            _rotate_log_file(out_path)
+            _rotate_log_file(err_path)
+            stdout = open(out_path, "a", encoding="utf-8", buffering=1)
+            stderr = open(err_path, "a", encoding="utf-8", buffering=1)
             
             cmd = [exe]
             if not is_frozen:

@@ -89,7 +89,7 @@ _current_trace_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("
 class _Api:
     BASE_API = "http://localhost:8000/api/v1"
     BASE     = "http://localhost:8000"
-    TIMEOUT  = 1.5  # seconds; kept short so background thread doesn't lag
+    TIMEOUT  = 2.0  # seconds; kept short so background thread doesn't lag
 
     def _req(self, method: str, url: str, body: Any = None) -> Any:
         data    = json.dumps(body).encode() if body is not None else None
